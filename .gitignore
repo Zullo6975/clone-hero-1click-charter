@@ -29,6 +29,7 @@ Thumbs.db
 # Generated Clone Hero folders
 samples/
 output/
+tools/
 
 # Logs
 *.log
