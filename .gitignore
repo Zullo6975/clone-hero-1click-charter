@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+
+# Packaging
+dist/
+build/
+*.egg-info/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Audio / media (do not commit test assets)
+*.wav
+*.mp3
+*.ogg
+*.flac
+
+# MIDI output
+*.mid
+
+# Generated Clone Hero folders
+exports/
+output/
+songs/
+
+# Logs
+*.log
+
+# IDEs
+.vscode/
+.idea/
+
+# Temporary files
+*.tmp
+*.cache

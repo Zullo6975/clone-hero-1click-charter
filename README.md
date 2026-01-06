@@ -1,6 +1,6 @@
-# OneClickCharter
+# CH 1-Click Charter
 
-OneClickCharter is a Python-based tool that generates **playable Clone Hero lead guitar charts** from audio files with a single command.
+1-Click Charter is a Python-based tool that generates **playable Clone Hero lead guitar charts** from audio files with a single command.
 
 This project is **fun-first**, targeting **Medium difficulty** charts that feel good to play and **never exceed the intensity of GH3 Medium (e.g. Cult of Personality)**. Accuracy is secondary to playability, consistency, and musical flow.
 
@@ -93,4 +93,4 @@ OneClickCharter prioritizes **fun over fidelity**, using clear rules and safety 
 
 ## License
 
-TBD
+MIT License
