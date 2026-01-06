@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import random
 
-import pretty_midi
+import pretty_midi # type: ignore
 
 TRACK_NAME = "PART GUITAR"
 
