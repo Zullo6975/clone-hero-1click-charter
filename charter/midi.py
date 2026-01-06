@@ -3,8 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 import random
 
-import pretty_midi # type: ignore
+import pretty_midi  # type: ignore
 
+from charter.audio import detect_onsets, OnsetCandidate
+
+# Keep this EXACTLY as your known-good baseline for now
 TRACK_NAME = "PART GUITAR"
 
 LANE_PITCH = {
@@ -14,6 +17,120 @@ LANE_PITCH = {
     3: 63,  # Blue
     4: 64,  # Orange (never used)
 }
+
+
+def _filter_onsets(
+    candidates: list[OnsetCandidate],
+    *,
+    min_gap_ms: int,
+    max_nps: float,
+) -> list[OnsetCandidate]:
+    """
+    Convert 'too many onsets' into a Medium-ish set of note times.
+
+    Rules:
+    - Prefer stronger onsets
+    - Enforce minimum spacing between notes (min_gap_ms)
+    - Enforce a rolling 1-second density cap (max_nps)
+    """
+    min_gap = max(0.03, min_gap_ms / 1000.0)
+    max_notes_in_1s = max(1, int(round(max_nps)))
+
+    ordered = sorted(candidates, key=lambda c: c.strength, reverse=True)
+
+    selected: list[OnsetCandidate] = []
+
+    def too_close(t: float) -> bool:
+        return any(abs(s.t - t) < min_gap for s in selected)
+
+    def window_full(t: float) -> bool:
+        lo = t - 1.0
+        cnt = 0
+        for s in selected:
+            if lo <= s.t <= t:
+                cnt += 1
+                if cnt >= max_notes_in_1s:
+                    return True
+        return False
+
+    for c in ordered:
+        if too_close(c.t):
+            continue
+        if window_full(c.t):
+            continue
+        selected.append(c)
+
+    selected.sort(key=lambda c: c.t)
+    return selected
+
+
+def _assign_lanes(times: list[float], *, seed: int = 42) -> list[int]:
+    """
+    Conservative lane assignment:
+    - no orange
+    - bias repeats and +/-1 movement
+    - blue rarer
+    """
+    rng = random.Random(seed)
+    last_lane = 1
+    out: list[int] = []
+
+    for _t in times:
+        candidates = [0, 1, 2, 3]
+        weights = []
+        for lane in candidates:
+            move = abs(lane - last_lane)
+            if move == 0:
+                w = 3.0
+            elif move == 1:
+                w = 2.2
+            elif move == 2:
+                w = 1.0
+            else:
+                w = 0.5
+            if lane == 3:
+                w *= 0.6
+            weights.append(w)
+
+        lane = rng.choices(candidates, weights=weights, k=1)[0]
+        out.append(lane)
+        last_lane = lane
+
+    return out
+
+
+def write_real_notes_mid(
+    *,
+    audio_path: Path,
+    out_path: Path,
+    min_gap_ms: int = 140,
+    max_nps: float = 3.8,
+    seed: int = 42,
+    tap_duration: float = 0.18,
+    bpm: float = 120.0,
+) -> None:
+    """
+    Real chart v0:
+      audio -> onsets -> filtered -> lanes -> notes.mid
+    Single notes only (no chords) for now.
+    """
+    candidates = detect_onsets(audio_path)
+    kept = _filter_onsets(candidates, min_gap_ms=min_gap_ms, max_nps=max_nps)
+
+    times = [c.t for c in kept]
+    lanes = _assign_lanes(times, seed=seed)
+
+    pm = pretty_midi.PrettyMIDI(initial_tempo=bpm)
+    inst = pretty_midi.Instrument(program=0, name=TRACK_NAME)
+
+    for t, lane in zip(times, lanes):
+        t = max(1.0, float(t))
+        pitch = LANE_PITCH[int(lane)]
+        inst.notes.append(pretty_midi.Note(velocity=100, pitch=pitch, start=t, end=t + tap_duration))
+
+    pm.instruments.append(inst)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    pm.write(str(out_path))
 
 
 def write_dummy_notes_mid(
