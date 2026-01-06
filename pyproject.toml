@@ -1,0 +1,12 @@
+[project]
+name = "1clickcharter"
+version = "0.1.0"
+description = "One-click Clone Hero chart generator for fun, playable Medium lead guitar charts"
+requires-python = ">=3.10"
+
+[project.scripts]
+1clickcharter = "charter.cli:main"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
