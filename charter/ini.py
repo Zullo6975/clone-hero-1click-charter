@@ -7,20 +7,24 @@ def write_song_ini(
     out_path: Path,
     title: str,
     artist: str = "",
-    charter: str = "1clickcharter",
+    album: str = "",
+    genre: str = "",
+    year: str = "",
+    charter: str = "Zullo7569",
     delay_ms: int = 0,
-    audio_filename: str = "song.ogg",
+    audio_filename: str = "song.mp3",
 ) -> None:
     """
-    Minimal Clone Hero song.ini that works.
+    Minimal-but-nice Clone Hero song.ini.
+    Keep fields boring and consistent for compatibility.
     """
     lines = [
         "[song]",
         f"name = {title}",
         f"artist = {artist}",
-        "album = ",
-        "genre = ",
-        "year = ",
+        f"album = {album}",
+        f"genre = {genre}",
+        f"year = {year}",
         f"charter = {charter}",
         f"delay = {delay_ms}",
         f"song = {audio_filename}",

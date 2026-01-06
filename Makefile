@@ -9,6 +9,15 @@ AUDIO ?= samples/test.mp3
 OUT ?= output/TestSong
 TITLE ?= Test Song
 ARTIST ?= Me
+ALBUM ?=
+GENRE ?=
+YEAR ?=
+CHARTER ?= Zullo7569
+DELAY_MS ?= 0
+BPM ?= 115
+BARS ?= 20
+DENSITY ?= 0.55
+
 
 venv:
 	$(PY) -m venv $(VENV)
@@ -27,7 +36,15 @@ run:
 	  --audio "$(AUDIO)" \
 	  --out "$(OUT)" \
 	  --title "$(TITLE)" \
-	  --artist "$(ARTIST)"
+	  --artist "$(ARTIST)" \
+	  --album "$(ALBUM)" \
+	  --genre "$(GENRE)" \
+	  --year "$(YEAR)" \
+	  --charter "$(CHARTER)" \
+	  --delay-ms "$(DELAY_MS)" \
+	  --bpm "$(BPM)" \
+	  --bars "$(BARS)" \
+	  --density "$(DENSITY)"
 
 test:
 	$(PYTHON) -m pytest -q
