@@ -16,7 +16,12 @@ LANE_PITCH = {
 }
 
 
-def write_dummy_notes_mid(out_path: Path, bpm: float = 115.0, bars: int = 16, density: float = 0.55) -> None:
+def write_dummy_notes_mid(
+    out_path: Path,
+    bpm: float = 115.0,
+    bars: int = 24,
+    density: float = 0.58,
+) -> None:
     """
     Dummy chart for compatibility + baseline feel testing.
     density in [0..1]: lower = fewer notes (easier).
@@ -33,17 +38,18 @@ def write_dummy_notes_mid(out_path: Path, bpm: float = 115.0, bars: int = 16, de
     # We place events on a mixed grid: mostly quarter notes, occasional eighths.
     # Start after 1s so the audio "settles".
     t = 1.0
+    last_lane = 1  # start Red
 
-    last_lane = 1  # start at Red
-    for beat in range(total_beats):
-        # Decide how many "slots" this beat has: 1 (quarter) or 2 (eighths)
-        slots = 2 if rng.random() < 0.35 else 1
+    for _beat in range(total_beats):
+        # More eighths as density rises (but still controlled)
+        eighth_prob = 0.25 + 0.45 * density  # 0.38-ish @ 0.58 density
+        slots = 2 if rng.random() < eighth_prob else 1
 
-        for s in range(slots):
+        for _s in range(slots):
             # Roll if we place a note in this slot
             # Lower density => fewer notes
-            place = rng.random() < density * (0.75 if slots == 2 else 0.95)
-            if not place:
+            place_prob = density * (0.70 if slots == 2 else 0.90)
+            if rng.random() >= place_prob:
                 t += spb / slots
                 continue
 
@@ -62,7 +68,7 @@ def write_dummy_notes_mid(out_path: Path, bpm: float = 115.0, bars: int = 16, de
                     w = 0.5
                 # Keep Blue rarer
                 if lane == 3:
-                    w *= 0.5
+                    w *= 0.6
                 weights.append(w)
 
             lane = rng.choices(candidates, weights=weights, k=1)[0]
@@ -70,7 +76,7 @@ def write_dummy_notes_mid(out_path: Path, bpm: float = 115.0, bars: int = 16, de
 
             lanes = [lane]
             # Occasional simple 2-note chord, but only when density isn't too high
-            if density < 0.70 and rng.random() < 0.10:
+            if density < 0.72 and rng.random() < (0.06 + 0.06 * density):
                 chord_options = [(0, 1), (1, 2), (2, 3), (0, 2), (1, 3)]
                 # Prefer chords involving current lane
                 cand = [c for c in chord_options if lane in c] or chord_options
@@ -86,7 +92,6 @@ def write_dummy_notes_mid(out_path: Path, bpm: float = 115.0, bars: int = 16, de
         # Ensure we end exactly on beat boundary if slots==2 caused rounding drift
         # (tiny drift doesn’t matter much, but keep it tidy)
         # no-op for simplicity
-
     pm.instruments.append(inst)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pm.write(str(out_path))

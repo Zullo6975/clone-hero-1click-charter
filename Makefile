@@ -1,4 +1,4 @@
-.PHONY: venv deps install run help test lint clean
+.PHONY: venv deps install help run test lint clean
 
 PY := python3
 VENV := .venv
@@ -15,16 +15,18 @@ YEAR ?=
 CHARTER ?= Zullo7569
 DELAY_MS ?= 0
 BPM ?= 115
-BARS ?= 20
-DENSITY ?= 0.55
+BARS ?= 24
+DENSITY ?= 0.58
 
+FETCH_METADATA ?= 1
+USER_AGENT ?= 1clickcharter/0.1 (Zullo7569)
 
 venv:
 	$(PY) -m venv $(VENV)
 
 deps: venv
 	$(PIP) install --upgrade pip
-	$(PIP) install -r requirements-dev.txt
+	$(PIP) install -e ".[dev]"
 
 install: deps
 
@@ -44,7 +46,9 @@ run:
 	  --delay-ms "$(DELAY_MS)" \
 	  --bpm "$(BPM)" \
 	  --bars "$(BARS)" \
-	  --density "$(DENSITY)"
+	  --density "$(DENSITY)" \
+	  $(if $(filter 1,$(FETCH_METADATA)),--fetch-metadata,) \
+	  --user-agent "$(USER_AGENT)"
 
 test:
 	$(PYTHON) -m pytest -q
@@ -53,4 +57,4 @@ lint:
 	$(PYTHON) -m ruff check .
 
 clean:
-	rm -rf $(VENV) output .pytest_cache .ruff_cache
+	rm -rf $(VENV) output .pytest_cache .ruff_cache .cache

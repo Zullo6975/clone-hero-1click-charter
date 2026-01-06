@@ -9,6 +9,7 @@ dependencies = [
   "scipy",
   "soundfile",
   "pretty_midi",
+  "requests",
 ]
 
 [project.optional-dependencies]
@@ -20,9 +21,9 @@ dev = [
 [project.scripts]
 1clickcharter = "charter.cli:main"
 
+[tool.setuptools]
+packages = ["charter"]
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-packages = ["charter"]
