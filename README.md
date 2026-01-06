@@ -1,8 +1,10 @@
 # CH 1-Click Charter
 
-1-Click Charter is a Python-based tool that generates **playable Clone Hero lead guitar charts** from audio files with a single command.
+CH 1-Click Charter is a Python-based tool that generates **playable Clone Hero lead guitar charts** from audio files with a single command.
 
-This project is **fun-first**, targeting **Medium difficulty** charts that feel good to play and **never exceed the intensity of GH3 Medium (e.g. Cult of Personality)**. Accuracy is secondary to playability, consistency, and musical flow.
+This project is **fun-first**, targeting **Medium difficulty** charts that feel good to play and **never exceed the intensity of GH3 Medium (e.g. Cult of Personality)**.
+
+Accuracy is intentionally secondary to **playability, consistency, and musical flow**.
 
 ---
 
@@ -10,8 +12,8 @@ This project is **fun-first**, targeting **Medium difficulty** charts that feel 
 
 - One-click generation of **Medium lead guitar** charts
 - Charts that are fun, readable, and predictable
-- No sudden difficulty spikes or Expert-style patterns
-- Mixed single notes and double notes (within safe limits)
+- Musical flow over mechanical precision
+- Mixed single notes, doubles, and sustains (within safe limits)
 - Output that works immediately in Clone Hero
 
 ---
@@ -20,26 +22,26 @@ This project is **fun-first**, targeting **Medium difficulty** charts that feel 
 
 This project intentionally does **not** aim to:
 
-- Generate Expert or Orange-lane charts
+- Generate Expert or competitive charts
 - Perfectly transcribe real guitar parts
-- Match a specific game style (GH or Rock Band)
-- Replace human charting for competitive play
+- Emulate a specific game’s charting style
+- Replace human charting for leaderboard play
+- Expose dozens of tuning knobs
 
 ---
 
 ## Hard Constraints (Always Enforced)
 
-- ❌ No Orange lane
 - ❌ No sustained fast streams
 - ❌ No chaotic hand travel
 - ❌ No sudden speed or difficulty spikes
 
 ### Difficulty Envelope
 
-- Medium-only
-- Max burst speed capped
-- Chord usage allowed but governed
-- Wide chords allowed, chaotic movement is not
+- Medium difficulty only
+- Burst speed capped
+- Chords allowed but governed
+- Sustains added only when musically justified
 
 If constraints are violated, the chart **simplifies automatically**.
 
@@ -47,25 +49,32 @@ If constraints are violated, the chart **simplifies automatically**.
 
 ## How It Works (High Level)
 
-1. Analyze audio for tempo, beats, and onsets  
-2. Generate candidate note events  
-3. Apply musical and difficulty rules  
-4. Enforce strict difficulty governors  
-5. Export a Clone Hero–ready chart (`notes.mid`, `song.ini`)
+1. Analyze audio for tempo, beats, and onsets
+2. Generate candidate note events
+3. Quantize events to a musical grid
+4. Apply musical rules (lanes, sustains, doubles)
+5. Enforce strict difficulty governors
+6. Export a Clone Hero–ready folder (`notes.mid`, `song.ini`, audio)
 
 ---
 
 ## Current Status
 
-🚧 Early development / prototype stage
+🚧 **Active prototype**
 
-Initial focus:
+What works today:
 
 - Local Python CLI
-- Single difficulty (Medium)
-- Lead guitar only
+- Medium-difficulty lead guitar
+- Groove-locked timing
+- Smart singles, doubles, and sustains
+- Deterministic output via seed
 
-Cloud deployment, UI, and advanced AI features may come later.
+Planned later:
+
+- Multiple difficulty derivation
+- Section-aware phrasing
+- Optional cloud / batch pipeline
 
 ---
 
@@ -74,12 +83,13 @@ Cloud deployment, UI, and advanced AI features may come later.
 - Python 3.10+
 - Clone Hero (for testing output)
 
-Planned dependencies include:
+Key dependencies:
 
 - `librosa`
 - `numpy`
 - `soundfile`
-- `pretty_midi` or `mido`
+- `pretty_midi`
+- `requests`
 
 ---
 
@@ -87,7 +97,7 @@ Planned dependencies include:
 
 > If a chart ever feels annoying, unreadable, or unfair — it failed.
 
-OneClickCharter prioritizes **fun over fidelity**, using clear rules and safety rails instead of chasing perfect transcription.
+CH 1-Click Charter prioritizes **fun over fidelity**, using clear rules and safety rails instead of chasing perfect transcription.
 
 ---
 

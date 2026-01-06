@@ -160,6 +160,55 @@ def _quantize_times_to_grid(
     grid_np = np.array(grid)
     return [float(grid_np[np.argmin(np.abs(grid_np - t))]) for t in times]
 
+def _get_beat_times(audio_path: Path) -> list[float]:
+    """
+    Estimate beat times for 'strong beat' heuristics.
+    If beat tracking fails, returns [] and we fall back to non-beat heuristics.
+    """
+    y, sr = librosa.load(str(audio_path), sr=None, mono=True)
+    _tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+    beat_times = librosa.frames_to_time(beat_frames, sr=sr)
+    return [float(t) for t in beat_times]
+
+
+def _is_strong_beat(t: float, beat_times: list[float], *, tol: float = 0.07) -> bool:
+    """
+    True if time 't' is near a beat, and that beat looks like a downbeat.
+    We assume 4/4 for now (good enough for v1).
+    """
+    if len(beat_times) < 2:
+        return False
+
+    # nearest beat index
+    idx = min(range(len(beat_times)), key=lambda i: abs(beat_times[i] - t))
+    if abs(beat_times[idx] - t) > tol:
+        return False
+
+    # every 4 beats treat as "strong"
+    return (idx % 4) == 0
+
+
+def _choose_double(main_lane: int, *, rng: random.Random, allow_orange: bool, gap_to_next: float) -> list[int]:
+    """
+    Create a 2-note chord that feels reasonable on Medium.
+    - Prefer adjacent doubles (G+R, R+Y, Y+B)
+    - Very selective orange: allow only B+O and only when it's safe (not fast)
+    """
+    # Very selective orange: only as B+O, only if not too fast
+    if allow_orange and main_lane == 3 and gap_to_next >= 0.30 and rng.random() < 0.18:
+        return [3, 4]  # B + O
+
+    # Otherwise choose an adjacent double around the main lane
+    adjacent = {
+        0: [(0, 1), (0, 2)],
+        1: [(0, 1), (1, 2), (1, 3)],
+        2: [(1, 2), (2, 3), (0, 2)],
+        3: [(2, 3), (1, 3)],
+    }.get(main_lane, [(1, 2)])
+
+    a, b = rng.choice(adjacent)
+    return [a, b]
+
 def write_real_notes_mid(
     *,
     audio_path: Path,
@@ -170,8 +219,22 @@ def write_real_notes_mid(
     tap_duration: float = 0.10,
     bpm: float = 120.0,
 ) -> None:
+    """
+    Real chart v2:
+      audio -> onsets -> windowed filtering -> quantize -> lanes -> notes.mid
+
+    Adds:
+      - smart sustains (gap-aware + beat-aware)
+      - smart doubles (very selective)
+      - very selective orange (only B+O, only when safe)
+
+    Still aims for "Medium casual" feel.
+    """
+    rng = random.Random(seed)
+
     candidates = detect_onsets(audio_path)
     duration_sec = float(librosa.get_duration(path=str(audio_path)))
+    beat_times = _get_beat_times(audio_path)
 
     kept = _filter_onsets_windowed(
         candidates,
@@ -186,6 +249,7 @@ def write_real_notes_mid(
     times = _quantize_times_to_grid(audio_path, times, subdivision="1/8")
     times = sorted(times)
 
+    # de-dupe after quantization
     min_gap = max(0.03, min_gap_ms / 1000.0)
     deduped: list[float] = []
     for t in times:
@@ -195,23 +259,61 @@ def write_real_notes_mid(
 
     lanes = _assign_lanes(times, seed=seed)
 
+    # ---- knobs (kept as constants for now; later we expose to CLI) ----
+    allow_orange = True  # very selective; only B+O and only when safe
+    base_double_prob = 0.10  # overall chance; strong beats will boost it
+    sustain_min_gap = 0.45   # need at least this much room to consider a sustain
+    sustain_max_len = 1.20   # cap sustain length (seconds)
+    # ------------------------------------------------------------------
+
     pm = pretty_midi.PrettyMIDI(initial_tempo=bpm)
     inst = pretty_midi.Instrument(program=0, name=TRACK_NAME)
 
     for i, (t, lane) in enumerate(zip(times, lanes)):
-        start = max(1.0, t)
-        next_start = times[i + 1] if i + 1 < len(times) else start + 1.0
+        start = max(1.0, float(t))
+        next_start = float(times[i + 1]) if i + 1 < len(times) else (start + 1.0)
+        gap = max(0.0, next_start - start)
 
-        end = min(start + tap_duration, max(start + 0.05, next_start - 0.03))
+        strong = _is_strong_beat(start, beat_times)
 
-        inst.notes.append(
-            pretty_midi.Note(
-                velocity=100,
-                pitch=LANE_PITCH[lane],
-                start=start,
-                end=end,
+        # -------- Decide sustain vs tap --------
+        # Default to tap-like notes, but upgrade to sustain if:
+        # - there's room (gap big enough)
+        # - AND it feels musically logical (strong beat helps)
+        do_sustain = False
+        if gap >= sustain_min_gap:
+            # on strong beats: more likely
+            p = 0.55 if strong else 0.25
+            do_sustain = rng.random() < p
+
+        if do_sustain:
+            end = min(start + sustain_max_len, next_start - 0.03)
+            end = max(end, start + 0.18)  # minimum hold so it "reads" as sustain
+        else:
+            end = min(start + tap_duration, max(start + 0.05, next_start - 0.03))
+
+        # -------- Decide single vs double --------
+        # Doubles are selective:
+        # - more likely on strong beats
+        # - avoid doubles if it's too fast
+        double_prob = base_double_prob * (1.8 if strong else 1.0)
+        if gap < 0.22:
+            double_prob *= 0.25
+
+        lanes_to_write = [int(lane)]
+        if rng.random() < double_prob:
+            lanes_to_write = _choose_double(int(lane), rng=rng, allow_orange=allow_orange, gap_to_next=gap)
+
+        # Write notes (single or chord) with the same start/end
+        for ln in lanes_to_write:
+            inst.notes.append(
+                pretty_midi.Note(
+                    velocity=100,
+                    pitch=LANE_PITCH[int(ln)],
+                    start=start,
+                    end=end,
+                )
             )
-        )
 
     pm.instruments.append(inst)
     out_path.parent.mkdir(parents=True, exist_ok=True)

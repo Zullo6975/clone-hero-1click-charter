@@ -1,6 +1,14 @@
 # TODO
 
-## Milestone 0 — Project scaffolding
+## Current Focus
+
+- Refining Medium difficulty feel
+- Locking in sustain and chord heuristics
+- Reducing randomness while preserving variety
+
+---
+
+## Milestone 0 — Project scaffolding (COMPLETE)
 
 - [X] Add `.gitignore` (ignore venv, outputs, audio, midi)
 - [X] Add `LICENSE` (MIT)
@@ -9,114 +17,101 @@
 - [X] Create package structure:
   - [X] `charter/cli.py`
   - [X] `charter/audio.py`
-  - [X] `charter/beat.py`
-  - [X] `charter/events.py`
-  - [X] `charter/rules.py`
-  - [X] `charter/governor.py`
   - [X] `charter/midi.py`
   - [X] `charter/ini.py`
-- [X] Add `tests/test_smoke.py`
+  - [X] `charter/metadata.py`
+- [X] Add basic smoke test
 
-## Milestone 1 — CLI + audio load (no chart yet)
+---
 
-Goal: run CLI on a file and print basic analysis.
+## Milestone 1 — CLI + audio load
 
-- [ ] CLI accepts:
-  - [ ] `--audio /path/to/file`
-  - [ ] `--title`, `--artist` (optional)
-  - [ ] `--out output_dir`
-- [ ] Load audio and log:
-  - [ ] duration
-  - [ ] sample rate
-  - [ ] RMS / loudness summary
-- [ ] Fail fast with clear errors for unsupported files
+Goal: run CLI on a file and produce a valid Clone Hero folder.
+
+- [X] CLI accepts audio input and output folder
+- [X] Load audio and detect duration
+- [X] Fail fast on missing/unsupported files
+- [X] Copy audio as `song.mp3`
+
+---
 
 ## Milestone 2 — Beat grid + onset candidates
 
-Goal: produce time-aligned candidate note events.
+Goal: produce musically-aligned candidate note events.
 
-- [ ] Implement beat tracking:
-  - [ ] estimate BPM
-  - [ ] beat timestamps
-- [ ] Implement onset detection:
-  - [ ] raw onset timestamps
-  - [ ] merge close onsets (anti-jitter)
-- [ ] Quantize candidates to grid:
-  - [ ] default 1/8 grid
-  - [ ] optional brief 1/16 windows (but conservative)
+- [X] Beat tracking and BPM estimation
+- [X] Onset detection
+- [X] Merge close onsets (anti-jitter)
+- [X] Quantize to 1/8 note grid
 
-## Milestone 3 — Note generation (Medium, no Orange)
+---
 
-Goal: generate a playable “draft” chart.
+## Milestone 3 — Note generation (Medium, governed)
 
-Hard constraints (always):
+Goal: generate a playable Medium chart.
 
-- No Orange lane
-- No 3-note chords
+Hard constraints (always enforced):
+
 - No sustained fast streams
 - No chaotic hand travel
 - No sudden difficulty spikes
 
-- [ ] Lane assignment (G/R/Y/B only)
-- [ ] Chord generation:
-  - [ ] allow 2-note chords (adjacent + spaced)
-  - [ ] avoid G+B
-- [ ] Sustains:
-  - [ ] add when energy decays slowly
-  - [ ] avoid micro-sustains
+- [X] Lane assignment (G/R/Y/B, selective Orange)
+- [X] Smart sustains (gap + beat aware)
+- [X] Selective double notes
+- [X] Full-song coverage
 
-## Milestone 4 — Difficulty governor (the secret sauce)
+---
 
-Goal: enforce your difficulty envelope every time.
+## Milestone 4 — Difficulty governor (TUNING)
 
-Metrics to compute:
+Goal: enforce the difficulty envelope consistently.
 
-- [ ] note density (rolling 1s window)
-- [ ] chord density (rolling 4s window)
-- [ ] consecutive chord streak length
-- [ ] movement cost (rolling 2s window)
+Metrics:
 
-Enforcement actions:
+- [ ] Rolling note density
+- [ ] Rolling chord density
+- [ ] Movement cost window
 
-- [ ] thin notes if density too high
-- [ ] convert some chords -> single notes when chord/density too high
-- [ ] reduce big jumps / zig-zags (rewrite lanes)
-- [ ] insert sustains as “breathing room”
+Actions:
 
-Acceptance test:
+- [ ] Thin notes if density too high
+- [ ] Convert chords to singles when needed
+- [ ] Insert sustains as breathing room
 
-- [ ] worst 1s window never exceeds target density cap
-- [ ] orange never appears
-- [ ] charts remain playable and consistent across runs
+Acceptance:
 
-## Milestone 5 — Export Clone Hero folder
+- [ ] Max NPS never exceeds target
+- [ ] Orange remains rare and justified
+- [ ] Charts feel consistent across songs
 
-Goal: output loads immediately in Clone Hero.
+---
 
-- [ ] Write `song.ini` (title, artist, delay/offset placeholder)
-- [ ] Write `notes.mid` (Clone Hero-compatible track)
-- [ ] Copy audio into output folder
-- [ ] Print final output path + quick summary stats
+## Milestone 5 — Export polish
+
+- [X] Write `song.ini`
+- [X] Write `notes.mid`
+- [X] Copy audio
+- [X] Output loads immediately in Clone Hero
+- [ ] Auto preview start time
+- [ ] Difficulty rating estimate
+
+---
 
 ## Milestone 6 — Quality loop
 
-Goal: iterate fast on feel.
-
-- [ ] Add “chart summary” printed after generation:
-  - [ ] BPM estimate
-  - [ ] total notes
-  - [ ] chords count
-  - [ ] max notes/sec (worst window)
-  - [ ] max movement cost window
-- [ ] Add `--seed` for repeatable randomness
-- [ ] Add `--preset`:
-  - [ ] `medium_casual` (default)
-  - [ ] `medium_chill`
+- [ ] Chart summary after generation
+- [ ] `--seed` exposed in CLI
+- [ ] `--preset`:
+  - [ ] `medium_casual`
   - [ ] `medium_dense`
+  - [ ] `medium_chill`
 
-## Later (optional)
+---
 
-- [ ] Stem separation (AI) as an optional step
-- [ ] Section detection (verse/chorus) for motif reuse
-- [ ] Multiple difficulties (Easy/Hard from Medium base)
-- [ ] Web/AWS pipeline (S3 + job queue + container/Lambda)
+## Later (Optional)
+
+- [ ] Section detection (verse / chorus)
+- [ ] Multiple difficulties derived from Medium
+- [ ] Optional stem separation (AI)
+- [ ] Web / batch pipeline (AWS)
