@@ -1,4 +1,4 @@
-.PHONY: venv deps run test lint clean
+.PHONY: venv deps install run help test lint clean
 
 PY := python3
 VENV := .venv
@@ -13,8 +13,13 @@ deps: venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -r requirements-dev.txt
 
+install: deps
+
+help:
+	$(BIN)/1clickcharter --help
+
 run:
-	$(PYTHON) -m charter.cli --audio samples/your_song.mp3 --out output/YourSong
+	$(BIN)/1clickcharter --audio samples/your_song.mp3 --out output/YourSong
 
 test:
 	$(PYTHON) -m pytest -q
