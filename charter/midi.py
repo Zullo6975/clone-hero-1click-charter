@@ -4,6 +4,7 @@ from pathlib import Path
 import random
 
 import pretty_midi  # type: ignore
+import librosa  # type: ignore
 
 from charter.audio import detect_onsets, OnsetCandidate
 
@@ -19,46 +20,66 @@ LANE_PITCH = {
 }
 
 
-def _filter_onsets(
+def _filter_onsets_windowed(
     candidates: list[OnsetCandidate],
     *,
+    duration_sec: float,
+    window_sec: float,
     min_gap_ms: int,
     max_nps: float,
+    min_notes_per_window: int,
 ) -> list[OnsetCandidate]:
     """
-    Convert 'too many onsets' into a Medium-ish set of note times.
+    Windowed onset selection for full-song coverage.
 
-    Rules:
-    - Prefer stronger onsets
-    - Enforce minimum spacing between notes (min_gap_ms)
-    - Enforce a rolling 1-second density cap (max_nps)
+    - Split song into windows (e.g., 4s)
+    - Pick strongest onsets per window up to a quota
+    - Enforce min gap between selected notes
+    - If a window would have 0 notes, inject 1 "filler" note
+      at the window midpoint (strength=0.0)
     """
-    min_gap = max(0.03, min_gap_ms / 1000.0)
-    max_notes_in_1s = max(1, int(round(max_nps)))
+    if window_sec <= 0:
+        window_sec = 4.0
 
-    ordered = sorted(candidates, key=lambda c: c.strength, reverse=True)
+    min_gap = max(0.03, min_gap_ms / 1000.0)
+    quota = max(1, int(round(max_nps * window_sec)))
+    min_notes_per_window = max(0, int(min_notes_per_window))
+
+    # group candidates by window index
+    buckets: dict[int, list[OnsetCandidate]] = {}
+    for c in candidates:
+        idx = int(c.t // window_sec)
+        buckets.setdefault(idx, []).append(c)
 
     selected: list[OnsetCandidate] = []
 
     def too_close(t: float) -> bool:
         return any(abs(s.t - t) < min_gap for s in selected)
 
-    def window_full(t: float) -> bool:
-        lo = t - 1.0
-        cnt = 0
-        for s in selected:
-            if lo <= s.t <= t:
-                cnt += 1
-                if cnt >= max_notes_in_1s:
-                    return True
-        return False
+    num_windows = int(duration_sec // window_sec) + 1
 
-    for c in ordered:
-        if too_close(c.t):
-            continue
-        if window_full(c.t):
-            continue
-        selected.append(c)
+    for w in range(num_windows):
+        items = buckets.get(w, [])
+        # strongest first
+        items_sorted = sorted(items, key=lambda x: x.strength, reverse=True)
+
+        picked_this_window: list[OnsetCandidate] = []
+        for c in items_sorted:
+            if len(picked_this_window) >= quota:
+                break
+            if too_close(c.t):
+                continue
+            picked_this_window.append(c)
+            selected.append(c)
+
+        # Ensure some coverage (optional but fixes "cuts off")
+        if len(picked_this_window) < min_notes_per_window:
+            # insert a synthetic "tap" near the middle of the window
+            mid = (w * window_sec) + (window_sec * 0.5)
+            # don't add near the very start; avoid t<1.0 since we clamp to 1.0 anyway
+            if mid >= 1.0 and mid <= duration_sec - 0.5 and not too_close(mid):
+                filler = OnsetCandidate(t=float(mid), strength=0.0)
+                selected.append(filler)
 
     selected.sort(key=lambda c: c.t)
     return selected
@@ -106,16 +127,32 @@ def write_real_notes_mid(
     min_gap_ms: int = 140,
     max_nps: float = 3.8,
     seed: int = 42,
-    tap_duration: float = 0.18,
+    tap_duration: float = 0.10,
     bpm: float = 120.0,
+    window_sec: float = 4.0,
+    min_notes_per_window: int = 1,
 ) -> None:
     """
-    Real chart v0:
-      audio -> onsets -> filtered -> lanes -> notes.mid
-    Single notes only (no chords) for now.
+    Real chart v1:
+      audio -> onsets -> windowed filtering (coverage) -> lanes -> notes.mid
+
+    Changes vs v0:
+    - ensures coverage across the full song (prevents "cuts off")
+    - caps note lengths to feel like taps (prevents long sustains)
     """
     candidates = detect_onsets(audio_path)
-    kept = _filter_onsets(candidates, min_gap_ms=min_gap_ms, max_nps=max_nps)
+
+    # Get duration for coverage windows
+    duration_sec = float(librosa.get_duration(path=str(audio_path)))
+
+    kept = _filter_onsets_windowed(
+        candidates,
+        duration_sec=duration_sec,
+        window_sec=window_sec,
+        min_gap_ms=min_gap_ms,
+        max_nps=max_nps,
+        min_notes_per_window=min_notes_per_window,
+    )
 
     times = [c.t for c in kept]
     lanes = _assign_lanes(times, seed=seed)
@@ -123,10 +160,16 @@ def write_real_notes_mid(
     pm = pretty_midi.PrettyMIDI(initial_tempo=bpm)
     inst = pretty_midi.Instrument(program=0, name=TRACK_NAME)
 
-    for t, lane in zip(times, lanes):
-        t = max(1.0, float(t))
+    # cap note duration against next note so nothing becomes a huge sustain
+    for i, (t, lane) in enumerate(zip(times, lanes)):
+        start = max(1.0, float(t))
+        next_start = float(times[i + 1]) if i + 1 < len(times) else (start + 999.0)
+
+        end = start + float(tap_duration)
+        end = min(end, max(start + 0.05, next_start - 0.03))  # keep tap-like, avoid overlap
+
         pitch = LANE_PITCH[int(lane)]
-        inst.notes.append(pretty_midi.Note(velocity=100, pitch=pitch, start=t, end=t + tap_duration))
+        inst.notes.append(pretty_midi.Note(velocity=100, pitch=pitch, start=start, end=end))
 
     pm.instruments.append(inst)
     out_path.parent.mkdir(parents=True, exist_ok=True)
