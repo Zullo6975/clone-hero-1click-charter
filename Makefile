@@ -5,6 +5,10 @@ VENV := .venv
 BIN := $(VENV)/bin
 PIP := $(BIN)/pip
 PYTHON := $(BIN)/python
+AUDIO ?= samples/test.mp3
+OUT ?= output/TestSong
+TITLE ?= Test Song
+ARTIST ?= Me
 
 venv:
 	$(PY) -m venv $(VENV)
@@ -19,7 +23,11 @@ help:
 	$(BIN)/1clickcharter --help
 
 run:
-	$(BIN)/1clickcharter --audio samples/your_song.mp3 --out output/YourSong
+	$(BIN)/1clickcharter \
+	  --audio "$(AUDIO)" \
+	  --out "$(OUT)" \
+	  --title "$(TITLE)" \
+	  --artist "$(ARTIST)"
 
 test:
 	$(PYTHON) -m pytest -q
