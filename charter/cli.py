@@ -6,7 +6,7 @@ from pathlib import Path
 
 from charter.ini import write_song_ini
 from charter.metadata import enrich_from_musicbrainz
-from charter.midi import write_dummy_notes_mid
+from charter.midi import write_dummy_notes_mid, write_real_notes_mid
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,10 +25,17 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--fetch-metadata", action="store_true", help="Fetch album/year/cover art via MusicBrainz")
     p.add_argument("--user-agent", default="1clickcharter/0.1 (Zullo7569)", help="HTTP User-Agent string")
 
-    # dummy chart params (temporary baseline)
+    p.add_argument("--mode", choices=["dummy", "real"], default="dummy", help="Chart generation mode")
+
+    # dummy chart params (baseline)
     p.add_argument("--bpm", type=float, default=115.0, help="Dummy chart BPM")
     p.add_argument("--bars", type=int, default=24, help="Dummy chart length in bars")
     p.add_argument("--density", type=float, default=0.58, help="Dummy chart density 0..1 (higher=harder)")
+
+    # real chart params (v0 knobs)
+    p.add_argument("--min-gap-ms", type=int, default=140, help="Minimum spacing between notes (ms)")
+    p.add_argument("--max-nps", type=float, default=3.8, help="Max notes per second (rolling 1s window)")
+    p.add_argument("--seed", type=int, default=42, help="Deterministic lane feel")
     return p.parse_args()
 
 
@@ -77,15 +84,25 @@ def main() -> None:
         audio_filename="song.mp3",
     )
 
-    # Write baseline dummy notes.mid (tunable with density)
-    write_dummy_notes_mid(
-        out_path=out_dir / "notes.mid",
-        bpm=args.bpm,
-        bars=args.bars,
-        density=args.density,
-    )
+    # Write notes.mid
+    if args.mode == "dummy":
+        write_dummy_notes_mid(
+            out_path=out_dir / "notes.mid",
+            bpm=args.bpm,
+            bars=args.bars,
+            density=args.density,
+        )
+    else:
+        write_real_notes_mid(
+            audio_path=audio_path,
+            out_path=out_dir / "notes.mid",
+            min_gap_ms=args.min_gap_ms,
+            max_nps=args.max_nps,
+            seed=args.seed,
+        )
 
     print("✅ Export complete")
+    print(f"Mode:     {args.mode}")
     print(f"Folder:   {out_dir}")
     print("Audio:    song.mp3")
     print("Files:    song.ini, notes.mid" + (", album.png" if (out_dir / "album.png").exists() else ""))

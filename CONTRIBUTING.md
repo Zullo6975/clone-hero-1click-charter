@@ -2,31 +2,40 @@
 
 This project prioritizes **playability over accuracy**.
 
-Before proposing changes, please understand the core philosophy:
+Before proposing changes, understand the core philosophy:
 
 - Medium difficulty is a hard ceiling
-- No Orange lane, no Expert mechanics
-- If a rule conflict occurs, the chart must simplify
-- Consistency and readability matter more than precision
+- Charts must remain readable and predictable
+- If a rule conflict occurs, the chart simplifies
+- Musical feel beats technical precision
+
+---
 
 ## What to Optimize For
 
 - Fun and comfort
-- Predictable patterns
-- Controlled speed and movement
-- Clean, readable code
+- Groove-locked timing
+- Intentional movement
+- Tasteful variety
+- Clear, debuggable logic
+
+---
 
 ## What Not to Optimize For
 
 - Perfect transcription
 - Maximum difficulty
 - Genre-specific gimmicks
-- Overfitting to edge cases
+- Model complexity over rules
+- Edge-case correctness at the cost of feel
 
-## Development Notes
+---
 
-- Prefer clear rules over complex models
-- Favor determinism and debuggability
-- Avoid adding user-facing knobs unless necessary
+## Development Principles
 
-If a change makes charts harder to play, it must be justified.
+- Prefer explicit rules over learned models
+- Favor determinism and repeatability
+- Small heuristics > big abstractions
+- Avoid adding user-facing knobs unless justified
+
+If a change makes charts harder to play, it must be justified **and** measurable.
