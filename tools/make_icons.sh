@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Configuration
-INPUT_FILE="images/icon_og.png"
-ICONSET_NAME="images/icon.iconset"
-OUTPUT_ICNS="images/icon.icns"
-OUTPUT_ICO="images/icons.ico"
-OUTPUT_LINUX="images/icon.png" #
+INPUT_FILE="icons/icon_og.png"
+ICONSET_NAME="icons/AppIcon.iconset"
+OUTPUT_ICNS="icons/AppIcon.icns"
+OUTPUT_ICO="icons/AppIcon.ico"
+OUTPUT_LINUX="icons/AppIcon.png" 
 
 # Check input
 if [ ! -f "$INPUT_FILE" ]; then

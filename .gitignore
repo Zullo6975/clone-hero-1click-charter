@@ -27,8 +27,10 @@ Thumbs.db
 *.mid
 
 # Generated Clone Hero folders
-# samples/
-# output/
+1clickcharter.spec
+icons/AppIcon.*
+samples/
+output/
 # tools/
 
 # Logs

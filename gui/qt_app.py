@@ -34,12 +34,26 @@ from PySide6.QtWidgets import (
 )
 
 # ---------------- Paths ----------------
+def is_frozen() -> bool:
+    return getattr(sys, 'frozen', False)
+
 def repo_root() -> Path:
+    if is_frozen():
+        # In a bundle, we are in a temp folder (_MEIxxxx)
+        return Path(sys._MEIPASS)
+    
+    # DEV MODE:
+    # File is in:   ProjectRoot/gui/qt_app.py
+    # .parent =     ProjectRoot/gui
+    # .parents[1] = ProjectRoot
     return Path(__file__).resolve().parents[1]
 
-def venv_python() -> Path:
+def get_python_exec() -> str | Path:
+    if is_frozen():
+        return sys.executable
+    
+    # Path to venv python relative to the Project Root
     return repo_root() / ".venv" / "bin" / "python"
-
 
 # ---------------- Difficulty presets ----------------
 # We’re mapping "feel" to ONLY the CLI args you already have.
@@ -909,17 +923,30 @@ class MainWindow(QMainWindow):
         if not cfg:
             return
 
-        py = venv_python()
-        if not py.exists():
-            QMessageBox.critical(self, "Missing venv", "Missing .venv.\n\nRun:\n  make install")
-            return
-
+        # 1. Determine which executable to run (Venv Python vs. The App Itself)
+        py_exec = get_python_exec()
+        
+        # 2. Safety Check (Dev mode only)
+        # If we are NOT frozen, we expect a venv. If frozen, we are self-contained.
+        if not is_frozen() and not Path(py_exec).exists():
+             QMessageBox.critical(self, "Missing venv", "Missing .venv.\n\nRun:\n  make install")
+             return
+        
         out_song = (cfg.out_root / cfg.title).resolve()
         out_song.mkdir(parents=True, exist_ok=True)
         self.last_out_song = out_song
 
-        cmd = [
-            str(py), "-m", "charter.cli",
+        # 3. Build Command
+        if is_frozen():
+            # APP MODE: Run the app executable with a secret flag.
+            # wrapper.py will see "--internal-cli" and switch to CLI mode.
+            cmd = [str(py_exec), "--internal-cli"]
+        else:
+            # DEV MODE: Standard "python -m charter.cli"
+            cmd = [str(py_exec), "-m", "charter.cli"]
+
+        # 4. Append Standard Arguments
+        cmd.extend([
             "--audio", str(cfg.audio),
             "--out", str(out_song),
             "--title", cfg.title,
@@ -931,7 +958,8 @@ class MainWindow(QMainWindow):
             "--min-gap-ms", str(cfg.min_gap_ms),
             "--max-nps", f"{cfg.max_nps:.2f}",
             "--seed", str(cfg.seed),
-        ]
+        ])
+
         if cfg.fetch_metadata:
             cmd.append("--fetch-metadata")
 
@@ -941,7 +969,12 @@ class MainWindow(QMainWindow):
 
         self.proc = QProcess(self)
         self.proc.setProcessChannelMode(QProcess.SeparateChannels)
-        self.proc.setWorkingDirectory(str(repo_root()))
+        
+        # 5. Set Working Directory
+        # In Dev mode, we must be in root so "import charter" works.
+        # In App mode, we rely on the absolute paths in 'cmd', so we don't change CWD.
+        if not is_frozen():
+            self.proc.setWorkingDirectory(str(repo_root()))
 
         self.proc.readyReadStandardOutput.connect(self._on_stdout)
         self.proc.readyReadStandardError.connect(self._on_stderr)

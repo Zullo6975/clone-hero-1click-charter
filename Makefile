@@ -1,4 +1,4 @@
-.PHONY: venv deps install reinstall help run run-real run-dummy gui doctor test lint clean open-out build distcheck pipx-install
+.PHONY: venv deps install reinstall help run run-real run-dummy gui doctor test lint clean open-out build distcheck pipx-install package icons run-dist
 
 # ---- Python selection (macOS-friendly) ----
 PY ?= python3
@@ -6,6 +6,10 @@ VENV := .venv
 BIN := $(VENV)/bin
 PIP := $(BIN)/pip
 PYTHON := $(BIN)/python
+
+# ---- Packaging Config ----
+APP_NAME := 1ClickCharter
+ENTRY_SCRIPT := wrapper.py
 
 # ---- Defaults for CLI ----
 AUDIO ?= samples/test.mp3
@@ -33,6 +37,8 @@ venv:
 deps: venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -e ".[dev,gui]"
+	# Ensure packaging tools are present
+	$(PIP) install pyinstaller Pillow
 
 install: deps
 
@@ -88,7 +94,7 @@ test:
 lint:
 	$(PYTHON) -m ruff check .
 
-# ---- packaging ----
+# ---- packaging (PyPI / Wheel) ----
 build: install
 	$(PYTHON) -m build
 
@@ -101,9 +107,40 @@ pipx-install: build
 	echo "Installing $$WHEEL with pipx..."; \
 	pipx install --python python3.12 --force "$$WHEEL"
 
+# ---- PACKAGING (Standalone App) ----
+
+# Generates icons by running the script inside the 'icons' folder
+icons:
+	@ls
+	@chmod +x tools/make_icons.sh
+	@echo "🎨 Generating icons..."
+	@# We enter 'icons' so the script finds 'icon.png' naturally
+	@./tools/make_icons.sh
+
+# Builds the macOS .app bundle
+package: install icons
+	@echo "🚀 Packaging $(APP_NAME)..."
+	@rm -rf dist build
+	@# Note: --paths "." ensures it finds 'gui' and 'charter' packages in root
+	@$(VENV)/bin/pyinstaller --noconfirm --clean \
+		--name "$(APP_NAME)" \
+		--windowed \
+		--onefile \
+		--icon "icons/AppIcon.icns" \
+		--paths "." \
+		--hidden-import "charter.cli" \
+		--hidden-import "gui.qt_app" \
+		--collect-all "charter" \
+		$(ENTRY_SCRIPT)
+	@echo "✅ Build complete! App is in dist/$(APP_NAME).app"
+
+# Helper to run the packaged app directly for testing
+run-dist:
+	@dist/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)
+
 # ---- convenience ----
 open-out:
 	open "$(dir $(OUT))" 2>/dev/null || true
 
 clean:
-	rm -rf $(VENV) output .pytest_cache .ruff_cache .cache dist build *.egg-info
+	rm -rf $(VENV) output .pytest_cache .ruff_cache .cache dist build *.egg-info *.spec
