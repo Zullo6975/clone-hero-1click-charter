@@ -97,7 +97,9 @@ distcheck: build
 
 # Installs into pipx for personal usage (recommended)
 pipx-install: build
-	pipx install --force "dist/$$(ls -1 dist/*.whl | tail -n 1)"
+	@WHEEL="$$(ls -1 dist/*.whl | tail -n 1)"; \
+	echo "Installing $$WHEEL with pipx..."; \
+	pipx install --force "$$WHEEL"
 
 # ---- convenience ----
 open-out:
