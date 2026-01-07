@@ -77,7 +77,7 @@ If constraints are violated, the chart **simplifies automatically**.
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.12
 - Clone Hero (for testing output)
 
 ---
