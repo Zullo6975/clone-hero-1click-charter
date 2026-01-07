@@ -32,8 +32,15 @@ def _load_cache(cache_path: Path) -> dict[str, Any]:
 
 
 def _save_cache(cache_path: Path, data: dict[str, Any]) -> None:
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    try:
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    except OSError as e:
+        # Fallback: if the default path is read-only, try writing to the user's home directory
+        user_fallback = Path.home() / ".1clickcharter_cache"
+        user_fallback.parent.mkdir(parents=True, exist_ok=True)
+        user_fallback.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+        print(f"Warning: Original cache path was read-only. Saved to {user_fallback} instead.")
 
 
 def _sleep_polite() -> None:

@@ -64,7 +64,7 @@ def main() -> None:
 
     # Optional metadata enrichment (best-effort, never overwrites explicit CLI fields)
     if args.fetch_metadata and args.artist and title:
-        cache_path = Path(".cache/music_metadata.json")
+        cache_path = Path.home() / ".cache" / "1clickcharter" / "metadata.json"
         enriched = enrich_from_musicbrainz(
             artist=args.artist,
             title=title,
