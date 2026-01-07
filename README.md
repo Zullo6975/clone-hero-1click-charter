@@ -4,6 +4,14 @@ CH 1-Click Charter is a Python-based tool that generates **playable Clone Hero l
 
 This project is **fun-first**, targeting **Medium difficulty** charts that feel good to play and **never exceed the intensity of GH3 Medium** (e.g. _Cult of Personality_). Accuracy is secondary to playability, consistency, and musical flow.
 
+## What it creates
+
+Given an audio file, the tool generates a song output directory containing:
+
+- `notes.mid` — Clone Hero–compatible MIDI
+- `stats.json` — tuning/analysis output (tooling-only)
+- `album.png` — optional album art (GUI only)
+
 ---
 
 ## Philosophy
@@ -74,30 +82,6 @@ If constraints are violated, the chart **simplifies automatically**.
 
 ---
 
-## Setup (Fresh Machine)
-
-### macOS
-
-```bash
-brew install python git make
-```
-
-### Linux (Debian/Ubuntu)
-
-```bash
-sudo apt update
-sudo apt install -y python3 python3-venv python3-pip git make
-```
-
-### Windows
-
-- Install Python 3.11+ from python.org
-- Install Git for Windows
-- Use Git Bash or PowerShell
-- Install `make` (recommended)
-
----
-
 ## Install
 
 ```bash
@@ -110,6 +94,21 @@ make install
 
 ```bash
 make gui
+```
+
+## CLI
+
+```bash
+make run AUDIO="samples/test.mp3" OUT="output/TestSong" TITLE="Test Song"
+```
+
+## Personal App
+
+```bash
+make build
+make pipx-install
+1clickcharter --help
+1clickcharter-gui
 ```
 
 The GUI supports:
