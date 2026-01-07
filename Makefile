@@ -99,7 +99,7 @@ distcheck: build
 pipx-install: build
 	@WHEEL="$$(ls -1 dist/*.whl | tail -n 1)"; \
 	echo "Installing $$WHEEL with pipx..."; \
-	pipx install --force "$$WHEEL"
+	pipx install --python python3.12 --force "$$WHEEL"
 
 # ---- convenience ----
 open-out:
