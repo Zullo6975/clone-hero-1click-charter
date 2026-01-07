@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QButtonGroup,
+    QComboBox,
     QRadioButton,
     QDoubleSpinBox,
     QFileDialog,
@@ -39,25 +40,29 @@ def repo_root() -> Path:
 def venv_python() -> Path:
     return repo_root() / ".venv" / "bin" / "python"
 
+
+# ---------------- Difficulty presets ----------------
+# We’re mapping "feel" to ONLY the CLI args you already have.
+# - max_nps: higher = denser
+# - min_gap_ms: lower = tighter spacing
+DIFFICULTY_PRESETS: dict[str, dict[str, float | int] | None] = {
+    "Medium (Casual)":   {"max_nps": 2.25, "min_gap_ms": 170},
+    "Medium (Balanced)": {"max_nps": 2.80, "min_gap_ms": 140},
+    "Medium (Intense)":  {"max_nps": 3.35, "min_gap_ms": 115},
+    "Medium (Chaotic)":  {"max_nps": 3.90, "min_gap_ms": 95},
+    "Custom…":           None,
+}
+
+
 # ---------------- Themes ----------------
 LIGHT_QSS = """
 QMainWindow { background: #f3f6fb; }
-QWidget {
-  color: #0f172a;
-  font-size: 14px;
-}
+QWidget { color: #0f172a; font-size: 14px; }
+
 /* Clean Scrollbars */
 QScrollArea { background: transparent; border: none; }
-QScrollBar:vertical {
-    background: transparent;
-    width: 8px;
-    margin: 0px;
-}
-QScrollBar::handle:vertical {
-    background: rgba(15,23,42,0.15);
-    min-height: 30px;
-    border-radius: 4px;
-}
+QScrollBar:vertical { background: transparent; width: 8px; margin: 0px; }
+QScrollBar::handle:vertical { background: rgba(15,23,42,0.15); min-height: 30px; border-radius: 4px; }
 QScrollBar::handle:vertical:hover { background: rgba(15,23,42,0.3); }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
@@ -87,14 +92,14 @@ QGroupBox::title {
 QLabel#Muted { color: rgba(15,23,42,0.60); }
 
 /* Inputs */
-QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit {
+QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QComboBox {
   background: rgba(255,255,255,0.85);
   border: 1px solid rgba(15,23,42,0.14);
   border-radius: 10px;
   padding: 8px 12px;
   selection-background-color: rgba(59,130,246,0.20);
 }
-QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus {
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QComboBox:focus {
   border: 1px solid rgba(59,130,246,0.65);
   background: rgba(255,255,255,0.92);
 }
@@ -125,9 +130,9 @@ QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
 /* Radio Buttons - Clean Blue Dot Style */
 QRadioButton { spacing: 8px; font-weight: 500; }
 QRadioButton::indicator {
-    width: 16px; height: 16px; 
-    border-radius: 9px; /* Half of 16+border roughly */
-    border: 1px solid #9ca3af; 
+    width: 16px; height: 16px;
+    border-radius: 9px;
+    border: 1px solid #9ca3af;
     background: white;
 }
 QRadioButton::indicator:checked {
@@ -135,9 +140,8 @@ QRadioButton::indicator:checked {
     background: qradialgradient(
         cx: 0.5, cy: 0.5, radius: 0.4,
         fx: 0.5, fy: 0.5,
-        stop: 0 #3b82f6,
-        stop: 0.5 #3b82f6,
-        stop: 1.0 white
+        stop: 0.0 #3b82f6,
+        stop: 1.0 #3b82f6
     );
 }
 QRadioButton::indicator:hover { border-color: #3b82f6; }
@@ -150,10 +154,7 @@ QPushButton, QToolButton {
   padding: 10px 16px;
   font-weight: 700;
 }
-QPushButton:hover, QToolButton:hover {
-  background: rgba(15,23,42,0.06);
-  border-color: rgba(15,23,42,0.18);
-}
+QPushButton:hover, QToolButton:hover { background: rgba(15,23,42,0.06); border-color: rgba(15,23,42,0.18); }
 QPushButton:pressed, QToolButton:pressed { background: rgba(15,23,42,0.03); }
 
 /* Primary Action */
@@ -178,10 +179,7 @@ QPushButton#Toggle:checked {
     border: 1px solid rgba(15,23,42,0.1);
     color: rgba(15,23,42,1.0);
 }
-QPushButton#Toggle:hover {
-    background: rgba(15,23,42,0.03);
-    color: rgba(15,23,42,0.9);
-}
+QPushButton#Toggle:hover { background: rgba(15,23,42,0.03); color: rgba(15,23,42,0.9); }
 
 /* Art preview */
 QLabel#ArtFrame {
@@ -204,22 +202,12 @@ QFrame#Divider { background: rgba(15,23,42,0.10); }
 
 DARK_QSS = """
 QMainWindow { background: #0b0f17; }
-QWidget {
-  color: #e8eef8;
-  font-size: 14px;
-}
+QWidget { color: #e8eef8; font-size: 14px; }
+
 /* Scrollbars */
 QScrollArea { background: transparent; border: none; }
-QScrollBar:vertical {
-    background: transparent;
-    width: 8px;
-    margin: 0px;
-}
-QScrollBar::handle:vertical {
-    background: rgba(255,255,255,0.15);
-    min-height: 30px;
-    border-radius: 4px;
-}
+QScrollBar:vertical { background: transparent; width: 8px; margin: 0px; }
+QScrollBar::handle:vertical { background: rgba(255,255,255,0.15); min-height: 30px; border-radius: 4px; }
 QScrollBar::handle:vertical:hover { background: rgba(255,255,255,0.3); }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
@@ -245,14 +233,14 @@ QGroupBox::title {
 }
 QLabel#Muted { color: rgba(232,238,248,0.65); }
 
-QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit {
+QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QComboBox {
   background: rgba(255,255,255,0.05);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 10px;
   padding: 8px 12px;
   selection-background-color: rgba(80, 140, 255, 0.35);
 }
-QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus {
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QComboBox:focus {
   border: 1px solid rgba(90,160,255,0.75);
   background: rgba(255,255,255,0.07);
 }
@@ -281,9 +269,9 @@ QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
 
 QRadioButton { spacing: 8px; font-weight: 500; }
 QRadioButton::indicator {
-    width: 16px; height: 16px; 
+    width: 16px; height: 16px;
     border-radius: 9px;
-    border: 1px solid rgba(255,255,255,0.4); 
+    border: 1px solid rgba(255,255,255,0.4);
     background: transparent;
 }
 QRadioButton::indicator:checked {
@@ -327,10 +315,7 @@ QPushButton#Toggle:checked {
     border: 1px solid rgba(255,255,255,0.1);
     color: rgba(255,255,255,0.95);
 }
-QPushButton#Toggle:hover {
-    background: rgba(255,255,255,0.03);
-    color: rgba(255,255,255,0.8);
-}
+QPushButton#Toggle:hover { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.8); }
 
 QLabel#ArtFrame {
   background: rgba(255,255,255,0.03);
@@ -349,18 +334,20 @@ QTextEdit#Log {
 QFrame#Divider { background: rgba(255,255,255,0.08); }
 """
 
+
 # ---------------- Helpers ----------------
 def human_ok(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\r", "\n")
 
 def arrow_text(expanded: bool) -> str:
-    return "▼" if expanded else "▶" 
+    return "▼" if expanded else "▶"
 
 def form_label(text: str) -> QLabel:
     lbl = QLabel(text)
-    lbl.setMinimumWidth(90)
+    lbl.setMinimumWidth(110)
     lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
     return lbl
+
 
 # ---------------- Config ----------------
 @dataclass
@@ -378,25 +365,29 @@ class RunConfig:
     charter: str = "Zullo7569"
     fetch_metadata: bool = True
 
+
 # ---------------- Main Window ----------------
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("CH 1-Click Charter")
         self.setMinimumSize(950, 720)
-        
+
         self.audio_path: Path | None = None
         self.cover_path: Path | None = None
         self.last_out_song: Path | None = None
         self.proc: QProcess | None = None
 
-        # Start in Light Mode (Dark Mode = False)
         self.dark_mode = False
         self._title_user_edited = False
-        
+
         self._build_ui()
         self._wire()
         self.apply_theme(dark=self.dark_mode)
+
+        # Apply default preset once the widgets exist
+        self.apply_preset(self.preset_combo.currentText())
+
         self._update_state()
         self.statusBar().showMessage("Ready")
 
@@ -418,7 +409,7 @@ class MainWindow(QMainWindow):
         sidebar_scroll.setFrameShape(QFrame.NoFrame)
         sidebar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        
+
         sidebar = QFrame()
         sidebar.setObjectName("Sidebar")
         s = QVBoxLayout(sidebar)
@@ -430,7 +421,7 @@ class MainWindow(QMainWindow):
         title_font.setPointSize(20)
         title_font.setWeight(QFont.DemiBold)
         title.setFont(title_font)
-        
+
         subtitle = QLabel("A fast, portable chart generator UI powered by your CLI.")
         subtitle.setObjectName("Muted")
         subtitle.setWordWrap(True)
@@ -438,10 +429,10 @@ class MainWindow(QMainWindow):
         s.addWidget(title)
         s.addWidget(subtitle)
 
-        # Theme toggle (Dark Mode Checkbox)
+        # Theme toggle
         theme_row = QHBoxLayout()
         self.chk_dark = QCheckBox("Dark mode")
-        self.chk_dark.setChecked(False) # Default Unchecked = Light Mode
+        self.chk_dark.setChecked(False)
         theme_row.addWidget(self.chk_dark)
         theme_row.addStretch(1)
         s.addLayout(theme_row)
@@ -450,11 +441,11 @@ class MainWindow(QMainWindow):
         audio_box = QGroupBox("Audio")
         audio_layout = QVBoxLayout(audio_box)
         audio_layout.setSpacing(10)
-        
+
         self.audio_label = QLabel("No file selected")
         self.audio_label.setObjectName("Muted")
         self.audio_label.setWordWrap(True)
-        
+
         audio_btn_row = QHBoxLayout()
         self.btn_pick_audio = QPushButton("Browse Audio…")
         self.btn_clear_audio = QToolButton()
@@ -462,7 +453,7 @@ class MainWindow(QMainWindow):
         self.btn_clear_audio.setToolButtonStyle(Qt.ToolButtonTextOnly)
         audio_btn_row.addWidget(self.btn_pick_audio, 1)
         audio_btn_row.addWidget(self.btn_clear_audio)
-        
+
         audio_layout.addWidget(self.audio_label)
         audio_layout.addLayout(audio_btn_row)
         s.addWidget(audio_box)
@@ -517,7 +508,7 @@ class MainWindow(QMainWindow):
 
         main = QFrame()
         main.setObjectName("MainPanel")
-        
+
         m = QVBoxLayout(main)
         m.setContentsMargins(24, 24, 24, 24)
         m.setSpacing(16)
@@ -531,6 +522,11 @@ class MainWindow(QMainWindow):
             edit.setMinimumHeight(42)
             edit.setClearButtonEnabled(True)
             return edit
+
+        def beefy_combo(combo: QComboBox) -> QComboBox:
+            combo.setFont(input_font)
+            combo.setMinimumHeight(42)
+            return combo
 
         # Metadata
         meta = QGroupBox("Metadata")
@@ -565,7 +561,7 @@ class MainWindow(QMainWindow):
         out_row.addWidget(self.btn_pick_output, 0)
         m.addWidget(out)
 
-        # Collapsible: Advanced (Toggle the whole group box to avoid empty space)
+        # Collapsible: Advanced
         self.adv_header = QPushButton(f"{arrow_text(False)}  Advanced Settings")
         self.adv_header.setObjectName("Toggle")
         self.adv_header.setCheckable(True)
@@ -575,36 +571,55 @@ class MainWindow(QMainWindow):
         self.adv_group = QGroupBox("")
         self.adv_group.setTitle("")
         self.adv_group.setFlat(True)
-        # Hidden by default
         self.adv_group.setVisible(False)
-        
+
         adv_group_layout = QVBoxLayout(self.adv_group)
         adv_group_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Body form inside the group
         adv_body = QWidget()
         adv_group_layout.addWidget(adv_body)
 
         adv_form = QFormLayout(adv_body)
         adv_form.setContentsMargins(14, 12, 14, 8)
         adv_form.setHorizontalSpacing(18)
-        adv_form.setVerticalSpacing(14)
+        adv_form.setVerticalSpacing(12)
         adv_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
 
-        # MODE: Radio Buttons
+        # Preset picker (human-friendly)
+        self.preset_combo = beefy_combo(QComboBox())
+        self.preset_combo.addItems(list(DIFFICULTY_PRESETS.keys()))
+        self.preset_combo.setCurrentText("Medium (Balanced)")
+
+        self.preset_hint = QLabel(
+            "Choose a feel. Balanced is your ‘default good’. Custom… unlocks the knobs."
+        )
+        self.preset_hint.setObjectName("Muted")
+        self.preset_hint.setWordWrap(True)
+
+        adv_form.addRow(form_label("Difficulty"), self.preset_combo)
+        adv_form.addRow(QLabel(""), self.preset_hint)
+
+        # Custom-only container (raw knobs)
+        self.custom_row_container = QWidget()
+        custom_form = QFormLayout(self.custom_row_container)
+        custom_form.setContentsMargins(0, 6, 0, 0)
+        custom_form.setHorizontalSpacing(18)
+        custom_form.setVerticalSpacing(12)
+        custom_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+
+        # MODE radios
         self.mode_group = QButtonGroup(self)
         self.mode_real = QRadioButton("Real")
         self.mode_dummy = QRadioButton("Dummy")
         self.mode_group.addButton(self.mode_real)
         self.mode_group.addButton(self.mode_dummy)
         self.mode_real.setChecked(True)
-        
+
         mode_layout = QHBoxLayout()
         mode_layout.addWidget(self.mode_real)
         mode_layout.addWidget(self.mode_dummy)
         mode_layout.addStretch(1)
 
-        # Numeric inputs
         def beefy_spin(spin: QSpinBox | QDoubleSpinBox) -> QWidget:
             spin.setFont(input_font)
             spin.setMinimumHeight(42)
@@ -615,20 +630,29 @@ class MainWindow(QMainWindow):
         self.max_nps_spin.setSingleStep(0.05)
         self.max_nps_spin.setValue(2.8)
         self.max_nps_spin.setDecimals(2)
+        self.max_nps_spin.setSuffix(" nps")
+        self.max_nps_spin.setToolTip("Higher = more notes per second (denser chart).")
 
         self.min_gap_spin = beefy_spin(QSpinBox())
         self.min_gap_spin.setRange(40, 400)
         self.min_gap_spin.setSingleStep(5)
         self.min_gap_spin.setValue(140)
+        self.min_gap_spin.setSuffix(" ms")
+        self.min_gap_spin.setToolTip("Lower = notes can be closer together (tighter).")
 
         self.seed_spin = beefy_spin(QSpinBox())
         self.seed_spin.setRange(0, 2_000_000_000)
         self.seed_spin.setValue(42)
+        self.seed_spin.setToolTip("Changes the pattern/variation while keeping the same difficulty.")
 
-        adv_form.addRow(form_label("Mode"), mode_layout)
-        adv_form.addRow(form_label("Max NPS"), self.max_nps_spin)
-        adv_form.addRow(form_label("Min gap (ms)"), self.min_gap_spin)
-        adv_form.addRow(form_label("Seed"), self.seed_spin)
+        # Human labels
+        custom_form.addRow(form_label("Mode"), mode_layout)
+        custom_form.addRow(form_label("Note density"), self.max_nps_spin)
+        custom_form.addRow(form_label("Note spacing"), self.min_gap_spin)
+        custom_form.addRow(form_label("Variation"), self.seed_spin)
+
+        self.custom_row_container.setVisible(False)
+        adv_group_layout.addWidget(self.custom_row_container)
 
         m.addWidget(self.adv_header)
         m.addWidget(self.adv_group)
@@ -668,7 +692,7 @@ class MainWindow(QMainWindow):
 
         m.addWidget(self.log_header)
         m.addWidget(self.log)
-        
+
         m.addStretch(1)
         main_scroll.setWidget(main)
 
@@ -681,6 +705,7 @@ class MainWindow(QMainWindow):
         # Menu
         act_quit = QAction("Quit", self)
         act_quit.triggered.connect(self.close)
+
         act_clear = QAction("Clear Log", self)
         act_clear.triggered.connect(lambda: self.log.clear())
 
@@ -700,13 +725,15 @@ class MainWindow(QMainWindow):
         self.btn_open_song.clicked.connect(self.open_last_song)
         self.btn_generate.clicked.connect(self.run_generate)
         self.btn_cancel.clicked.connect(self.cancel_run)
-        
+
         self.title_edit.textEdited.connect(lambda _: setattr(self, "_title_user_edited", True))
-        
+
         self.adv_header.toggled.connect(self.toggle_advanced)
         self.log_header.toggled.connect(self.toggle_logs)
         self.chk_dark.toggled.connect(self.on_dark_toggle)
-        
+
+        self.preset_combo.currentTextChanged.connect(self.apply_preset)
+
         for w in [self.out_dir_edit, self.title_edit]:
             w.textChanged.connect(self._update_state)
 
@@ -718,10 +745,34 @@ class MainWindow(QMainWindow):
         self.dark_mode = checked
         self.apply_theme(dark=self.dark_mode)
 
+    # ---------- Presets ----------
+    def apply_preset(self, name: str) -> None:
+        preset = DIFFICULTY_PRESETS.get(name)
+        is_custom = preset is None
+
+        # Show/hide manual controls
+        self.custom_row_container.setVisible(is_custom)
+
+        if is_custom:
+            self.preset_hint.setText(
+                "Custom: tweak density + spacing. Higher density = more notes; lower spacing = tighter notes."
+            )
+            return
+
+        # Apply preset values
+        assert preset is not None
+        self.max_nps_spin.setValue(float(preset["max_nps"]))
+        self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
+
+        # Leave seed as-is (your personal “riff style”)
+        self.preset_hint.setText(
+            f"Applied: {preset['max_nps']} nps density • {preset['min_gap_ms']}ms spacing. "
+            "Pick Custom… if you want to tune."
+        )
+
     # ---------- Collapsibles ----------
     def toggle_advanced(self, expanded: bool) -> None:
         self.adv_header.setText(f"{arrow_text(expanded)}  Advanced Settings")
-        # FIX: Hide the whole container to avoid the empty white box
         self.adv_group.setVisible(expanded)
 
     def toggle_logs(self, expanded: bool) -> None:
@@ -732,7 +783,7 @@ class MainWindow(QMainWindow):
     def _update_state(self) -> None:
         running = self.proc is not None and self.proc.state() != QProcess.NotRunning
         has_audio = self.audio_path is not None and self.audio_path.exists()
-        
+
         self.btn_generate.setEnabled((not running) and has_audio)
         self.btn_cancel.setEnabled(running)
         self.btn_open_song.setEnabled(self.last_out_song is not None and self.last_out_song.exists())
@@ -743,7 +794,6 @@ class MainWindow(QMainWindow):
             return
         self.log.append(t)
         self.log.moveCursor(QTextCursor.End)
-
 
     # ---------- Album art preview ----------
     def update_cover_preview(self, image_path: Path | None) -> None:
@@ -759,18 +809,12 @@ class MainWindow(QMainWindow):
             self.cover_preview.setText("Invalid image")
             return
 
-        # Scale dynamically
         scaled = pix.scaled(QSize(250, 250), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.cover_preview.setText("")
         self.cover_preview.setPixmap(scaled)
         self.cover_preview.setMinimumHeight(scaled.height() + 10)
 
     # ---------- Pickers ----------
-    def repolish(self, w: QWidget) -> None:
-        w.style().unpolish(w)
-        w.style().polish(w)
-        w.update()
-
     def pick_audio(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
             self, "Choose Audio File", "", "Audio Files (*.mp3 *.wav *.ogg *.flac)"
@@ -780,11 +824,10 @@ class MainWindow(QMainWindow):
         self.audio_path = Path(path)
         self.audio_label.setText(self.audio_path.name)
         self.audio_label.setObjectName("")
-        self.repolish(self.audio_label)
-        
+
         if (not self._title_user_edited) and (not self.title_edit.text().strip()):
             self.title_edit.setText(self.audio_path.stem)
-            
+
         self.statusBar().showMessage(f"Selected audio: {self.audio_path.name}")
         self._update_state()
 
@@ -835,15 +878,14 @@ class MainWindow(QMainWindow):
     def build_cfg(self) -> RunConfig | None:
         if not self.audio_path:
             return None
-        
+
         audio = self.audio_path.expanduser().resolve()
         if not audio.exists():
             QMessageBox.critical(self, "Audio missing", f"Audio file not found:\n{audio}")
             return None
-        
+
         out_root = Path(self.out_dir_edit.text()).expanduser().resolve()
         title = self.title_edit.text().strip() or audio.stem
-
         mode_val = "real" if self.mode_real.isChecked() else "dummy"
 
         return RunConfig(
@@ -859,11 +901,6 @@ class MainWindow(QMainWindow):
             seed=int(self.seed_spin.value()),
         )
 
-    def _pretty_cmd(self, cmd: list[str]) -> str:
-        def q(s: str) -> str:
-            return f'"{s}"' if (" " in s or "\t" in s) else s
-        return " ".join(q(s) for s in cmd)
-
     def run_generate(self) -> None:
         if self.proc and self.proc.state() != QProcess.NotRunning:
             return
@@ -877,7 +914,6 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Missing venv", "Missing .venv.\n\nRun:\n  make install")
             return
 
-        cfg.out_root.mkdir(parents=True, exist_ok=True)
         out_song = (cfg.out_root / cfg.title).resolve()
         out_song.mkdir(parents=True, exist_ok=True)
         self.last_out_song = out_song
@@ -899,18 +935,18 @@ class MainWindow(QMainWindow):
         if cfg.fetch_metadata:
             cmd.append("--fetch-metadata")
 
-        self.append_log(f"$ {self._pretty_cmd(cmd)}\n")
+        self.append_log(f"$ {' '.join(cmd)}\n")
         self.statusBar().showMessage("Generating chart…")
         self.btn_generate.setText("Generating…")
 
         self.proc = QProcess(self)
         self.proc.setProcessChannelMode(QProcess.SeparateChannels)
         self.proc.setWorkingDirectory(str(repo_root()))
-        
+
         self.proc.readyReadStandardOutput.connect(self._on_stdout)
         self.proc.readyReadStandardError.connect(self._on_stderr)
         self.proc.finished.connect(lambda code, status: self._on_finished(code, status, out_song))
-        
+
         self.proc.start(cmd[0], cmd[1:])
         self._update_state()
 
@@ -937,7 +973,7 @@ class MainWindow(QMainWindow):
     def _on_finished(self, code: int, status: QProcess.ExitStatus, out_song: Path) -> None:
         self.btn_generate.setText("Generate Chart")
         ok = (status == QProcess.NormalExit) and (code == 0)
-        
+
         if ok and self.cover_path and self.cover_path.exists():
             try:
                 dest = out_song / "album.png"
@@ -945,7 +981,7 @@ class MainWindow(QMainWindow):
                 self.append_log(f"🖼 Copied album art → {dest}")
             except Exception as e:
                 self.append_log(f"⚠️ Failed copying album art: {e}")
-        
+
         generated_cover = out_song / "album.png"
         if generated_cover.exists():
             self.update_cover_preview(generated_cover)
@@ -959,7 +995,7 @@ class MainWindow(QMainWindow):
                 self.log_header.setChecked(True)
             QMessageBox.critical(self, "Generation failed", f"CLI exited with code {code}.\n\n(Logs expanded below.)")
             self.statusBar().showMessage("Failed")
-            
+
         self.proc = None
         self._update_state()
 
@@ -979,12 +1015,14 @@ class MainWindow(QMainWindow):
         except Exception:
             return f"✅ Chart generated.\n\nFolder:\n{out_song}"
 
+
 def main() -> None:
     app = QApplication(sys.argv)
     w = MainWindow()
     w.apply_theme(dark=w.dark_mode)
     w.show()
     sys.exit(app.exec())
+
 
 if __name__ == "__main__":
     main()

@@ -27,6 +27,7 @@ MODE ?= dummy
 MIN_GAP_MS ?= 140
 MAX_NPS ?= 3.8
 SEED ?= 42
+SP_PITCH ?= 116
 
 FETCH_METADATA ?= 1
 USER_AGENT ?= 1clickcharter/0.1 (Zullo7569)
@@ -118,3 +119,6 @@ open-out:
 
 clean:
 	rm -rf $(VENV) output .pytest_cache .ruff_cache .cache
+
+validate:
+	./.venv/bin/python validator.py "$(SONG)" --sp-pitch "$(SP_PITCH)" --summary
