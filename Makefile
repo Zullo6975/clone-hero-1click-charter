@@ -1,8 +1,8 @@
 .PHONY: venv deps install reinstall help run run-real run-dummy gui doctor test lint clean open-out
 
-# ---- Python selection (macOS-friendly) ----
-# Prefer Homebrew Python (often has Tk). Fallback to python3.
-PY ?= /opt/homebrew/bin/python3
+# ---- Python selection ----
+PY ?= python3
+
 VENV := .venv
 BIN := $(VENV)/bin
 PIP := $(BIN)/pip
@@ -33,6 +33,20 @@ USER_AGENT ?= 1clickcharter/0.1 (Zullo7569)
 
 # ---- venv / deps ----
 venv:
+	@echo "Builder Python: $(PY)"
+	@$(PY) -c "import sys; print('Builder version:', sys.version)"
+	@$(PY) -c "import sys; assert sys.version_info < (3,12), 'Use Python <= 3.11 for stable Tk builds (avoid 3.12/3.13 Homebrew Tk issues)'" || ( \
+		echo "❌ Refusing: Python is 3.12+ (can cause Tk/macOS aborts)."; \
+		echo "   Use a Python 3.10/3.11 on PATH (python.org installer recommended)."; \
+		echo "   Then run: make reinstall"; \
+		exit 1; \
+	)
+	@$(PY) -c "import tkinter; print('✅ tkinter OK in builder Python')" >/dev/null 2>&1 || ( \
+		echo "❌ This Python cannot import tkinter (_tkinter missing)."; \
+		echo "   Install a Python build that includes Tk (python.org installer is best)."; \
+		echo "   Then run: make reinstall"; \
+		exit 1; \
+	)
 	$(PY) -m venv $(VENV)
 
 deps: venv
@@ -48,11 +62,12 @@ reinstall:
 # ---- sanity checks ----
 doctor:
 	@echo "PY (builder):     $(PY)"
+	@echo "Builder version:  $$($(PY) -V)"
 	@echo "VENV python:      $$($(PYTHON) -c 'import sys; print(sys.executable)')"
 	@echo "VENV version:     $$($(PYTHON) -V)"
 	@echo "VENV pip:         $$($(PIP) -V)"
 	@echo "Tkinter check:    (attempting import...)"
-	@$(PYTHON) -c "import tkinter; print('✅ tkinter OK')" || (echo "❌ tkinter import failed"; exit 1)
+	@$(PYTHON) -c "import tkinter as tk; print('✅ tkinter OK'); print('Tk', tk.TkVersion, 'Tcl', tk.TclVersion)" || (echo "❌ tkinter import failed"; exit 1)
 	@echo "1clickcharter:    $$($(BIN)/1clickcharter --help >/dev/null 2>&1 && echo '✅ installed' || echo '❌ not installed')"
 
 # ---- CLI ----
@@ -87,8 +102,8 @@ run-dummy:
 	$(MAKE) run MODE=dummy
 
 # ---- GUI ----
-gui: install
-	$(PYTHON) gui/app.py
+gui:
+	$(PYTHON) gui/qt_app.py
 
 # ---- dev ----
 test:

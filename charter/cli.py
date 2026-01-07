@@ -4,9 +4,12 @@ import argparse
 import shutil
 from pathlib import Path
 
+import librosa  # type: ignore
+
 from charter.ini import write_song_ini
 from charter.metadata import enrich_from_musicbrainz
 from charter.midi import write_dummy_notes_mid, write_real_notes_mid
+from charter.stats import compute_chart_stats, write_stats_json, format_stats_summary
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,6 +39,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--min-gap-ms", type=int, default=140, help="Minimum spacing between notes (ms)")
     p.add_argument("--max-nps", type=float, default=3.8, help="Max notes per second (rolling 1s window)")
     p.add_argument("--seed", type=int, default=42, help="Deterministic lane feel")
+
+    # stats
+    p.add_argument("--stats-window-sec", type=float, default=15.0, help="Section window size for stats (seconds)")
+    p.add_argument("--no-stats", action="store_true", help="Disable stats.json output")
     return p.parse_args()
 
 
@@ -85,9 +92,10 @@ def main() -> None:
     )
 
     # Write notes.mid
+    notes_mid = out_dir / "notes.mid"
     if args.mode == "dummy":
         write_dummy_notes_mid(
-            out_path=out_dir / "notes.mid",
+            out_path=notes_mid,
             bpm=args.bpm,
             bars=args.bars,
             density=args.density,
@@ -95,7 +103,7 @@ def main() -> None:
     else:
         write_real_notes_mid(
             audio_path=audio_path,
-            out_path=out_dir / "notes.mid",
+            out_path=notes_mid,
             min_gap_ms=args.min_gap_ms,
             max_nps=args.max_nps,
             seed=args.seed,
@@ -106,6 +114,26 @@ def main() -> None:
     print(f"Folder:   {out_dir}")
     print("Audio:    song.mp3")
     print("Files:    song.ini, notes.mid" + (", album.png" if (out_dir / "album.png").exists() else ""))
+
+    # ---- Stats (safe, read-only on notes.mid) ----
+    if not args.no_stats:
+        try:
+            song_duration = float(librosa.get_duration(path=str(audio_path)))
+        except Exception:
+            song_duration = 0.0
+
+        stats = compute_chart_stats(
+            notes_mid_path=notes_mid,
+            title=title,
+            artist=args.artist,
+            mode=args.mode,
+            song_duration_sec=song_duration,
+            window_sec=float(args.stats_window_sec),
+        )
+        write_stats_json(out_dir / "stats.json", stats)
+        print()
+        print(format_stats_summary(stats))
+        print(f"Wrote:    {out_dir / 'stats.json'}")
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ dependencies = [
   "pretty_midi",
   "requests",
   "pillow",
+  "pyside6",
 ]
 
 [project.optional-dependencies]

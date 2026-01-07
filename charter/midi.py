@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import random
 
 import pretty_midi  # type: ignore
@@ -8,6 +9,8 @@ import librosa  # type: ignore
 import numpy as np  # type: ignore
 
 from charter.audio import detect_onsets, OnsetCandidate
+from charter.sections import generate_sections, compute_section_stats
+from charter.star_power import generate_star_power_phrases, SP_PITCH
 
 # Keep this EXACTLY as your known-good baseline for now
 TRACK_NAME = "PART GUITAR"
@@ -17,7 +20,7 @@ LANE_PITCH = {
     1: 61,  # Red
     2: 62,  # Yellow
     3: 63,  # Blue
-    4: 64,  # Orange (never used)
+    4: 64,  # Orange (rare)
 }
 
 
@@ -30,15 +33,6 @@ def _filter_onsets_windowed(
     max_nps: float,
     min_notes_per_window: int,
 ) -> list[OnsetCandidate]:
-    """
-    Windowed onset selection for full-song coverage.
-
-    - Split song into windows (e.g., 4s)
-    - Pick strongest onsets per window up to a quota
-    - Enforce min gap between selected notes
-    - If a window would have 0 notes, inject 1 "filler" note
-      at the window midpoint (strength=0.0)
-    """
     if window_sec <= 0:
         window_sec = 4.0
 
@@ -46,7 +40,6 @@ def _filter_onsets_windowed(
     quota = max(1, int(round(max_nps * window_sec)))
     min_notes_per_window = max(0, int(min_notes_per_window))
 
-    # group candidates by window index
     buckets: dict[int, list[OnsetCandidate]] = {}
     for c in candidates:
         idx = int(c.t // window_sec)
@@ -61,7 +54,6 @@ def _filter_onsets_windowed(
 
     for w in range(num_windows):
         items = buckets.get(w, [])
-        # strongest first
         items_sorted = sorted(items, key=lambda x: x.strength, reverse=True)
 
         picked_this_window: list[OnsetCandidate] = []
@@ -73,11 +65,8 @@ def _filter_onsets_windowed(
             picked_this_window.append(c)
             selected.append(c)
 
-        # Ensure some coverage (optional but fixes "cuts off")
         if len(picked_this_window) < min_notes_per_window:
-            # insert a synthetic "tap" near the middle of the window
             mid = (w * window_sec) + (window_sec * 0.5)
-            # don't add near the very start; avoid t<1.0 since we clamp to 1.0 anyway
             if mid >= 1.0 and mid <= duration_sec - 0.5 and not too_close(mid):
                 filler = OnsetCandidate(t=float(mid), strength=0.0)
                 selected.append(filler)
@@ -99,7 +88,6 @@ def _assign_lanes(times: list[float], *, seed: int = 42) -> list[int]:
 
         for lane in candidates:
             move = abs(lane - last_lane)
-
             if move == 0:
                 w = 2.6
             elif move == 1:
@@ -134,6 +122,7 @@ def _assign_lanes(times: list[float], *, seed: int = 42) -> list[int]:
 
     return out
 
+
 def _quantize_times_to_grid(
     audio_path: Path,
     times: list[float],
@@ -141,7 +130,7 @@ def _quantize_times_to_grid(
     subdivision: str = "1/8",
 ) -> list[float]:
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
-    tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
+    _tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
     beat_times = librosa.frames_to_time(beat_frames, sr=sr)
 
     if len(beat_times) < 2:
@@ -160,11 +149,8 @@ def _quantize_times_to_grid(
     grid_np = np.array(grid)
     return [float(grid_np[np.argmin(np.abs(grid_np - t))]) for t in times]
 
+
 def _get_beat_times(audio_path: Path) -> list[float]:
-    """
-    Estimate beat times for 'strong beat' heuristics.
-    If beat tracking fails, returns [] and we fall back to non-beat heuristics.
-    """
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
     _tempo, beat_frames = librosa.beat.beat_track(y=y, sr=sr)
     beat_times = librosa.frames_to_time(beat_frames, sr=sr)
@@ -172,33 +158,20 @@ def _get_beat_times(audio_path: Path) -> list[float]:
 
 
 def _is_strong_beat(t: float, beat_times: list[float], *, tol: float = 0.07) -> bool:
-    """
-    True if time 't' is near a beat, and that beat looks like a downbeat.
-    We assume 4/4 for now (good enough for v1).
-    """
     if len(beat_times) < 2:
         return False
 
-    # nearest beat index
     idx = min(range(len(beat_times)), key=lambda i: abs(beat_times[i] - t))
     if abs(beat_times[idx] - t) > tol:
         return False
 
-    # every 4 beats treat as "strong"
     return (idx % 4) == 0
 
 
 def _choose_double(main_lane: int, *, rng: random.Random, allow_orange: bool, gap_to_next: float) -> list[int]:
-    """
-    Create a 2-note chord that feels reasonable on Medium.
-    - Prefer adjacent doubles (G+R, R+Y, Y+B)
-    - Very selective orange: allow only B+O and only when it's safe (not fast)
-    """
-    # Very selective orange: only as B+O, only if not too fast
     if allow_orange and main_lane == 3 and gap_to_next >= 0.30 and rng.random() < 0.18:
         return [3, 4]  # B + O
 
-    # Otherwise choose an adjacent double around the main lane
     adjacent = {
         0: [(0, 1), (0, 2)],
         1: [(0, 1), (1, 2), (1, 3)],
@@ -209,6 +182,7 @@ def _choose_double(main_lane: int, *, rng: random.Random, allow_orange: bool, ga
     a, b = rng.choice(adjacent)
     return [a, b]
 
+
 def write_real_notes_mid(
     *,
     audio_path: Path,
@@ -218,17 +192,19 @@ def write_real_notes_mid(
     seed: int = 42,
     tap_duration: float = 0.10,
     bpm: float = 120.0,
+    # NEW: CH-full features
+    add_sections: bool = True,
+    add_star_power: bool = True,
+    stats_out_path: Path | None = None,
 ) -> None:
     """
-    Real chart v2:
+    Real chart:
       audio -> onsets -> windowed filtering -> quantize -> lanes -> notes.mid
 
     Adds:
-      - smart sustains (gap-aware + beat-aware)
-      - smart doubles (very selective)
-      - very selective orange (only B+O, only when safe)
-
-    Still aims for "Medium casual" feel.
+      - GH-ish star power phrases
+      - MIDI section markers (EVENTS track)
+      - stats.json export for tuning (our tool, not Clone Hero)
     """
     rng = random.Random(seed)
 
@@ -259,15 +235,21 @@ def write_real_notes_mid(
 
     lanes = _assign_lanes(times, seed=seed)
 
-    # ---- knobs (kept as constants for now; later we expose to CLI) ----
-    allow_orange = True  # very selective; only B+O and only when safe
-    base_double_prob = 0.10  # overall chance; strong beats will boost it
-    sustain_min_gap = 0.45   # need at least this much room to consider a sustain
-    sustain_max_len = 1.20   # cap sustain length (seconds)
-    # ------------------------------------------------------------------
+    # ---- knobs (kept as constants for now) ----
+    allow_orange = True
+    base_double_prob = 0.10
+    sustain_min_gap = 0.45
+    sustain_max_len = 1.20
+    # ------------------------------------------
 
     pm = pretty_midi.PrettyMIDI(initial_tempo=bpm)
+
+    # 1) Guitar track
     inst = pretty_midi.Instrument(program=0, name=TRACK_NAME)
+
+    # We'll track chord starts separately for stats
+    chord_starts: list[float] = []
+    note_starts: list[float] = []
 
     for i, (t, lane) in enumerate(zip(times, lanes)):
         start = max(1.0, float(t))
@@ -276,26 +258,19 @@ def write_real_notes_mid(
 
         strong = _is_strong_beat(start, beat_times)
 
-        # -------- Decide sustain vs tap --------
-        # Default to tap-like notes, but upgrade to sustain if:
-        # - there's room (gap big enough)
-        # - AND it feels musically logical (strong beat helps)
+        # sustain vs tap
         do_sustain = False
         if gap >= sustain_min_gap:
-            # on strong beats: more likely
             p = 0.55 if strong else 0.25
             do_sustain = rng.random() < p
 
         if do_sustain:
             end = min(start + sustain_max_len, next_start - 0.03)
-            end = max(end, start + 0.18)  # minimum hold so it "reads" as sustain
+            end = max(end, start + 0.18)
         else:
             end = min(start + tap_duration, max(start + 0.05, next_start - 0.03))
 
-        # -------- Decide single vs double --------
-        # Doubles are selective:
-        # - more likely on strong beats
-        # - avoid doubles if it's too fast
+        # single vs double
         double_prob = base_double_prob * (1.8 if strong else 1.0)
         if gap < 0.22:
             double_prob *= 0.25
@@ -304,7 +279,10 @@ def write_real_notes_mid(
         if rng.random() < double_prob:
             lanes_to_write = _choose_double(int(lane), rng=rng, allow_orange=allow_orange, gap_to_next=gap)
 
-        # Write notes (single or chord) with the same start/end
+        if len(lanes_to_write) >= 2:
+            chord_starts.append(start)
+        note_starts.append(start)
+
         for ln in lanes_to_write:
             inst.notes.append(
                 pretty_midi.Note(
@@ -316,6 +294,65 @@ def write_real_notes_mid(
             )
 
     pm.instruments.append(inst)
+
+    # 2) EVENTS track (sections)
+    sections = []
+    if add_sections:
+        sections = generate_sections(duration_sec=duration_sec, approx_section_len_sec=25.0, start_at=1.0)
+        events_inst = pretty_midi.Instrument(program=0, name="EVENTS")
+        for s in sections:
+            # pretty_midi supports lyrics/text via .lyrics
+            # Clone Hero reads [section ...] style markers from text/lyrics events.
+            pm.lyrics.append(pretty_midi.Lyric(text=f"[section {s.name}]", time=float(s.start)))
+        pm.instruments.append(events_inst)
+
+    # 3) Star Power phrases
+    if add_star_power and note_starts:
+        phrases = generate_star_power_phrases(
+            note_times=note_starts,
+            duration_sec=duration_sec,
+            every_sec=22.0,
+            phrase_len_sec=9.0,
+            start_at=12.0,
+        )
+        for p in phrases:
+            inst.notes.append(
+                pretty_midi.Note(
+                    velocity=100,
+                    pitch=SP_PITCH,
+                    start=float(p.start),
+                    end=float(p.end),
+                )
+            )
+
+    # 4) Stats export (our tool)
+    if stats_out_path is not None:
+        stats = compute_section_stats(
+            note_starts=note_starts,
+            chord_starts=chord_starts,
+            sections=sections,
+            duration_sec=duration_sec,
+        )
+        payload = {
+            "duration_sec": duration_sec,
+            "total_notes": len(note_starts),
+            "total_chords": len(chord_starts),
+            "sections": [
+                {
+                    "name": s.name,
+                    "start": s.start,
+                    "end": s.end,
+                    "notes": s.notes,
+                    "chords": s.chords,
+                    "avg_nps": round(s.avg_nps, 3),
+                    "max_nps_1s": round(s.max_nps_1s, 3),
+                }
+                for s in stats
+            ],
+        }
+        stats_out_path.parent.mkdir(parents=True, exist_ok=True)
+        stats_out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pm.write(str(out_path))
 
@@ -326,10 +363,6 @@ def write_dummy_notes_mid(
     bars: int = 24,
     density: float = 0.58,
 ) -> None:
-    """
-    Dummy chart for compatibility + baseline feel testing.
-    density in [0..1]: lower = fewer notes (easier).
-    """
     density = max(0.05, min(1.0, float(density)))
     rng = random.Random(42)
 
@@ -339,26 +372,20 @@ def write_dummy_notes_mid(
     spb = 60.0 / bpm
     total_beats = bars * 4
 
-    # We place events on a mixed grid: mostly quarter notes, occasional eighths.
-    # Start after 1s so the audio "settles".
     t = 1.0
-    last_lane = 1  # start Red
+    last_lane = 1
 
     for _beat in range(total_beats):
-        # More eighths as density rises (but still controlled)
-        eighth_prob = 0.25 + 0.45 * density  # 0.38-ish @ 0.58 density
+        eighth_prob = 0.25 + 0.45 * density
         slots = 2 if rng.random() < eighth_prob else 1
 
         for _s in range(slots):
-            # Roll if we place a note in this slot
-            # Lower density => fewer notes
             place_prob = density * (0.70 if slots == 2 else 0.90)
             if rng.random() >= place_prob:
                 t += spb / slots
                 continue
 
-            # Choose lane with movement bias (prefer repeats / +/-1)
-            candidates = [0, 1, 2, 3]  # no orange
+            candidates = [0, 1, 2, 3]
             weights = []
             for lane in candidates:
                 move = abs(lane - last_lane)
@@ -370,7 +397,6 @@ def write_dummy_notes_mid(
                     w = 1.0
                 else:
                     w = 0.5
-                # Keep Blue rarer
                 if lane == 3:
                     w *= 0.6
                 weights.append(w)
@@ -379,23 +405,25 @@ def write_dummy_notes_mid(
             last_lane = lane
 
             lanes = [lane]
-            # Occasional simple 2-note chord, but only when density isn't too high
             if density < 0.72 and rng.random() < (0.06 + 0.06 * density):
                 chord_options = [(0, 1), (1, 2), (2, 3), (0, 2), (1, 3)]
-                # Prefer chords involving current lane
                 cand = [c for c in chord_options if lane in c] or chord_options
                 a, b = rng.choice(cand)
                 lanes = [a, b]
 
             dur = 0.18 if slots == 2 else 0.22
             for ln in lanes:
-                inst.notes.append(pretty_midi.Note(velocity=100, pitch=LANE_PITCH[ln], start=t, end=t + dur))
+                inst.notes.append(
+                    pretty_midi.Note(
+                        velocity=100,
+                        pitch=LANE_PITCH[ln],
+                        start=t,
+                        end=t + dur,
+                    )
+                )
 
             t += spb / slots
 
-        # Ensure we end exactly on beat boundary if slots==2 caused rounding drift
-        # (tiny drift doesn’t matter much, but keep it tidy)
-        # no-op for simplicity
     pm.instruments.append(inst)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pm.write(str(out_path))
