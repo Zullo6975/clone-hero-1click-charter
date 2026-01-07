@@ -10,6 +10,7 @@ dependencies = [
   "soundfile",
   "pretty_midi",
   "requests",
+  "pillow",
 ]
 
 [project.optional-dependencies]
