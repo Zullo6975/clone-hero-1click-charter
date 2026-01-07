@@ -6,10 +6,19 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 try:
-    from PIL import Image, ImageTk # type: ignore
+    from PIL import Image, ImageTk  # type: ignore
 except ImportError:
     Image = None
     ImageTk = None
+
+
+def _repo_root() -> Path:
+    # repo_root is one level up from /gui
+    return Path(__file__).resolve().parents[1]
+
+
+def _venv_python() -> Path:
+    return _repo_root() / ".venv" / "bin" / "python"
 
 
 class OneClickCharterGUI(tk.Tk):
@@ -17,8 +26,9 @@ class OneClickCharterGUI(tk.Tk):
         super().__init__()
 
         self.title("CH 1-Click Charter")
-        self.geometry("600x680")  # increased height to prevent cutoff
-        self.resizable(False, False)
+        self.geometry("600x780")  # a little taller so Generate never gets cut off
+        self.minsize(600, 850)
+        self.resizable(True, True)
 
         self.audio_path: Path | None = None
         self.cover_path: Path | None = None
@@ -34,17 +44,8 @@ class OneClickCharterGUI(tk.Tk):
         root = ttk.Frame(self)
         root.pack(fill="both", expand=True)
 
-        ttk.Label(
-            root,
-            text="CH 1-Click Charter",
-            font=("Helvetica", 16, "bold"),
-        ).pack(pady=(12, 4))
-
-        ttk.Label(
-            root,
-            text="Generate fun, playable Medium charts",
-            foreground="gray",
-        ).pack(pady=(0, 14))
+        ttk.Label(root, text="CH 1-Click Charter", font=("Helvetica", 16, "bold")).pack(pady=(12, 4))
+        ttk.Label(root, text="Generate fun, playable Medium charts", foreground="gray").pack(pady=(0, 14))
 
         # ---- Audio ----
         audio_box = ttk.LabelFrame(root, text="Audio")
@@ -76,12 +77,7 @@ class OneClickCharterGUI(tk.Tk):
 
         ttk.Button(art_row, text="Choose Album Art", command=self.pick_cover).pack(side="left")
 
-        self.cover_preview = ttk.Label(
-            art_row,
-            text="No art",
-            width=18,
-            anchor="center",
-        )
+        self.cover_preview = ttk.Label(art_row, text="No art", width=18, anchor="center")
         self.cover_preview.pack(side="right")
 
         # ---- Output ----
@@ -103,31 +99,52 @@ class OneClickCharterGUI(tk.Tk):
         adv = ttk.LabelFrame(root, text="Advanced (optional)")
         adv.pack(fill="x", **pad)
 
+        # IMPORTANT: real vs dummy (default to real)
+        self.mode_var = tk.StringVar(value="real")
+        mode_row = ttk.Frame(adv)
+        mode_row.pack(fill="x", padx=10, pady=6)
+        ttk.Label(mode_row, text="Mode", width=12).pack(side="left")
+        ttk.Combobox(
+            mode_row,
+            textvariable=self.mode_var,
+            values=["real", "dummy"],
+            state="readonly",
+        ).pack(side="left", fill="x", expand=True)
+
+        # Real-chart knobs
         self.max_nps = tk.DoubleVar(value=2.8)
         self._slider(adv, "Max Notes / Second", self.max_nps, 1.5, 4.0)
 
+        self.min_gap_ms = tk.IntVar(value=140)
+        self._slider_int(adv, "Min Gap (ms)", self.min_gap_ms, 80, 220)
+
+        self.seed = tk.IntVar(value=42)
+        seed_row = ttk.Frame(adv)
+        seed_row.pack(fill="x", padx=10, pady=6)
+        ttk.Label(seed_row, text="Seed", width=12).pack(side="left")
+        ttk.Entry(seed_row, textvariable=self.seed, width=10).pack(side="left")
+
         # ---- Generate ----
-        self.generate_btn = ttk.Button(
-            root,
-            text="Generate Chart",
-            command=self.run,
-            state="disabled",
-        )
-        self.generate_btn.pack(pady=20)
+        self.generate_btn = ttk.Button(root, text="Generate Chart", command=self.run, state="disabled")
+        self.generate_btn.pack(pady=18)
 
     # ---------------- Helpers ----------------
 
     def _entry(self, parent: ttk.Frame, label: str, var: tk.StringVar) -> None:
         row = ttk.Frame(parent)
         row.pack(fill="x", padx=10, pady=4)
-
         ttk.Label(row, text=label, width=12).pack(side="left")
         ttk.Entry(row, textvariable=var).pack(side="right", fill="x", expand=True)
 
     def _slider(self, parent: ttk.Frame, label: str, var: tk.DoubleVar, lo: float, hi: float) -> None:
         row = ttk.Frame(parent)
         row.pack(fill="x", padx=10, pady=6)
+        ttk.Label(row, text=label).pack(anchor="w")
+        ttk.Scale(row, from_=lo, to=hi, variable=var).pack(fill="x")
 
+    def _slider_int(self, parent: ttk.Frame, label: str, var: tk.IntVar, lo: int, hi: int) -> None:
+        row = ttk.Frame(parent)
+        row.pack(fill="x", padx=10, pady=6)
         ttk.Label(row, text=label).pack(anchor="w")
         ttk.Scale(row, from_=lo, to=hi, variable=var).pack(fill="x")
 
@@ -135,7 +152,6 @@ class OneClickCharterGUI(tk.Tk):
         if not Image or not ImageTk:
             self.cover_preview.config(text="Preview unavailable")
             return
-
         try:
             img = Image.open(path).convert("RGB")
             img.thumbnail((128, 128))
@@ -147,9 +163,7 @@ class OneClickCharterGUI(tk.Tk):
     # ---------------- Actions ----------------
 
     def pick_audio(self) -> None:
-        p = filedialog.askopenfilename(
-            filetypes=[("Audio Files", "*.mp3 *.wav *.ogg *.flac")]
-        )
+        p = filedialog.askopenfilename(filetypes=[("Audio Files", "*.mp3 *.wav *.ogg *.flac")])
         if not p:
             return
 
@@ -162,9 +176,7 @@ class OneClickCharterGUI(tk.Tk):
         self.generate_btn.config(state="normal")
 
     def pick_cover(self) -> None:
-        p = filedialog.askopenfilename(
-            filetypes=[("Images", "*.png *.jpg *.jpeg")]
-        )
+        p = filedialog.askopenfilename(filetypes=[("Images", "*.png *.jpg *.jpeg")])
         if not p:
             return
 
@@ -180,21 +192,43 @@ class OneClickCharterGUI(tk.Tk):
         if not self.audio_path:
             return
 
+        py = _venv_python()
+        if not py.exists():
+            messagebox.showerror("Error", "Missing .venv. Run: make install")
+            return
+
         title = self.title_var.get().strip() or self.audio_path.stem
         out_root = Path(self.out_dir.get()).expanduser().resolve()
         out_song = out_root / title
 
+        # ✅ CRITICAL: call the repo code through the repo venv, and pass mode/knobs
         cmd = [
-            "1clickcharter",
-            "--audio", str(self.audio_path),
-            "--out", str(out_song),
-            "--title", title,
-            "--artist", self.artist_var.get(),
-            "--album", self.album_var.get(),
-            "--genre", self.genre_var.get(),
-            "--charter", "Zullo7569",
+            str(py),
+            "-m",
+            "charter.cli",
+            "--audio",
+            str(self.audio_path),
+            "--out",
+            str(out_song),
+            "--title",
+            title,
+            "--artist",
+            self.artist_var.get(),
+            "--album",
+            self.album_var.get(),
+            "--genre",
+            self.genre_var.get(),
+            "--charter",
+            "Zullo7569",
             "--fetch-metadata",
-            "--max-nps", f"{self.max_nps.get():.2f}",
+            "--mode",
+            self.mode_var.get(),
+            "--min-gap-ms",
+            str(int(self.min_gap_ms.get())),
+            "--max-nps",
+            f"{self.max_nps.get():.2f}",
+            "--seed",
+            str(int(self.seed.get())),
         ]
 
         try:

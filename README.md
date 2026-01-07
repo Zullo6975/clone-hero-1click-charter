@@ -1,20 +1,30 @@
 # CH 1-Click Charter
 
-CH 1-Click Charter is a Python-based tool that generates **playable Clone Hero lead guitar charts** from audio files with a single command.
+CH 1-Click Charter is a Python-based tool that generates **playable Clone Hero lead guitar charts** from audio files with a single command or via a lightweight GUI.
 
-This project is **fun-first**, targeting **Medium difficulty** charts that feel good to play and **never exceed the intensity of GH3 Medium (e.g. Cult of Personality)**.
+This project is **fun-first**, targeting **Medium difficulty** charts that feel good to play and **never exceed the intensity of GH3 Medium** (e.g. _Cult of Personality_). Accuracy is secondary to playability, consistency, and musical flow.
 
-Accuracy is intentionally secondary to **playability, consistency, and musical flow**.
+---
+
+## Philosophy
+
+> If a chart ever feels annoying, unreadable, or unfair — it failed.
+
+This project prioritizes:
+
+- Comfort over precision
+- Flow over transcription accuracy
+- Consistency over surprise
 
 ---
 
 ## Goals
 
 - One-click generation of **Medium lead guitar** charts
-- Charts that are fun, readable, and predictable
-- Musical flow over mechanical precision
-- Mixed single notes, doubles, and sustains (within safe limits)
+- Predictable, readable patterns
+- Mixed single notes, doubles, and sustains (within strict limits)
 - Output that works immediately in Clone Hero
+- Deterministic results (same input → same chart)
 
 ---
 
@@ -22,26 +32,21 @@ Accuracy is intentionally secondary to **playability, consistency, and musical f
 
 This project intentionally does **not** aim to:
 
-- Generate Expert or competitive charts
+- Generate Expert or Orange-heavy charts
 - Perfectly transcribe real guitar parts
-- Emulate a specific game’s charting style
-- Replace human charting for leaderboard play
-- Expose dozens of tuning knobs
+- Match a specific game engine (GH vs Rock Band)
+- Replace human charting for competitive play
 
 ---
 
 ## Hard Constraints (Always Enforced)
 
-- ❌ No sustained fast streams
 - ❌ No chaotic hand travel
-- ❌ No sudden speed or difficulty spikes
+- ❌ No sudden difficulty spikes
+- ❌ No sustained fast streams
+- ❌ No unreadable patterns
 
-### Difficulty Envelope
-
-- Medium difficulty only
-- Burst speed capped
-- Chords allowed but governed
-- Sustains added only when musically justified
+Medium difficulty is a **hard ceiling**.
 
 If constraints are violated, the chart **simplifies automatically**.
 
@@ -50,31 +55,15 @@ If constraints are violated, the chart **simplifies automatically**.
 ## How It Works (High Level)
 
 1. Analyze audio for tempo, beats, and onsets
-2. Generate candidate note events
-3. Quantize events to a musical grid
-4. Apply musical rules (lanes, sustains, doubles)
-5. Enforce strict difficulty governors
-6. Export a Clone Hero–ready folder (`notes.mid`, `song.ini`, audio)
-
----
-
-## Current Status
-
-🚧 **Active prototype**
-
-What works today:
-
-- Local Python CLI
-- Medium-difficulty lead guitar
-- Groove-locked timing
-- Smart singles, doubles, and sustains
-- Deterministic output via seed
-
-Planned later:
-
-- Multiple difficulty derivation
-- Section-aware phrasing
-- Optional cloud / batch pipeline
+2. Select musically relevant note times
+3. Quantize to a conservative beat grid
+4. Assign lanes with movement bias
+5. Apply difficulty governors
+6. Export a Clone Hero–ready folder:
+   - `song.mp3`
+   - `song.ini`
+   - `notes.mid`
+   - `album.png` (optional)
 
 ---
 
@@ -83,21 +72,82 @@ Planned later:
 - Python 3.10+
 - Clone Hero (for testing output)
 
-Key dependencies:
+---
 
-- `librosa`
-- `numpy`
-- `soundfile`
-- `pretty_midi`
-- `requests`
+## Setup (Fresh Machine)
+
+### macOS
+
+```bash
+brew install python git make
+```
+
+### Linux (Debian/Ubuntu)
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip git make
+```
+
+### Windows
+
+- Install Python 3.11+ from python.org
+- Install Git for Windows
+- Use Git Bash or PowerShell
+- Install `make` (recommended)
 
 ---
 
-## Philosophy
+## Install
 
-> If a chart ever feels annoying, unreadable, or unfair — it failed.
+```bash
+make install
+```
 
-CH 1-Click Charter prioritizes **fun over fidelity**, using clear rules and safety rails instead of chasing perfect transcription.
+---
+
+## GUI (Recommended)
+
+```bash
+make gui
+```
+
+The GUI supports:
+
+- Audio selection
+- Metadata entry
+- Album art preview
+- Difficulty tuning
+- One-click chart generation
+
+Always launch the GUI via `make gui` to ensure the correct Python environment.
+
+---
+
+## CLI Usage
+
+### Dummy Chart
+
+```bash
+make run MODE=dummy
+```
+
+### Real Chart
+
+```bash
+make run MODE=real
+```
+
+---
+
+## Current Status
+
+✅ Playable Medium charts
+✅ Full-song coverage
+✅ Smart taps, sustains, and doubles
+✅ GUI + CLI parity
+
+This is a **stable v0.1 baseline**.
 
 ---
 
