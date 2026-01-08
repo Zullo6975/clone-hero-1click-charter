@@ -425,7 +425,7 @@ class MainWindow(QMainWindow):
         grp_out = QGroupBox("Output Destination")
         out_layout = QHBoxLayout(grp_out)
         self.out_dir_edit = QLineEdit("") 
-        self.out_dir_edit.setPlaceholderText("Select output folder... (Required)")
+        self.out_dir_edit.setPlaceholderText("Select output folder...")
         
         self.btn_pick_output = QPushButton("Browse...")
         self.btn_pick_output.setCursor(Qt.PointingHandCursor)
