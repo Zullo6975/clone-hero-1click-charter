@@ -1,0 +1,120 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on tags like v1.0, v0.5.1, etc.
+
+jobs:
+  # --- MACOS BUILD ---
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev,gui] pyinstaller Pillow
+
+      - name: Generate Icons
+        run: |
+          chmod +x tools/make_icons.sh
+          ./tools/make_icons.sh
+
+      - name: Build .app with PyInstaller
+        run: |
+          # Matches the logic in your Makefile 'package' target
+          pyinstaller --noconfirm --clean \
+            --name "1ClickCharter" \
+            --windowed \
+            --onefile \
+            --icon "icons/AppIcon.icns" \
+            --paths "." \
+            --hidden-import "charter.cli" \
+            --hidden-import "gui.qt_app" \
+            --collect-all "charter" \
+            wrapper.py
+
+      - name: Zip Application
+        run: |
+          cd dist
+          zip -r ../1ClickCharter-macOS.zip 1ClickCharter.app
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Build
+          path: 1ClickCharter-macOS.zip
+
+  # --- WINDOWS BUILD ---
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev,gui] pyinstaller Pillow
+
+      - name: Generate Icons (Python Fallback)
+        # Windows doesn't have bash/sips, but make_icons.sh has a Python fallback block.
+        # We'll just run the python snippet directly to be safe and avoid shell issues.
+        run: |
+          python -c "from PIL import Image; img = Image.open('icons/icon_og.png'); img.save('icons/AppIcon.ico', format='ICO', sizes=[(256,256), (128,128), (64,64), (48,48), (32,32), (16,16)])"
+
+      - name: Build .exe with PyInstaller
+        run: |
+          pyinstaller --noconfirm --clean `
+            --name "1ClickCharter" `
+            --windowed `
+            --onefile `
+            --icon "icons/AppIcon.ico" `
+            --paths "." `
+            --hidden-import "charter.cli" `
+            --hidden-import "gui.qt_app" `
+            --collect-all "charter" `
+            wrapper.py
+
+      - name: Zip Executable
+        run: |
+          Compress-Archive -Path dist\1ClickCharter.exe -DestinationPath 1ClickCharter-Windows.zip
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Build
+          path: 1ClickCharter-Windows.zip
+
+  # --- CREATE RELEASE ---
+  release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/macOS-Build/1ClickCharter-macOS.zip
+            artifacts/Windows-Build/1ClickCharter-Windows.zip
+          generate_release_notes: true

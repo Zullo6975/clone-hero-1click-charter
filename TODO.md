@@ -1,47 +1,38 @@
-# TODO
+# Project Roadmap
 
-## Ship-it checklist (personal release)
+## 🟢 Phase 1: Polish & Stability (Current)
 
-- [ ] Test generated song in Clone Hero
-  - [ ] Notes load correctly
-  - [ ] Sections appear in-game
-  - [ ] Star Power is collectible and usable
-  - [ ] Timing feels reasonable
-- [ ] Lock default tuning values
-- [ ] Build + install via pipx
-- [ ] Tag local git release (optional)
+- [x] **Safe Inputs:** Prevent mouse-wheel scrolling from accidentally changing values on dropdowns/spinners.
+- [x] **Action Bar:** Move Generate/Cancel buttons to a fixed footer.
+- [x] **Separate Logs:** Move logs to a pop-up window to clean up the main UI.
+- [x] **Smart Delay:** Add lead-in time via `song.ini` delay instead of destructive audio editing.
+- [x] **Required Fields:** Visual cues (Red `*`) for Title/Artist/Audio/Output.
 
 ---
 
-## Next iteration ideas
+## 🟡 Phase 2: Batch Processing (Next)
 
-### Difficulty & feel
+The goal: "Chart an entire discography while I make coffee."
 
-- [ ] Difficulty presets
-  - Easy
-  - Medium Casual
-  - Medium Intense
-  - Hard
-- [ ] Presets map to:
-  - max_nps
-  - min_gap_ms
-  - chord probability
-  - sustain behavior
-- [ ] Optional “No Orange” toggle
-- [ ] Optional “More Chords” toggle
+- [ ] **Queue UI:** Replace the single "Input Audio" box with a `QListWidget` that accepts multiple files.
+- [ ] **Batch Logic:** Refactor `qt_app.py` to iterate through the list.
+- [ ] **Error Handling:** If Song A fails, log it and proceed to Song B (don't crash the app).
+- [ ] **Auto-Naming:** Smarter regex to extract "Artist - Title" from filenames since the user can't type metadata for 50 songs.
 
-### GUI improvements
+---
 
-- [ ] Preset dropdown with explanations
-- [ ] Tooltips for advanced settings
-- [ ] Save/load last-used settings
-- [ ] Compact advanced panel layout
+## 🔴 Phase 3: Multi-Difficulty Support (Long Term)
 
-### Validation tooling (no Clone Hero required)
+The goal: "One click, four difficulties."
 
-- [ ] Validator summary:
-  - section list
-  - star power phrase count + timings
-  - peak NPS warnings
-- [ ] Export validation report (txt / json)
-- [ ] Compare two runs side-by-side
+- [ ] **Refactor `midi.py`:** Separation of concerns.
+  - `Analysis` (Beats/Onsets) happens ONCE.
+  - `PatternGeneration` happens 4 times (Easy, Med, Hard, Expert) with different `ChartConfig` objects.
+- [ ] **Reduction Algorithm:** - Implement a "Parent -> Child" reduction logic.
+  - Expert notes are the "source of truth".
+  - Hard = Expert minus 20% density + simpler chords.
+  - Medium = Hard minus 30% + no Orange.
+  - Easy = Medium minus 40% + playing only on the beat.
+- [ ] **UI Update:**
+  - Add "Target Difficulties" checkboxes (e.g., [x] Easy [x] Medium [x] Hard [x] Expert).
+  - Allow distinct settings per difficulty tier (eventually).
