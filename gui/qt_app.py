@@ -227,7 +227,7 @@ class LogWindow(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("CloneHero 1-Click Generator")
+        self.setWindowTitle("CloneHero 1-Click Charter")
         self.setAcceptDrops(True)
         self.settings = QSettings("Zullo", "1ClickCharter")
         
@@ -287,7 +287,7 @@ class MainWindow(QMainWindow):
                 pix = pix.scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 icon_lbl.setPixmap(pix)
         
-        title_lbl = QLabel("CloneHero 1-Click Generator")
+        title_lbl = QLabel("CloneHero 1-Click Charter")
         title_lbl.setFont(get_font(26, True))
         title_lbl.setStyleSheet("color: palette(text);")
         
