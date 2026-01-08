@@ -144,22 +144,22 @@ class ThemeManager:
             palette.setColor(QPalette.Disabled, QPalette.Text, QColor(150, 150, 160))
             palette.setColor(QPalette.PlaceholderText, QColor(140, 140, 150))
         app.setPalette(palette)
-
+        
         app.setStyleSheet("""
             QGroupBox { border: 1px solid palette(mid); border-radius: 6px; margin-top: 24px; padding-top: 12px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
-
-            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget {
-                padding: 6px;
-                border-radius: 4px;
-                border: 1px solid palette(mid);
-                background-color: palette(base);
+            
+            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget { 
+                padding: 6px; 
+                border-radius: 4px; 
+                border: 1px solid palette(mid); 
+                background-color: palette(base); 
                 color: palette(text);
             }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus {
-                border: 1px solid palette(highlight);
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus { 
+                border: 1px solid palette(highlight); 
             }
-
+            
             QComboBox QAbstractItemView {
                 background-color: palette(base);
                 color: palette(text);
@@ -169,12 +169,12 @@ class ThemeManager:
 
             QPushButton { padding: 8px 16px; border-radius: 5px; border: 1px solid palette(mid); background-color: palette(button); }
             QPushButton:hover { background-color: palette(light); }
-
-            QPushButton#Primary {
-                background-color: palette(highlight);
-                color: palette(highlighted-text);
-                font-weight: bold;
-                border: 1px solid palette(highlight);
+            
+            QPushButton#Primary { 
+                background-color: palette(highlight); 
+                color: palette(highlighted-text); 
+                font-weight: bold; 
+                border: 1px solid palette(highlight); 
             }
             QPushButton#Primary:hover { border: 1px solid palette(text); }
             QPushButton#Primary:disabled {
@@ -182,9 +182,9 @@ class ThemeManager:
                 color: palette(disabled-text);
                 border: 1px solid palette(mid);
             }
-
+            
             QCheckBox { spacing: 8px; }
-
+            
             QStatusBar { background: palette(window); border-top: 1px solid palette(mid); min-height: 50px; }
             QStatusBar::item { border: none; }
         """)
@@ -202,7 +202,7 @@ class LogWindow(QWidget):
         mono_font.setPointSize(11)
         self.text_edit.setFont(mono_font)
         layout.addWidget(self.text_edit)
-
+        
         row_btns = QHBoxLayout()
         btn_clear = QPushButton("Clear Logs")
         btn_clear.clicked.connect(self.text_edit.clear)
@@ -216,10 +216,10 @@ class LogWindow(QWidget):
     def append_text(self, text: str):
         self.text_edit.append(text)
         self.text_edit.verticalScrollBar().setValue(self.text_edit.verticalScrollBar().maximum())
-
+    
     def clear(self):
         self.text_edit.clear()
-
+        
     def get_text(self) -> str:
         return self.text_edit.toPlainText()
 
@@ -230,16 +230,16 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("CloneHero 1-Click Generator")
         self.setAcceptDrops(True)
         self.settings = QSettings("Zullo", "1ClickCharter")
-
+        
         self.audio_path: Path | None = None
         self.cover_path: Path | None = None
         self.last_out_song: Path | None = None
         self.proc: QProcess | None = None
         self.validator_proc: QProcess | None = None
-
+        
         # QUEUE SYSTEM
         self.song_queue: list[Path] = []
-
+        
         self.log_window = LogWindow()
         self.dark_mode = self.settings.value("dark_mode", True, type=bool)
         self._title_user_edited = False
@@ -247,8 +247,8 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._wire()
         self._restore_settings()
-
-        self.resize(980, 750)
+        
+        self.resize(980, 750) 
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
         self.apply_preset(self.preset_combo.currentText())
         self._update_state()
@@ -269,8 +269,8 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(16, 16, 16, 16)
-        main_layout.setSpacing(16)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(20)
 
         # --- HEADER ---
         header_widget = QWidget()
@@ -286,11 +286,11 @@ class MainWindow(QMainWindow):
             if not pix.isNull():
                 pix = pix.scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 icon_lbl.setPixmap(pix)
-
+        
         title_lbl = QLabel("CloneHero 1-Click Generator")
         title_lbl.setFont(get_font(26, True))
         title_lbl.setStyleSheet("color: palette(text);")
-
+        
         header_layout.addWidget(icon_lbl)
         header_layout.addWidget(title_lbl)
         main_layout.addWidget(header_widget)
@@ -306,7 +306,7 @@ class MainWindow(QMainWindow):
         self.sidebar_widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
         self.sidebar_widget.setMinimumWidth(340)
         self.sidebar_widget.setMaximumWidth(340)
-
+        
         sidebar_layout = QVBoxLayout(self.sidebar_widget)
         sidebar_layout.setContentsMargins(0, 0, 12, 0)
         sidebar_layout.setSpacing(18)
@@ -318,19 +318,18 @@ class MainWindow(QMainWindow):
         self.audio_label.setAlignment(Qt.AlignCenter)
         self.audio_label.setWordWrap(True)
         self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
-
+        
         # ADD Button
         self.btn_add_audio = QPushButton("Add Songs...")
         self.btn_add_audio.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
         self.btn_add_audio.setToolTip("Add files to queue")
         self.btn_add_audio.setCursor(Qt.PointingHandCursor)
-        # Note: Wiring happens in _wire to avoid duplicate signals
-
+        
         self.btn_clear_audio = QToolButton()
         self.btn_clear_audio.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
         self.btn_clear_audio.setCursor(Qt.PointingHandCursor)
-        self.btn_clear_audio.setToolTip("Skip current song (loads next in queue)")
-
+        self.btn_clear_audio.setToolTip("Skip current song")
+        
         row_audio_btns = QHBoxLayout()
         row_audio_btns.addWidget(self.btn_add_audio, 1)
         row_audio_btns.addWidget(self.btn_clear_audio, 0)
@@ -339,73 +338,61 @@ class MainWindow(QMainWindow):
         grp_audio_layout.addLayout(row_audio_btns)
         sidebar_layout.addWidget(grp_audio)
 
-        # --- SEPARATE QUEUE BOX (Always Visible) ---
+        # Queue Box
         self.grp_queue = QGroupBox("Pending Queue")
-        # Ensure it's visible even if empty
-        self.grp_queue.setVisible(True)
-
+        self.grp_queue.setVisible(True) 
+        
         queue_layout = QVBoxLayout(self.grp_queue)
         queue_layout.setContentsMargins(8, 8, 8, 8)
         queue_layout.setSpacing(8)
-
+        
         self.queue_list = QListWidget()
         self.queue_list.setSelectionMode(QAbstractItemView.NoSelection)
-        # Small scrollable box ~2.5 rows (60px)
         self.queue_list.setMaximumHeight(65)
         self.queue_list.setStyleSheet("border: 1px solid palette(mid); border-radius: 4px;")
-
+        
         self.btn_clear_queue_all = QPushButton("Clear Queue")
         self.btn_clear_queue_all.setCursor(Qt.PointingHandCursor)
-
+        
         queue_layout.addWidget(self.queue_list)
         queue_layout.addWidget(self.btn_clear_queue_all)
-
+        
         sidebar_layout.addWidget(self.grp_queue)
 
         # Art
         grp_art = QGroupBox("Album Art")
         grp_art_layout = QVBoxLayout(grp_art)
+        
         self.cover_preview = QLabel("Drag Art Here")
         self.cover_preview.setAlignment(Qt.AlignCenter)
         self.cover_preview.setFixedSize(260, 260)
         self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text);")
-
+        
         row_art_btns = QHBoxLayout()
         self.btn_pick_cover = QPushButton("Image...")
         self.btn_pick_cover.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
         self.btn_pick_cover.setCursor(Qt.PointingHandCursor)
-
+        
         self.btn_clear_cover = QToolButton()
         self.btn_clear_cover.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
         self.btn_clear_cover.setCursor(Qt.PointingHandCursor)
-
+        
         row_art_btns.addWidget(self.btn_pick_cover, 1)
         row_art_btns.addWidget(self.btn_clear_cover, 0)
 
-        grp_art_layout.addWidget(self.cover_preview)
+        grp_art_layout.addStretch()
+        grp_art_layout.addWidget(self.cover_preview, 0, Qt.AlignCenter)
+        grp_art_layout.addStretch()
         grp_art_layout.addLayout(row_art_btns)
+        
         sidebar_layout.addWidget(grp_art)
-
-        # Tools
-        grp_tools = QGroupBox("Quick Actions")
-        grp_tools_layout = QVBoxLayout(grp_tools)
-        self.btn_open_output = QPushButton("Open Output Folder")
-        self.btn_open_output.setCursor(Qt.PointingHandCursor)
-
-        self.btn_open_song = QPushButton("Open Last Song")
-        self.btn_open_song.setCursor(Qt.PointingHandCursor)
-
-        grp_tools_layout.addWidget(self.btn_open_output)
-        grp_tools_layout.addWidget(self.btn_open_song)
-        sidebar_layout.addWidget(grp_tools)
-
         sidebar_layout.addStretch(1)
 
         # ================= Main Panel =================
         self.main_widget = QWidget()
         self.main_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-        self.main_widget.setMinimumWidth(500)
-
+        self.main_widget.setMinimumWidth(500) 
+        
         main_layout_inner = QVBoxLayout(self.main_widget)
         main_layout_inner.setContentsMargins(12, 0, 0, 0)
         main_layout_inner.setSpacing(22)
@@ -429,49 +416,29 @@ class MainWindow(QMainWindow):
         self.btn_clear_meta.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
         self.btn_clear_meta.setToolTip("Clear all metadata fields")
         self.btn_clear_meta.setCursor(Qt.PointingHandCursor)
-
+        
         form_meta.addRow(form_label("Title", required=True), self.title_edit)
         form_meta.addRow(form_label("Artist", required=True), self.artist_edit)
         form_meta.addRow(form_label("Album"), self.album_edit)
         form_meta.addRow(form_label("Genre"), self.genre_edit)
         form_meta.addRow(form_label("Charter"), self.charter_edit)
-
+        
         row_clear = QHBoxLayout()
         row_clear.addStretch()
-        row_clear.addWidget(QLabel("Clear Fields"))
+        row_clear.addWidget(QLabel("Clear fields"))
         row_clear.addWidget(self.btn_clear_meta)
         form_meta.addRow("", row_clear)
 
         main_layout_inner.addWidget(grp_meta)
 
-        # Output
-        grp_out = QGroupBox("Output Destination")
-        out_layout = QHBoxLayout(grp_out)
-        self.out_dir_edit = QLineEdit("")
-        self.out_dir_edit.setPlaceholderText("Select output folder... (Required)")
-
-        self.btn_pick_output = QPushButton("Browse...")
-        self.btn_pick_output.setCursor(Qt.PointingHandCursor)
-
-        self.btn_clear_out = QToolButton()
-        self.btn_clear_out.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
-        self.btn_clear_out.setToolTip("Clear output path")
-        self.btn_clear_out.setCursor(Qt.PointingHandCursor)
-
-        out_layout.addWidget(self.out_dir_edit, 1)
-        out_layout.addWidget(self.btn_pick_output, 0)
-        out_layout.addWidget(self.btn_clear_out, 0)
-        grp_out.setTitle("Output Destination  (REQUIRED)")
-        main_layout_inner.addWidget(grp_out)
-
-        # Advanced
+        # Configuration
         self.adv_container = QGroupBox("Configuration")
         adv_layout = QVBoxLayout(self.adv_container)
-
+        
         self.chk_adv = QCheckBox("Show Advanced Settings")
         self.chk_adv.setStyleSheet("font-weight: bold; margin-bottom: 6px;")
         self.chk_adv.setCursor(Qt.PointingHandCursor)
-
+        
         self.adv_content = QWidget()
         self.adv_content.setVisible(False)
         adv_form = QFormLayout(self.adv_content)
@@ -483,7 +450,7 @@ class MainWindow(QMainWindow):
         self.preset_combo.addItems(list(DIFFICULTY_PRESETS.keys()))
         self.preset_combo.setCurrentText("Medium (Balanced)")
         self.preset_combo.setCursor(Qt.PointingHandCursor)
-
+        
         self.preset_hint = QLabel("Select a preset to auto-configure settings.")
         self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11px;")
 
@@ -498,14 +465,12 @@ class MainWindow(QMainWindow):
         self.mode_group = QButtonGroup(self)
         self.mode_real = QRadioButton("Real (Audio Analysis)")
         self.mode_dummy = QRadioButton("Dummy (Metronome)")
-
         self.mode_real.setCursor(Qt.PointingHandCursor)
         self.mode_dummy.setCursor(Qt.PointingHandCursor)
-
         self.mode_real.setChecked(True)
         self.mode_group.addButton(self.mode_real)
         self.mode_group.addButton(self.mode_dummy)
-
+        
         row_mode = QHBoxLayout()
         row_mode.addWidget(self.mode_real)
         row_mode.addWidget(self.mode_dummy)
@@ -516,7 +481,7 @@ class MainWindow(QMainWindow):
         self.max_nps_spin.setSingleStep(0.1)
         self.max_nps_spin.setSuffix(" NPS")
         self.max_nps_spin.setMinimumHeight(30)
-
+        
         self.min_gap_spin = SafeSpinBox()
         self.min_gap_spin.setRange(10, 1000)
         self.min_gap_spin.setSingleStep(10)
@@ -527,21 +492,21 @@ class MainWindow(QMainWindow):
         self.seed_spin.setRange(0, 999999)
         self.seed_spin.setMinimumHeight(30)
         self.seed_spin.setToolTip("Seed for random generation.")
-
+        
         self.chk_orange = QCheckBox("Allow Orange Lane")
         self.chk_orange.setChecked(True)
         self.chk_orange.setCursor(Qt.PointingHandCursor)
-
+        
         self.chord_slider = QSlider(Qt.Horizontal)
         self.chord_slider.setRange(0, 50)
         self.chord_slider.setValue(12)
         self.chord_slider.setCursor(Qt.PointingHandCursor)
-
+        
         self.sustain_slider = QSlider(Qt.Horizontal)
         self.sustain_slider.setRange(0, 100)
         self.sustain_slider.setValue(50)
         self.sustain_slider.setCursor(Qt.PointingHandCursor)
-
+        
         self.grid_combo = SafeComboBox()
         self.grid_combo.addItems(["1/4", "1/8", "1/16"])
         self.grid_combo.setCurrentText("1/8")
@@ -551,12 +516,12 @@ class MainWindow(QMainWindow):
         custom_form.addRow(form_label("Max Notes/Sec"), self.max_nps_spin)
         custom_form.addRow(form_label("Min Note Spacing"), self.min_gap_spin)
         custom_form.addRow(form_label("Pattern Variation"), self.seed_spin)
-
+        
         div = QFrame()
         div.setFrameShape(QFrame.HLine)
         div.setStyleSheet("color: palette(mid);")
         custom_form.addRow(div)
-
+        
         custom_form.addRow(form_label("Grid Snap"), self.grid_combo)
         custom_form.addRow(form_label("5th Lane"), self.chk_orange)
         custom_form.addRow(form_label("Chord Density"), self.chord_slider)
@@ -566,6 +531,45 @@ class MainWindow(QMainWindow):
         adv_layout.addWidget(self.chk_adv)
         adv_layout.addWidget(self.adv_content)
         main_layout_inner.addWidget(self.adv_container)
+
+        # Output (Left Aligned Buttons)
+        grp_out = QGroupBox("Output Destination")
+        out_container_layout = QVBoxLayout(grp_out)
+        
+        out_row1 = QHBoxLayout()
+        self.out_dir_edit = QLineEdit("") 
+        self.out_dir_edit.setPlaceholderText("Select output folder... (Required)")
+        
+        self.btn_pick_output = QPushButton("Browse...")
+        self.btn_pick_output.setCursor(Qt.PointingHandCursor)
+        
+        self.btn_clear_out = QToolButton()
+        self.btn_clear_out.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
+        self.btn_clear_out.setToolTip("Clear output path")
+        self.btn_clear_out.setCursor(Qt.PointingHandCursor)
+        
+        out_row1.addWidget(self.out_dir_edit, 1)
+        out_row1.addWidget(self.btn_pick_output, 0)
+        out_row1.addWidget(self.btn_clear_out, 0)
+        
+        out_row2 = QHBoxLayout()
+        out_row2.setSpacing(8)
+        
+        self.btn_open_output = QPushButton("Open Folder")
+        self.btn_open_output.setCursor(Qt.PointingHandCursor)
+        self.btn_open_song = QPushButton("Open Last Song")
+        self.btn_open_song.setCursor(Qt.PointingHandCursor)
+        
+        out_row2.addWidget(self.btn_open_output)
+        out_row2.addWidget(self.btn_open_song)
+        out_row2.addStretch() # Push left
+        
+        out_container_layout.addLayout(out_row1)
+        out_container_layout.addLayout(out_row2)
+        
+        grp_out.setTitle("Output Destination  (REQUIRED)") 
+        main_layout_inner.addWidget(grp_out)
+        
         main_layout_inner.addStretch(1)
 
         # SCROLL AREA
@@ -582,41 +586,41 @@ class MainWindow(QMainWindow):
         # Footer
         footer = QWidget()
         footer_layout = QHBoxLayout(footer)
-        footer_layout.setContentsMargins(0, 5, 20, 5)
+        footer_layout.setContentsMargins(0, 5, 20, 5) 
         footer_layout.setSpacing(16)
-
+        
         self.chk_dark = QCheckBox("Dark Mode")
         self.chk_dark.setChecked(self.dark_mode)
         self.chk_dark.setCursor(Qt.PointingHandCursor)
-
+        
         self.btn_show_logs = QPushButton("Show Logs")
         self.btn_show_logs.setCursor(Qt.PointingHandCursor)
-
+        
         self.btn_help = QPushButton("Help")
         self.btn_help.setCursor(Qt.PointingHandCursor)
         self.btn_help.clicked.connect(self.show_help)
-
+        
         self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.setCursor(Qt.PointingHandCursor)
         self.btn_cancel.setMinimumHeight(36)
-
+        
         self.btn_generate = QPushButton("GENERATE CHART")
         self.btn_generate.setObjectName("Primary")
         self.btn_generate.setCursor(Qt.PointingHandCursor)
         self.btn_generate.setMinimumHeight(36)
-
+        
         footer_layout.addWidget(self.chk_dark)
         footer_layout.addWidget(self.btn_show_logs)
         footer_layout.addWidget(self.btn_help)
-
+        
         sep = QFrame()
         sep.setFrameShape(QFrame.VLine)
         sep.setStyleSheet("color: palette(mid);")
         footer_layout.addWidget(sep)
-
+        
         footer_layout.addWidget(self.btn_cancel)
         footer_layout.addWidget(self.btn_generate)
-
+        
         self.statusBar().addPermanentWidget(footer)
 
         # Menu
@@ -624,7 +628,7 @@ class MainWindow(QMainWindow):
         act_quit.triggered.connect(self.close)
         act_clear_log = QAction("Clear Log", self)
         act_clear_log.triggered.connect(lambda: self.log_window.clear())
-
+        
         menu = self.menuBar().addMenu("File")
         menu.addAction(act_clear_log)
         menu.addSeparator()
@@ -640,9 +644,9 @@ class MainWindow(QMainWindow):
         self.btn_open_song.clicked.connect(self.open_last_song)
         self.btn_generate.clicked.connect(self.run_generate)
         self.btn_cancel.clicked.connect(self.cancel_run)
-
+        
         self.btn_clear_queue_all.clicked.connect(self.clear_queue)
-
+        
         self.btn_clear_meta.clicked.connect(self.clear_metadata)
         self.btn_clear_out.clicked.connect(self.clear_output_dir)
         self.btn_show_logs.clicked.connect(self.log_window.show)
@@ -684,9 +688,8 @@ class MainWindow(QMainWindow):
         self.charter_edit.clear()
         self._title_user_edited = False
         self._update_state()
-
+        
     def clear_song_info(self) -> None:
-        """Clears only song-specific metadata (keeps Charter/Genre)."""
         self.title_edit.clear()
         self.artist_edit.clear()
         self.album_edit.clear()
@@ -724,32 +727,23 @@ class MainWindow(QMainWindow):
     # ---------- Logic / Processing ----------
     def _update_queue_display(self) -> None:
         self.queue_list.clear()
-
-        # Always visible, just enable/disable clear button
         self.btn_clear_queue_all.setEnabled(bool(self.song_queue))
-
         for i, path in enumerate(self.song_queue):
             item = QListWidgetItem(self.queue_list)
-
             wid = QWidget()
             hbox = QHBoxLayout(wid)
             hbox.setContentsMargins(4, 0, 4, 0)
-
             lbl = QLabel(path.name)
-            lbl.setStyleSheet("background: transparent; font-size: 11px;")
-
+            lbl.setStyleSheet("background: transparent; font-size: 11px;") 
             btn = QToolButton()
             btn.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet("border: none;")
             btn.clicked.connect(lambda checked=False, idx=i: self.remove_queue_item(idx))
-
             hbox.addWidget(lbl, 1)
             hbox.addWidget(btn, 0)
-
             item.setSizeHint(wid.sizeHint())
             self.queue_list.setItemWidget(item, wid)
-
         QTimer.singleShot(10, self.snap_to_content)
 
     def remove_queue_item(self, index: int) -> None:
@@ -760,14 +754,10 @@ class MainWindow(QMainWindow):
     def add_to_queue_dialog(self) -> None:
         files, _ = QFileDialog.getOpenFileNames(self, "Add Audio to Queue", "", "Audio (*.mp3 *.wav *.ogg *.flac)")
         if not files: return
-
         new_paths = [Path(f) for f in files]
-
-        # If nothing loaded, load first
         if not self.audio_path and new_paths:
             first = new_paths.pop(0)
             self.load_audio(first)
-
         self.song_queue.extend(new_paths)
         self._update_queue_display()
 
@@ -778,14 +768,11 @@ class MainWindow(QMainWindow):
         urls = event.mimeData().urls()
         audio_exts = {".mp3", ".wav", ".ogg", ".flac"}
         img_exts = {".jpg", ".jpeg", ".png"}
-
         new_songs = []
         found_cover = None
-
         for url in urls:
             path = Path(url.toLocalFile())
             if not path.exists(): continue
-
             if path.is_file():
                 if path.suffix.lower() in audio_exts:
                     new_songs.append(path)
@@ -795,15 +782,11 @@ class MainWindow(QMainWindow):
                 for f in path.rglob("*"):
                     if f.is_file() and f.suffix.lower() in audio_exts:
                         new_songs.append(f)
-
-        if found_cover:
-            self.load_cover(found_cover)
-
+        if found_cover: self.load_cover(found_cover)
         if new_songs:
             if not self.audio_path:
                 first = new_songs.pop(0)
                 self.load_audio(first)
-
             self.song_queue.extend(new_songs)
             self._update_queue_display()
 
@@ -831,8 +814,11 @@ class MainWindow(QMainWindow):
         has_title = bool(self.title_edit.text().strip())
         has_artist = bool(self.artist_edit.text().strip())
         has_out = bool(self.out_dir_edit.text().strip())
+        
         self.btn_generate.setEnabled((not running) and has_audio and has_title and has_artist and has_out)
         self.btn_cancel.setEnabled(running)
+        
+        self.btn_open_output.setEnabled(bool(self.out_dir_edit.text().strip()))
         self.btn_open_song.setEnabled(self.last_out_song is not None and self.last_out_song.exists())
 
     def append_log(self, text: str) -> None:
@@ -869,8 +855,7 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self.snap_to_content)
 
     def clear_audio(self) -> None:
-        self.clear_song_info() # clear metadata regardless
-
+        self.clear_song_info() 
         if self.song_queue:
             next_song = self.song_queue.pop(0)
             self._update_queue_display()
@@ -1003,7 +988,6 @@ class MainWindow(QMainWindow):
     def _on_finished(self, code: int, status: QProcess.ExitStatus, out_song: Path) -> None:
         self.btn_generate.setText("GENERATE CHART")
         ok = (status == QProcess.NormalExit) and (code == 0)
-
         if ok:
             if self.cover_path and self.cover_path.exists():
                 try:
@@ -1013,9 +997,8 @@ class MainWindow(QMainWindow):
                 except Exception as e: self.append_log(f"Cover copy failed: {e}")
             gen_cover = out_song / "album.png"
             if gen_cover.exists(): self.update_cover_preview(gen_cover)
-
             self.run_health_check(out_song)
-
+            
             # --- QUEUE LOGIC ---
             if self.song_queue:
                 next_song = self.song_queue.pop(0)
@@ -1030,7 +1013,6 @@ class MainWindow(QMainWindow):
                 self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
                 self._update_state()
                 self.statusBar().showMessage("Queue Finished")
-
         else:
             reason = "Unknown error."
             logs = self.log_window.get_text()
@@ -1040,7 +1022,6 @@ class MainWindow(QMainWindow):
                     break
             QMessageBox.critical(self, "Generation Failed", f"Failed to generate chart.\n\nReason: {reason}\n\nCheck logs for full details.")
             self.statusBar().showMessage("Generation Failed")
-
         self.proc = None
         self._update_state()
 
@@ -1062,15 +1043,14 @@ class MainWindow(QMainWindow):
                 warnings.append(line[2:])
         self.append_log("\n--- VALIDATION REPORT ---")
         self.append_log(output)
-
-        # Only popup if queue is done, to avoid spam
+        
         if not self.song_queue:
             msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
             if warnings: msg += "\n\nWarnings:\n" + "\n".join(f"• {w}" for w in warnings)
             title = "Generation Complete" if not warnings else "Complete (With Warnings)"
             QMessageBox.information(self, title, msg) if not warnings else QMessageBox.warning(self, title, msg)
             self.statusBar().showMessage("Ready")
-
+        
         self.validator_proc = None
 
 def main() -> None:
