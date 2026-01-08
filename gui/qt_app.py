@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QProcess, QSize, QTimer, QSettings
-from PySide6.QtGui import QFont, QPixmap, QAction, QPalette, QColor, QDragEnterEvent, QDropEvent, QFontDatabase
+from PySide6.QtGui import QFont, QPixmap, QAction, QPalette, QColor, QDragEnterEvent, QDropEvent, QFontDatabase, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -33,7 +33,9 @@ from PySide6.QtWidgets import (
     QWidget,
     QSizePolicy,
     QStyle,
-    QSlider
+    QSlider,
+    QListWidget,
+    QAbstractItemView
 )
 
 # ---------------- Paths & Config ----------------
@@ -146,14 +148,16 @@ class ThemeManager:
             QGroupBox { border: 1px solid palette(mid); border-radius: 6px; margin-top: 24px; padding-top: 12px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
             
-            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit { 
+            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget { 
                 padding: 6px; 
                 border-radius: 4px; 
                 border: 1px solid palette(mid); 
                 background-color: palette(base); 
                 color: palette(text);
             }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus { border: 1px solid palette(highlight); }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus { 
+                border: 1px solid palette(highlight); 
+            }
             
             QComboBox QAbstractItemView {
                 background-color: palette(base);
@@ -190,29 +194,19 @@ class LogWindow(QWidget):
         super().__init__()
         self.setWindowTitle("Logs")
         self.resize(700, 500)
-        
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(12)
-        
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
-        
         mono_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         mono_font.setPointSize(11)
         self.text_edit.setFont(mono_font)
-        
         layout.addWidget(self.text_edit)
         
         row_btns = QHBoxLayout()
         btn_clear = QPushButton("Clear Logs")
-        btn_clear.setCursor(Qt.PointingHandCursor)
-        btn_clear.clicked.connect(self.clear)
-        
+        btn_clear.clicked.connect(self.text_edit.clear)
         btn_close = QPushButton("Close")
-        btn_close.setCursor(Qt.PointingHandCursor)
         btn_close.clicked.connect(self.hide)
-        
         row_btns.addStretch()
         row_btns.addWidget(btn_clear)
         row_btns.addWidget(btn_close)
@@ -221,7 +215,7 @@ class LogWindow(QWidget):
     def append_text(self, text: str):
         self.text_edit.append(text)
         self.text_edit.verticalScrollBar().setValue(self.text_edit.verticalScrollBar().maximum())
-
+    
     def clear(self):
         self.text_edit.clear()
         
@@ -232,7 +226,7 @@ class LogWindow(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("CloneHero 1-Click Charter")
+        self.setWindowTitle("CloneHero 1-Click Generator")
         self.setAcceptDrops(True)
         self.settings = QSettings("Zullo", "1ClickCharter")
         
@@ -242,8 +236,10 @@ class MainWindow(QMainWindow):
         self.proc: QProcess | None = None
         self.validator_proc: QProcess | None = None
         
-        self.log_window = LogWindow()
+        # QUEUE SYSTEM
+        self.song_queue: list[Path] = []
         
+        self.log_window = LogWindow()
         self.dark_mode = self.settings.value("dark_mode", True, type=bool)
         self._title_user_edited = False
 
@@ -251,12 +247,10 @@ class MainWindow(QMainWindow):
         self._wire()
         self._restore_settings()
         
-        self.resize(950, 700)
-        
+        self.resize(950, 750)
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
         self.apply_preset(self.preset_combo.currentText())
         self._update_state()
-        
         QTimer.singleShot(100, self.snap_to_content)
         self.statusBar().showMessage("Ready")
 
@@ -316,13 +310,39 @@ class MainWindow(QMainWindow):
         sidebar_layout.setContentsMargins(0, 0, 12, 0)
         sidebar_layout.setSpacing(18)
 
-        # Audio
+        # Audio Input Group
         grp_audio = QGroupBox("Input Audio (REQUIRED)")
         grp_audio_layout = QVBoxLayout(grp_audio)
-        self.audio_label = QLabel("Drag Audio Here", alignment=Qt.AlignCenter)
+        self.audio_label = QLabel("Drag Audio Files Here")
+        self.audio_label.setAlignment(Qt.AlignCenter)
         self.audio_label.setWordWrap(True)
         self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
         
+        # Queue Indicator
+        self.queue_widget = QWidget()
+        self.queue_widget.setVisible(False)
+        queue_layout = QHBoxLayout(self.queue_widget)
+        queue_layout.setContentsMargins(0, 0, 0, 0)
+        self.queue_label = QLabel("0 songs waiting")
+        self.queue_label.setStyleSheet("color: palette(highlight); font-weight: bold; font-size: 11px;")
+        
+        self.btn_clear_queue = QToolButton()
+        self.btn_clear_queue.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
+        self.btn_clear_queue.setToolTip("Clear pending queue")
+        self.btn_clear_queue.setCursor(Qt.PointingHandCursor)
+        self.btn_clear_queue.clicked.connect(self.clear_queue)
+        
+        queue_layout.addStretch()
+        queue_layout.addWidget(self.queue_label)
+        queue_layout.addWidget(self.btn_clear_queue)
+        queue_layout.addStretch()
+        
+        # ADD Button
+        self.btn_add_audio = QPushButton("+ Add")
+        self.btn_add_audio.setToolTip("Add files to queue")
+        self.btn_add_audio.setCursor(Qt.PointingHandCursor)
+        self.btn_add_audio.clicked.connect(self.add_to_queue_dialog)
+
         row_audio_btns = QHBoxLayout()
         self.btn_pick_audio = QPushButton("Browse...")
         self.btn_pick_audio.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
@@ -333,9 +353,11 @@ class MainWindow(QMainWindow):
         self.btn_clear_audio.setCursor(Qt.PointingHandCursor)
         
         row_audio_btns.addWidget(self.btn_pick_audio, 1)
+        row_audio_btns.addWidget(self.btn_add_audio, 0)
         row_audio_btns.addWidget(self.btn_clear_audio, 0)
 
         grp_audio_layout.addWidget(self.audio_label)
+        grp_audio_layout.addWidget(self.queue_widget)
         grp_audio_layout.addLayout(row_audio_btns)
         sidebar_layout.addWidget(grp_audio)
 
@@ -438,7 +460,7 @@ class MainWindow(QMainWindow):
         out_layout.addWidget(self.out_dir_edit, 1)
         out_layout.addWidget(self.btn_pick_output, 0)
         out_layout.addWidget(self.btn_clear_out, 0)
-        grp_out.setTitle("Output Destination  (REQUIRED)") 
+        grp_out.setTitle("Output Destination (REQUIRED)") 
         main_layout_inner.addWidget(grp_out)
 
         # Advanced
@@ -478,6 +500,7 @@ class MainWindow(QMainWindow):
         
         self.mode_real.setCursor(Qt.PointingHandCursor)
         self.mode_dummy.setCursor(Qt.PointingHandCursor)
+        
         self.mode_real.setChecked(True)
         self.mode_group.addButton(self.mode_real)
         self.mode_group.addButton(self.mode_dummy)
@@ -568,6 +591,10 @@ class MainWindow(QMainWindow):
         self.btn_show_logs = QPushButton("Show Logs")
         self.btn_show_logs.setCursor(Qt.PointingHandCursor)
         
+        self.btn_help = QPushButton("Help")
+        self.btn_help.setCursor(Qt.PointingHandCursor)
+        self.btn_help.clicked.connect(self.show_help)
+        
         self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.setCursor(Qt.PointingHandCursor)
         self.btn_cancel.setMinimumHeight(36)
@@ -579,6 +606,7 @@ class MainWindow(QMainWindow):
         
         footer_layout.addWidget(self.chk_dark)
         footer_layout.addWidget(self.btn_show_logs)
+        footer_layout.addWidget(self.btn_help)
         
         sep = QFrame()
         sep.setFrameShape(QFrame.VLine)
@@ -633,6 +661,21 @@ class MainWindow(QMainWindow):
         w = 310 + 550 + 40
         self.resize(w, h)
 
+    def show_help(self) -> None:
+        msg = """
+        <h3>How to Use 1-Click Charter</h3>
+        <ol>
+            <li><b>Drag & Drop</b> your audio file(s) into the top-left box.</li>
+            <li><b>Select Output Folder:</b> Choose where the charts should go.</li>
+            <li><b>Verify Metadata:</b> Ensure Title and Artist are correct.</li>
+            <li><b>(Optional) Add Cover Art:</b> Drag an image into the box.</li>
+            <li><b>Click Generate:</b> The app will process the current song.</li>
+        </ol>
+        <p><b>Queue Mode:</b> If you drag multiple files, they are added to the queue. After generating one, the app auto-loads the next song.</p>
+        <p><b>Tips:</b> Use "Advanced Settings" to tune difficulty. Check "Show Logs" if something goes wrong.</p>
+        """
+        QMessageBox.information(self, "Help & Instructions", msg.strip())
+
     def clear_metadata(self) -> None:
         self.title_edit.clear()
         self.artist_edit.clear()
@@ -646,6 +689,10 @@ class MainWindow(QMainWindow):
         self.out_dir_edit.clear()
         self._update_state()
 
+    def clear_queue(self) -> None:
+        self.song_queue.clear()
+        self._update_queue_display()
+
     def clear_for_next_run(self) -> None:
         self.clear_audio()
         self.clear_cover()
@@ -655,7 +702,6 @@ class MainWindow(QMainWindow):
         self._title_user_edited = False
         self._update_state()
 
-    # ---------- Persistence, DragDrop, Logic, Pickers, Execution ----------
     def _restore_settings(self) -> None:
         saved_charter = self.settings.value("charter", "Zullo7569", type=str)
         if saved_charter != "Zullo7569":
@@ -667,20 +713,63 @@ class MainWindow(QMainWindow):
         geom = self.settings.value("geometry")
         if geom: self.restoreGeometry(geom)
 
+    # ---------- Logic / Processing ----------
+    def _update_queue_display(self) -> None:
+        cnt = len(self.song_queue)
+        if cnt > 0:
+            self.queue_widget.setVisible(True)
+            self.queue_label.setText(f"{cnt} songs waiting...")
+        else:
+            self.queue_widget.setVisible(False)
+
+    def add_to_queue_dialog(self) -> None:
+        files, _ = QFileDialog.getOpenFileNames(self, "Add Audio to Queue", "", "Audio (*.mp3 *.wav *.ogg *.flac)")
+        if not files: return
+        
+        # If nothing loaded, load first
+        new_paths = [Path(f) for f in files]
+        if not self.audio_path and new_paths:
+            first = new_paths.pop(0)
+            self.load_audio(first)
+            
+        self.song_queue.extend(new_paths)
+        self._update_queue_display()
+
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls(): event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent) -> None:
-        for url in event.mimeData().urls():
+        urls = event.mimeData().urls()
+        audio_exts = {".mp3", ".wav", ".ogg", ".flac"}
+        img_exts = {".jpg", ".jpeg", ".png"}
+        
+        new_songs = []
+        found_cover = None
+
+        for url in urls:
             path = Path(url.toLocalFile())
             if not path.exists(): continue
-            suffix = path.suffix.lower()
-            if suffix in {".mp3", ".wav", ".ogg", ".flac"}:
-                self.load_audio(path)
-                break
-            elif suffix in {".jpg", ".jpeg", ".png"}:
-                self.load_cover(path)
-                break
+            
+            if path.is_file():
+                if path.suffix.lower() in audio_exts:
+                    new_songs.append(path)
+                elif path.suffix.lower() in img_exts:
+                    found_cover = path
+            elif path.is_dir():
+                for f in path.rglob("*"):
+                    if f.is_file() and f.suffix.lower() in audio_exts:
+                        new_songs.append(f)
+
+        if found_cover:
+            self.load_cover(found_cover)
+
+        if new_songs:
+            if not self.audio_path:
+                first = new_songs.pop(0)
+                self.load_audio(first)
+            
+            self.song_queue.extend(new_songs)
+            self._update_queue_display()
 
     def on_dark_toggle(self, checked: bool) -> None:
         self.dark_mode = checked
@@ -745,7 +834,7 @@ class MainWindow(QMainWindow):
 
     def clear_audio(self) -> None:
         self.audio_path = None
-        self.audio_label.setText("Drag & drop audio here")
+        self.audio_label.setText("Drag Audio Files Here")
         self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
         self._update_state()
         self.audio_label.adjustSize() 
@@ -869,6 +958,7 @@ class MainWindow(QMainWindow):
     def _on_finished(self, code: int, status: QProcess.ExitStatus, out_song: Path) -> None:
         self.btn_generate.setText("GENERATE CHART")
         ok = (status == QProcess.NormalExit) and (code == 0)
+        
         if ok:
             if self.cover_path and self.cover_path.exists():
                 try:
@@ -878,8 +968,36 @@ class MainWindow(QMainWindow):
                 except Exception as e: self.append_log(f"Cover copy failed: {e}")
             gen_cover = out_song / "album.png"
             if gen_cover.exists(): self.update_cover_preview(gen_cover)
+            
             self.run_health_check(out_song)
-            self.clear_for_next_run()
+            
+            # --- QUEUE LOGIC ---
+            if self.song_queue:
+                next_song = self.song_queue.pop(0)
+                self.title_edit.clear()
+                self.artist_edit.clear()
+                self.album_edit.clear()
+                self.cover_path = None
+                self.update_cover_preview(None)
+                self._title_user_edited = False
+                
+                self.load_audio(next_song)
+                self._update_queue_display()
+                self.statusBar().showMessage(f"Chart generated! Loaded next: {next_song.name}")
+                
+            else:
+                self.title_edit.clear()
+                self.artist_edit.clear()
+                self.album_edit.clear()
+                self.cover_path = None
+                self.update_cover_preview(None)
+                self.audio_path = None
+                self.audio_label.setText("Drag Audio Files Here")
+                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
+                self._title_user_edited = False
+                self._update_state()
+                self.statusBar().showMessage("Queue Finished")
+
         else:
             reason = "Unknown error."
             logs = self.log_window.get_text()
@@ -889,6 +1007,7 @@ class MainWindow(QMainWindow):
                     break
             QMessageBox.critical(self, "Generation Failed", f"Failed to generate chart.\n\nReason: {reason}\n\nCheck logs for full details.")
             self.statusBar().showMessage("Generation Failed")
+            
         self.proc = None
         self._update_state()
 
@@ -910,11 +1029,15 @@ class MainWindow(QMainWindow):
                 warnings.append(line[2:])
         self.append_log("\n--- VALIDATION REPORT ---")
         self.append_log(output)
-        msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
-        if warnings: msg += "\n\nWarnings:\n" + "\n".join(f"• {w}" for w in warnings)
-        title = "Generation Complete" if not warnings else "Complete (With Warnings)"
-        QMessageBox.information(self, title, msg) if not warnings else QMessageBox.warning(self, title, msg)
-        self.statusBar().showMessage("Ready")
+        
+        # Only popup if queue is done, to avoid spam
+        if not self.song_queue:
+            msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
+            if warnings: msg += "\n\nWarnings:\n" + "\n".join(f"• {w}" for w in warnings)
+            title = "Generation Complete" if not warnings else "Complete (With Warnings)"
+            QMessageBox.information(self, title, msg) if not warnings else QMessageBox.warning(self, title, msg)
+            self.statusBar().showMessage("Ready")
+        
         self.validator_proc = None
 
 def main() -> None:
