@@ -111,7 +111,6 @@ pipx-install: build
 
 # Generates icons by running the script inside the 'icons' folder
 icons:
-	@ls
 	@chmod +x tools/make_icons.sh
 	@echo "🎨 Generating icons..."
 	@# We enter 'icons' so the script finds 'icon.png' naturally
@@ -121,12 +120,13 @@ icons:
 package: install icons
 	@echo "🚀 Packaging $(APP_NAME)..."
 	@rm -rf dist build
-	@# Note: --paths "." ensures it finds 'gui' and 'charter' packages in root
+	@# Note: --add-data 'src:dest'
 	@$(VENV)/bin/pyinstaller --noconfirm --clean \
 		--name "$(APP_NAME)" \
 		--windowed \
 		--onefile \
 		--icon "icons/AppIcon.icns" \
+		--add-data "icons/icon_og.png:icons" \
 		--paths "." \
 		--hidden-import "charter.cli" \
 		--hidden-import "gui.qt_app" \
