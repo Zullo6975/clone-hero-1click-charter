@@ -47,4 +47,3 @@
 - [ ] **Chart Export:** Option to export in `.chart` format (text-based) for editing in Moonscraper.
 - [ ] **Auto-Update:** In-app notification when a new GitHub Release is available.
 - [ ] **Batch Reporting:** A summary screen after a large batch job ("Processed 50 songs: 48 Success, 2 Failed").
-- [ ] 
