@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "1clickcharter"
-version = "0.1.0"
+version = "1.0.0"
 description = "One-click Clone Hero chart generator for fun, playable Medium lead guitar charts"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,8 +29,6 @@ dev = [
 
 [project.scripts]
 1clickcharter = "charter.cli:main"
-
-# Optional GUI entrypoint (only works if PySide6 is installed)
 1clickcharter-gui = "gui.qt_app:main"
 
 [tool.setuptools]
