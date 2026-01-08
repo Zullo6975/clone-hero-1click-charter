@@ -1,6 +1,7 @@
 from __future__ import annotations
 import sys
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -48,7 +49,6 @@ def get_python_exec() -> str | Path:
     return repo_root() / ".venv" / "bin" / "python"
 
 def form_label(text: str, required: bool = False) -> QLabel:
-    """Helper to create standard aligned labels with optional red star."""
     txt = f"{text} <span style='color:#ff4444;'>*</span>" if required else text
     lbl = QLabel(txt)
     lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
@@ -61,7 +61,6 @@ def get_font(size: int = 10, bold: bool = False) -> QFont:
     f.setBold(bold)
     return f
 
-# --- Custom Widget: ComboBox that doesn't scroll ---
 class SafeComboBox(QComboBox):
     def wheelEvent(self, event):
         event.ignore()
@@ -134,11 +133,28 @@ class ThemeManager:
             palette.setColor(QPalette.PlaceholderText, QColor(140, 140, 150))
         app.setPalette(palette)
 
+        # Updated Stylesheet with ComboBox fix
         app.setStyleSheet("""
             QGroupBox { border: 1px solid palette(mid); border-radius: 6px; margin-top: 24px; padding-top: 12px; font-weight: bold; }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
-            QLineEdit, QComboBox { padding: 6px; border-radius: 4px; border: 1px solid palette(mid); background-color: palette(base); }
+
+            QLineEdit, QComboBox {
+                padding: 6px;
+                border-radius: 4px;
+                border: 1px solid palette(mid);
+                background-color: palette(base);
+                color: palette(text);
+            }
             QLineEdit:focus, QComboBox:focus { border: 1px solid palette(highlight); }
+
+            /* Fix for invisible text in Light Mode dropdowns on macOS */
+            QComboBox QAbstractItemView {
+                background-color: palette(base);
+                color: palette(text);
+                selection-background-color: palette(highlight);
+                selection-color: palette(highlighted-text);
+            }
+
             QPushButton { padding: 8px 16px; border-radius: 5px; border: 1px solid palette(mid); background-color: palette(button); }
             QPushButton:hover { background-color: palette(light); }
 
@@ -148,10 +164,7 @@ class ThemeManager:
                 font-weight: bold;
                 border: 1px solid palette(highlight);
             }
-            QPushButton#Primary:hover {
-                border: 1px solid palette(text);
-            }
-            /* Explicit disabled style to make it obvious */
+            QPushButton#Primary:hover { border: 1px solid palette(text); }
             QPushButton#Primary:disabled {
                 background-color: palette(mid);
                 color: palette(disabled-text);
@@ -159,9 +172,6 @@ class ThemeManager:
             }
 
             QCheckBox { spacing: 8px; }
-            QLabel#HealthGood { color: #2ecc71; font-weight: bold; }
-            QLabel#HealthWarn { color: #f1c40f; font-weight: bold; }
-            QLabel#HealthBad { color: #e74c3c; font-weight: bold; }
         """)
 
 # ---------------- Main Window ----------------
@@ -226,9 +236,9 @@ class MainWindow(QMainWindow):
         sidebar_layout.addLayout(title_block)
 
         # Audio
-        grp_audio = QGroupBox("Input Audio (REQUIRED)")
+        grp_audio = QGroupBox("Input Audio")
         grp_audio_layout = QVBoxLayout(grp_audio)
-        self.audio_label = QLabel("Drag & drop audio here", alignment=Qt.AlignCenter)
+        self.audio_label = QLabel("Drag & drop audio here")
         self.audio_label.setWordWrap(True)
         self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
 
@@ -251,10 +261,10 @@ class MainWindow(QMainWindow):
         # Art
         grp_art = QGroupBox("Album Art")
         grp_art_layout = QVBoxLayout(grp_art)
-        self.cover_preview = QLabel("Drag Art Here", alignment=Qt.AlignCenter)
+        self.cover_preview = QLabel("Drag Art Here")
         self.cover_preview.setAlignment(Qt.AlignCenter)
         self.cover_preview.setFixedSize(260, 260)
-        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); qproperty-alignment: AlignCenter;")
+        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text);")
 
         row_art_btns = QHBoxLayout()
         self.btn_pick_cover = QPushButton("Image...")
@@ -306,14 +316,11 @@ class MainWindow(QMainWindow):
         self.title_edit = QLineEdit()
         self.artist_edit = QLineEdit()
         self.album_edit = QLineEdit()
-
         self.genre_edit = QLineEdit()
         self.genre_edit.setPlaceholderText("Default: Rock")
-
         self.charter_edit = QLineEdit()
         self.charter_edit.setPlaceholderText("Default: Zullo7569")
 
-        # Metadata Header with Clear Button
         self.btn_clear_meta = QToolButton()
         self.btn_clear_meta.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
         self.btn_clear_meta.setToolTip("Clear all metadata fields")
@@ -334,13 +341,10 @@ class MainWindow(QMainWindow):
         main_layout_inner.addWidget(grp_meta)
 
         # Output
-        # Add Red star to group box title manually since QGroupBox doesn't like rich text in standard style
         grp_out = QGroupBox("Output Destination")
-        # We'll use a label inside to convey requirement if title fails, but sticking to standard groupbox for looks
-
         out_layout = QHBoxLayout(grp_out)
-        self.out_dir_edit = QLineEdit("") # Start blank to force user choice
-        self.out_dir_edit.setPlaceholderText("Select output folder...")
+        self.out_dir_edit = QLineEdit("")
+        self.out_dir_edit.setPlaceholderText("Select output folder... (Required)")
 
         self.btn_pick_output = QPushButton("Browse...")
         self.btn_pick_output.setCursor(Qt.PointingHandCursor)
@@ -353,16 +357,7 @@ class MainWindow(QMainWindow):
         out_layout.addWidget(self.out_dir_edit, 1)
         out_layout.addWidget(self.btn_pick_output, 0)
         out_layout.addWidget(self.btn_clear_out, 0)
-
-        # Add a "Required" label above it since groupbox title is tricky
-        lbl_req_out = QLabel("Output Folder <span style='color:#ff4444;'>*</span>")
-        lbl_req_out.setTextFormat(Qt.RichText)
-        # Hacky insert into main layout? No, just put it inside the groupbox?
-        # Actually, let's just rely on the red placeholder text and disabled button.
-        # Or rename groupbox:
-        grp_out.setTitle("Output Destination  (REQUIRED)")
-        # (Fusion might not color the *, but the asterisk implies required)
-
+        grp_out.setTitle("Output Destination  *")
         main_layout_inner.addWidget(grp_out)
 
         # Advanced
@@ -399,10 +394,8 @@ class MainWindow(QMainWindow):
         self.mode_group = QButtonGroup(self)
         self.mode_real = QRadioButton("Real (Audio Analysis)")
         self.mode_dummy = QRadioButton("Dummy (Metronome)")
-
         self.mode_real.setCursor(Qt.PointingHandCursor)
         self.mode_dummy.setCursor(Qt.PointingHandCursor)
-
         self.mode_real.setChecked(True)
         self.mode_group.addButton(self.mode_real)
         self.mode_group.addButton(self.mode_dummy)
@@ -427,7 +420,6 @@ class MainWindow(QMainWindow):
         self.seed_spin = QSpinBox()
         self.seed_spin.setRange(0, 999999)
         self.seed_spin.setMinimumHeight(30)
-        self.seed_spin.setToolTip("Seed for random generation.")
 
         self.chk_orange = QCheckBox("Allow Orange Lane")
         self.chk_orange.setChecked(True)
@@ -467,20 +459,6 @@ class MainWindow(QMainWindow):
         adv_layout.addWidget(self.chk_adv)
         adv_layout.addWidget(self.adv_content)
         main_layout_inner.addWidget(self.adv_container)
-
-        # Health Status
-        self.health_bar = QFrame()
-        self.health_bar.setVisible(False)
-        self.health_bar.setStyleSheet("background-color: palette(alternate-base); border-radius: 6px; padding: 4px;")
-        hb_layout = QHBoxLayout(self.health_bar)
-        hb_layout.setContentsMargins(8, 4, 8, 4)
-        self.health_icon = QLabel("●")
-        self.health_icon.setFont(get_font(14, True))
-        self.health_text = QLabel("Checking...")
-        self.health_text.setFont(get_font(10, True))
-        hb_layout.addWidget(self.health_icon)
-        hb_layout.addWidget(self.health_text, 1)
-        main_layout_inner.addWidget(self.health_bar)
 
         # Actions
         row_actions = QHBoxLayout()
@@ -599,13 +577,11 @@ class MainWindow(QMainWindow):
         self._update_state()
 
     def clear_for_next_run(self) -> None:
-        """Clears inputs but keeps charter, output folder, and genre."""
         self.clear_audio()
         self.clear_cover()
         self.title_edit.clear()
         self.artist_edit.clear()
         self.album_edit.clear()
-        # Genre and Charter usually stay same per session
         self._title_user_edited = False
         self._update_state()
 
@@ -615,7 +591,6 @@ class MainWindow(QMainWindow):
         if saved_charter != "Zullo7569":
             self.charter_edit.setText(saved_charter)
 
-        # Defaults to blank now per request
         saved_out = self.settings.value("out_dir", "", type=str)
         self.out_dir_edit.setText(saved_out)
 
@@ -626,11 +601,8 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:
         self.settings.setValue("dark_mode", self.chk_dark.isChecked())
-
-        # Save charter text, or default if blank
         c_val = self.charter_edit.text().strip() or "Zullo7569"
         self.settings.setValue("charter", c_val)
-
         self.settings.setValue("out_dir", self.out_dir_edit.text())
         self.settings.setValue("preset", self.preset_combo.currentText())
         self.settings.setValue("geometry", self.saveGeometry())
@@ -764,12 +736,10 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", "Audio file missing.")
             return None
 
-        # Output folder check
         out_txt = self.out_dir_edit.text().strip()
         if not out_txt:
             QMessageBox.critical(self, "Error", "Output folder is required.")
             return None
-
         out_root = Path(out_txt).expanduser().resolve()
 
         title = self.title_edit.text().strip()
@@ -777,7 +747,6 @@ class MainWindow(QMainWindow):
 
         mode_val = "real" if self.mode_real.isChecked() else "dummy"
 
-        # Apply quiet defaults logic
         genre_val = self.genre_edit.text().strip() or "Rock"
         charter_val = self.charter_edit.text().strip() or "Zullo7569"
 
@@ -822,8 +791,9 @@ class MainWindow(QMainWindow):
         if not cfg.allow_orange: cmd.append("--no-orange")
         if cfg.fetch_metadata: cmd.append("--fetch-metadata")
         self.log_view.clear()
-        if not self.grp_logs.isVisible(): self.chk_log.setChecked(True)
-        self.health_bar.setVisible(False)
+
+        # NOTE: Removed auto-check of Logs checkbox
+
         self.append_log(f"Starting generation for: {cfg.title}...")
         self.btn_generate.setText("Generating...")
         self.proc = QProcess(self)
@@ -853,56 +823,82 @@ class MainWindow(QMainWindow):
     def _on_finished(self, code: int, status: QProcess.ExitStatus, out_song: Path) -> None:
         self.btn_generate.setText("GENERATE CHART")
         ok = (status == QProcess.NormalExit) and (code == 0)
-        if ok and self.cover_path and self.cover_path.exists():
-            try:
-                dest = out_song / "album.png"
-                dest.write_bytes(self.cover_path.read_bytes())
-                self.append_log(f"Cover copied to {dest}")
-            except Exception as e: self.append_log(f"Cover copy failed: {e}")
-        gen_cover = out_song / "album.png"
-        if gen_cover.exists(): self.update_cover_preview(gen_cover)
         if ok:
+            if self.cover_path and self.cover_path.exists():
+                try:
+                    dest = out_song / "album.png"
+                    dest.write_bytes(self.cover_path.read_bytes())
+                    self.append_log(f"Cover copied to {dest}")
+                except Exception as e: self.append_log(f"Cover copy failed: {e}")
+            gen_cover = out_song / "album.png"
+            if gen_cover.exists(): self.update_cover_preview(gen_cover)
+
+            # SUCCESS PATH: Run health check, then popup results
             self.run_health_check(out_song)
-            self.statusBar().showMessage("Generation Complete")
-
-            # --- AUTO CLEAR LOGIC ---
             self.clear_for_next_run()
-
         else:
-            QMessageBox.critical(self, "Failed", f"Process exited with code {code}. See logs.")
+            # FAILURE PATH: Parse logs for human readable reason
+            err_msg = "Unknown error."
+            logs = self.log_view.toPlainText()
+
+            # Simple heuristic to find the last error line
+            lines = logs.splitlines()
+            for line in reversed(lines):
+                if "Error" in line or "Exception" in line:
+                    err_msg = line.strip()
+                    break
+
+            QMessageBox.critical(self, "Generation Failed",
+                                 f"The chart could not be generated.\n\nReason: {err_msg}\n\n(See Logs for details)")
             self.statusBar().showMessage("Generation Failed")
+
         self.proc = None
         self._update_state()
 
     def run_health_check(self, song_dir: Path) -> None:
-        self.health_bar.setVisible(True)
-        self.health_icon.setText("⏳")
-        self.health_text.setText("Validating chart health...")
-        self.health_icon.setObjectName("HealthWarn")
-        self.health_text.setStyleSheet("")
+        self.statusBar().showMessage("Validating chart...")
         QTimer.singleShot(0, self.snap_to_content)
         py_exec = get_python_exec()
         script = repo_root() / "tools" / "validator.py"
         self.validator_proc = QProcess(self)
-        self.validator_proc.finished.connect(lambda c, s: self._on_health_finished(c, s))
+        self.validator_proc.finished.connect(lambda c, s: self._on_health_finished(c, s, song_dir))
         self.validator_proc.start(str(py_exec), [str(script), str(song_dir), "--summary"])
 
-    def _on_health_finished(self, code: int, status: QProcess.ExitStatus) -> None:
+    def _on_health_finished(self, code: int, status: QProcess.ExitStatus, song_dir: Path) -> None:
         output = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8")
-        if code == 0:
-            self.health_icon.setText("●")
-            self.health_icon.setObjectName("HealthGood")
-            self.health_text.setText("Chart Healthy (Ready to Play)")
-            self.health_text.setStyleSheet("color: palette(text);")
-            if "WARNINGS:" in output:
-                self.health_icon.setObjectName("HealthWarn")
-                self.health_text.setText("Playable (See Logs for Warnings)")
+
+        # Parse output for cleaner display in Popup
+        errors = []
+        warnings = []
+        current_list = None
+
+        for line in output.splitlines():
+            line = line.strip()
+            if line == "ERRORS:":
+                current_list = errors
+            elif line == "WARNINGS:":
+                current_list = warnings
+            elif line.startswith("- ") and current_list is not None:
+                current_list.append(line[2:])
+            elif line.startswith("---"):
+                current_list = None
+
+        if code != 0 or errors:
+            msg = "Chart generated, but errors were detected:\n\n"
+            msg += "\n".join(f"• {e}" for e in errors)
+            if warnings:
+                msg += "\n\nWarnings:\n" + "\n".join(f"• {w}" for w in warnings)
+            QMessageBox.warning(self, "Generated with Errors", msg)
+            self.statusBar().showMessage("Generated (Errors Detected)")
+        elif warnings:
+            msg = "Chart generated successfully!\n\nWarnings:\n"
+            msg += "\n".join(f"• {w}" for w in warnings)
+            QMessageBox.information(self, "Generation Complete", msg)
+            self.statusBar().showMessage("Generation Complete")
         else:
-            self.health_icon.setText("●")
-            self.health_icon.setObjectName("HealthBad")
-            self.health_text.setText("Chart Errors Detected")
-        self.health_icon.style().unpolish(self.health_icon)
-        self.health_icon.style().polish(self.health_icon)
+            QMessageBox.information(self, "Generation Complete", "Chart generated successfully!\n\nNo errors or warnings found.")
+            self.statusBar().showMessage("Generation Complete")
+
         self.append_log("\n--- VALIDATION REPORT ---")
         self.append_log(output)
         self.validator_proc = None
