@@ -1,38 +1,49 @@
 # Project Roadmap
 
-## 🟢 Phase 1: Polish & Stability (Current)
+## 🟢 v1.1: The "Musicality" Update (Next)
 
-- [x] **Safe Inputs:** Prevent mouse-wheel scrolling from accidentally changing values on dropdowns/spinners.
-- [x] **Action Bar:** Move Generate/Cancel buttons to a fixed footer.
-- [x] **Separate Logs:** Move logs to a pop-up window to clean up the main UI.
-- [x] **Smart Delay:** Add lead-in time via `song.ini` delay instead of destructive audio editing.
-- [x] **Required Fields:** Visual cues (Red `*`) for Title/Artist/Audio/Output.
+**Focus:** Making the engine smarter so charts feel less "random" and more like the song.
 
----
-
-## 🟡 Phase 2: Batch Processing (Next)
-
-The goal: "Chart an entire discography while I make coffee."
-
-- [ ] **Queue UI:** Replace the single "Input Audio" box with a `QListWidget` that accepts multiple files.
-- [ ] **Batch Logic:** Refactor `qt_app.py` to iterate through the list.
-- [ ] **Error Handling:** If Song A fails, log it and proceed to Song B (don't crash the app).
-- [ ] **Auto-Naming:** Smarter regex to extract "Artist - Title" from filenames since the user can't type metadata for 50 songs.
+- [ ] **Pitch Contouring:** Analyze audio pitch direction.
+  - *Goal:* If the melody climbs, notes move Right (Green -> Orange). If it falls, notes move Left.
+- [ ] **Rhythmic Glue:** Detect repeated rhythmic motifs (e.g., "dun-dun-bap").
+  - *Goal:* Force the engine to use the same chord/strum pattern when the audio repeats a rhythm.
+- [ ] **Smart Sections:** Improve segmentation logic.
+  - *Goal:* Identify "Solo" sections based on high note density/frequency and label them automatically.
+- [ ] **Audio Normalization:** Auto-gain input audio to a standard -14 LUFS.
+  - *Goal:* Consistent volume levels in-game for all charts.
 
 ---
 
-## 🔴 Phase 3: Multi-Difficulty Support (Long Term)
+## 🟡 v1.2: Power User Controls
 
-The goal: "One click, four difficulties."
+**Focus:** Giving users granular control over the generation parameters.
 
-- [ ] **Refactor `midi.py`:** Separation of concerns.
-  - `Analysis` (Beats/Onsets) happens ONCE.
-  - `PatternGeneration` happens 4 times (Easy, Med, Hard, Expert) with different `ChartConfig` objects.
-- [ ] **Reduction Algorithm:** - Implement a "Parent -> Child" reduction logic.
-  - Expert notes are the "source of truth".
-  - Hard = Expert minus 20% density + simpler chords.
-  - Medium = Hard minus 30% + no Orange.
-  - Easy = Medium minus 40% + playing only on the beat.
-- [ ] **UI Update:**
-  - Add "Target Difficulties" checkboxes (e.g., [x] Easy [x] Medium [x] Hard [x] Expert).
-  - Allow distinct settings per difficulty tier (eventually).
+- [ ] **User Presets:** Save and load custom configuration profiles (e.g., "My Thrash Metal Settings") to a local JSON file.
+- [ ] **Manual Overrides:** A simple table view to review/edit data before generation.
+  - *Features:* Rename sections, adjust specific section difficulty, or tweak the start offset manually.
+- [ ] **Density Visualizer:** A small graph in the UI showing note density over time.
+  - *Goal:* Let users see where the difficulty spikes are before they play.
+
+---
+
+## 🟠 v2.0: Multi-Difficulty Architecture
+
+**Focus:** Moving from a single "Medium" chart to a full difficulty suite.
+
+- [ ] **The "Expert" Engine:** Create a new generation profile for Expert (1/16 grid, complex chords, 3-note chords allowed).
+- [ ] **Reduction Algorithm:** Create a logic system to "dumb down" an Expert chart.
+  - *Expert -> Hard:* Remove 20% of notes, simplify complex chords.
+  - *Hard -> Medium:* Remove Orange, enforce 1/8 grid strictness.
+  - *Medium -> Easy:* On-beat only, mostly single notes.
+- [ ] **Unified MIDI Writer:** Update `midi.py` to write `PART GUITAR`, `EASY`, `MEDIUM`, `HARD`, and `EXPERT` tracks into a single `.mid` file.
+
+---
+
+## 🔴 v2.1 and beyond: Community & Polish (Long Term)
+
+**Focus:** Features for sharing and distribution.
+
+- [ ] **Chart Export:** Option to export in `.chart` format (text-based) for editing in Moonscraper.
+- [ ] **Auto-Update:** In-app notification when a new GitHub Release is available.
+- [ ] **Batch Reporting:** A summary screen after a large batch job ("Processed 50 songs: 48 Success, 2 Failed").
