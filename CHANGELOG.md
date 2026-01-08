@@ -1,8 +1,14 @@
 # Changelog
 
+## [1.0.2] - 2026-01-08
+
+### Image Replacement
+
+Fixing a lost image.
+
 ## [1.0.1] - 2026-01-08
 
-### Documentation
+### Documentation Updates
 
 Highlighting the usage of AI.
 

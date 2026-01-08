@@ -35,6 +35,7 @@ jobs:
             --windowed \
             --onefile \
             --icon "icons/AppIcon.icns" \
+            --add-data "icons/icon_og.png:icons" \
             --paths "." \
             --hidden-import "charter.cli" \
             --hidden-import "gui.qt_app" \
@@ -76,12 +77,14 @@ jobs:
           python -c "from PIL import Image; img = Image.open('icons/icon_og.png'); img.save('icons/AppIcon.ico', format='ICO', sizes=[(256,256), (128,128), (64,64), (48,48), (32,32), (16,16)])"
 
       - name: Build .exe with PyInstaller
+        # Note: Windows uses ';' as separator for add-data
         run: |
           pyinstaller --noconfirm --clean `
             --name "1ClickCharter" `
             --windowed `
             --onefile `
             --icon "icons/AppIcon.ico" `
+            --add-data "icons/icon_og.png;icons" `
             --paths "." `
             --hidden-import "charter.cli" `
             --hidden-import "gui.qt_app" `
@@ -91,6 +94,7 @@ jobs:
       - name: Zip Executable
         run: |
           Compress-Archive -Path dist\1ClickCharter.exe, USER_GUIDE.md -DestinationPath 1ClickCharter-Windows.zip
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
