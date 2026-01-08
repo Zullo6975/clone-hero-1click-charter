@@ -4,6 +4,8 @@
 
 It is designed for players who want to expand their library without spending hours manually charting. The focus is on **Medium-difficulty** gameplay that feels good—predictable, rhythmic, and fair.
 
+(Assisted by ChatGPT, and Gemini)
+
 ---
 
 ## ✨ Features
