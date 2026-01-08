@@ -16,9 +16,6 @@ class OnsetCandidate:
 def detect_onsets(audio_path: Path, *, hop_length: int = 512) -> list[OnsetCandidate]:
     """
     Detect onset candidates with relative strength using librosa.
-
-    This is deliberately "over-detecty" — we will filter later with rules
-    to match your Medium vibe.
     """
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
 
@@ -38,3 +35,39 @@ def detect_onsets(audio_path: Path, *, hop_length: int = 512) -> list[OnsetCandi
         strengths.append(float(oenv[f]) if 0 <= f < len(oenv) else 0.0)
 
     return [OnsetCandidate(t=float(t), strength=s) for t, s in zip(times, strengths)]
+
+
+def estimate_pitches(audio_path: Path, times: list[float]) -> list[float | None]:
+    """
+    Estimates the fundamental frequency (pitch) at specific timestamps.
+    Returns a list of frequencies (Hz) or None if unpitched (silence/noise).
+    """
+    if not times:
+        return []
+
+    y, sr = librosa.load(str(audio_path), sr=None, mono=True)
+
+    # fmin/fmax range covers typical guitar/bass frequencies (approx C1 to C7)
+    # This analysis is heavy, but runs only once per song.
+    f0, _, _ = librosa.pyin(
+        y,
+        fmin=librosa.note_to_hz('C1'),
+        fmax=librosa.note_to_hz('C7'),
+        sr=sr
+    )
+
+    # Map our target times to the f0 frames
+    frame_indices = librosa.time_to_frames(times, sr=sr, hop_length=512)
+    
+    pitches = []
+    for idx in frame_indices:
+        if 0 <= idx < len(f0):
+            val = f0[idx]
+            if np.isnan(val):
+                pitches.append(None)
+            else:
+                pitches.append(float(val))
+        else:
+            pitches.append(None)
+            
+    return pitches

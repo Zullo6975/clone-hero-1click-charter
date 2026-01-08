@@ -77,12 +77,33 @@ class SafeDoubleSpinBox(QDoubleSpinBox):
     def wheelEvent(self, event):
         event.ignore()
 
+# --- FINE TUNED PRESETS (v1.1) ---
 DIFFICULTY_PRESETS: dict[str, dict[str, float | int] | None] = {
-    "Medium (Casual)":   {"max_nps": 2.25, "min_gap_ms": 170},
-    "Medium (Balanced)": {"max_nps": 2.80, "min_gap_ms": 140},
-    "Medium (Intense)":  {"max_nps": 3.35, "min_gap_ms": 115},
-    "Medium (Chaotic)":  {"max_nps": 3.90, "min_gap_ms": 95},
-    "Custom…":           None,
+    "Medium (Casual)":   {
+        "max_nps": 2.25, 
+        "min_gap_ms": 170, 
+        "sustain": 70,  # Flowing
+        "chord": 5      # Rare chords
+    },
+    "Medium (Balanced)": {
+        "max_nps": 2.80, 
+        "min_gap_ms": 140, 
+        "sustain": 50,  # Standard
+        "chord": 12     # Occasional chords
+    },
+    "Medium (Intense)":  {
+        "max_nps": 3.40, 
+        "min_gap_ms": 110, 
+        "sustain": 25,  # Driving rhythm
+        "chord": 25     # Frequent chords
+    },
+    "Medium (Chaotic)":  {
+        "max_nps": 4.20, 
+        "min_gap_ms": 85,  
+        "sustain": 5,   # Staccato (almost no sustains)
+        "chord": 40     # Heavy chords
+    },
+    "Custom…": None,
 }
 
 @dataclass
@@ -806,6 +827,10 @@ class MainWindow(QMainWindow):
         else:
             self.max_nps_spin.setValue(float(preset["max_nps"]))
             self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
+            # NEW: Apply sustain and chord settings
+            self.sustain_slider.setValue(int(preset["sustain"]))
+            self.chord_slider.setValue(int(preset["chord"]))
+            
             self.preset_hint.setText(f"Preset Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
 
     def _update_state(self) -> None:

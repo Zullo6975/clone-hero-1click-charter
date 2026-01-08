@@ -3,13 +3,14 @@ from pathlib import Path
 from dataclasses import asdict
 import random
 import json
+import math
 
 import pretty_midi # type: ignore
 import librosa # type: ignore
 import numpy as np # type: ignore
 
 from charter.config import ChartConfig, LANE_PITCHES, TRACK_NAME, SP_PITCH
-from charter.audio import detect_onsets
+from charter.audio import detect_onsets, estimate_pitches
 from charter.sections import generate_sections, compute_section_stats
 from charter.star_power import generate_star_power_phrases
 
@@ -39,16 +40,29 @@ def _filter_onsets(candidates: list, duration: float, cfg: ChartConfig) -> list:
     selected.sort(key=lambda x: x.t)
     return selected
 
-def _assign_lane(prev_lane: int, rng: random.Random, cfg: ChartConfig) -> int:
+def _pitch_diff_semitones(p1: float | None, p2: float | None) -> float:
+    """Returns semitone difference between two frequencies. +ve = Up, -ve = Down."""
+    if p1 is None or p2 is None or p1 <= 0 or p2 <= 0:
+        return 0.0
+    return 12 * math.log2(p2 / p1)
+
+def _assign_lane(
+    prev_lane: int, 
+    curr_pitch: float | None,
+    prev_pitch: float | None,
+    rng: random.Random, 
+    cfg: ChartConfig
+) -> int:
     options = [0, 1, 2, 3]
     if cfg.allow_orange:
         options.append(4)
 
+    # 1. Base Weights (Favor movement based on bias)
     weights = []
     for lane in options:
-        # Orange is rare spice
-        base_w = 0.05 if lane == 4 else 1.0
+        base_w = 0.05 if lane == 4 else 1.0 # Orange is rare spice
         dist = abs(lane - prev_lane)
+        
         if dist == 0:
             w = 2.0 * (1.0 - cfg.movement_bias)
         elif dist == 1:
@@ -57,7 +71,29 @@ def _assign_lane(prev_lane: int, rng: random.Random, cfg: ChartConfig) -> int:
             w = 1.0 + (cfg.movement_bias * 0.5)
         else:
             w = 0.2 + (cfg.movement_bias * 0.8)
+        
         weights.append(max(0.01, w * base_w))
+
+    # 2. Pitch Direction Modification
+    # If we have pitch data, bias the weights towards the direction of the music
+    semitone_diff = _pitch_diff_semitones(prev_pitch, curr_pitch)
+    
+    # Significant change threshold (e.g., 1 semitone)
+    if abs(semitone_diff) > 0.5:
+        for i, lane in enumerate(options):
+            # If pitch went UP, boost lanes > prev_lane
+            if semitone_diff > 0: 
+                if lane > prev_lane: weights[i] *= 3.5
+                elif lane < prev_lane: weights[i] *= 0.2
+            
+            # If pitch went DOWN, boost lanes < prev_lane
+            elif semitone_diff < 0:
+                if lane < prev_lane: weights[i] *= 3.5
+                elif lane > prev_lane: weights[i] *= 0.2
+
+    # Normalize weights
+    total = sum(weights)
+    weights = [w / total for w in weights]
 
     return rng.choices(options, weights=weights, k=1)[0]
 
@@ -81,8 +117,13 @@ def write_real_notes_mid(
 
     # 2. Filter & Quantize
     notes = _filter_onsets(onsets, duration, cfg)
-    times = [n.t for n in notes]
+    
+    # v1.1: Get Pitches BEFORE quantizing
+    raw_times = [n.t for n in notes]
+    pitches = estimate_pitches(audio_path, raw_times)
+    pitch_map = {t: p for t, p in zip(raw_times, pitches)}
 
+    times = [n.t for n in notes]
     tempo, beats = librosa.beat.beat_track(y=y, sr=sr)
     beat_times = librosa.frames_to_time(beats, sr=sr)
 
@@ -100,17 +141,32 @@ def write_real_notes_mid(
         for t in times:
             idx = (np.abs(grid - t)).argmin()
             snapped.append(grid[idx])
-        times = sorted(list(set(snapped)))
+        
+        # Remap pitches to snapped times
+        combined = []
+        for t, original_t in zip(snapped, times):
+            combined.append((t, pitch_map.get(original_t)))
+        
+        combined.sort(key=lambda x: x[0])
+        
+        final_times = []
+        final_pitches = []
+        seen_times = set()
+        for t, p in combined:
+            if t not in seen_times:
+                final_times.append(t)
+                final_pitches.append(p)
+                seen_times.add(t)
+                
+        times = final_times
+        pitches = final_pitches
 
     # --- LEAD-IN LOGIC ---
-    # If the song starts too fast (< 3.0s), shift everything to give 3s runway.
     shift_seconds = 0.0
     if times and times[0] < 3.0:
         shift_seconds = 3.0 - times[0]
 
-    # Apply shift
     times = [t + shift_seconds for t in times]
-    # We must also effectively "extend" the duration for section logic
     duration += shift_seconds
 
     # 3. Write Notes
@@ -118,11 +174,16 @@ def write_real_notes_mid(
     guitar = pretty_midi.Instrument(program=0, name=TRACK_NAME)
 
     prev_lane = 2
+    prev_pitch = None
     chord_starts = []
 
     for i, t in enumerate(times):
-        lane = _assign_lane(prev_lane, rng, cfg)
+        curr_pitch = pitches[i]
+        
+        lane = _assign_lane(prev_lane, curr_pitch, prev_pitch, rng, cfg)
+        
         prev_lane = lane
+        prev_pitch = curr_pitch
 
         # Sustain Logic
         next_t = times[i+1] if i+1 < len(times) else t + 2.0
@@ -154,14 +215,11 @@ def write_real_notes_mid(
     # 4. Events
     final_sections = []
     if cfg.add_sections:
-        # Generate raw sections (based on original audio time)
-        # Then shift them to match the new grid
         raw_sections = generate_sections(str(audio_path), duration - shift_seconds)
-
         evt = pretty_midi.Instrument(0, name="EVENTS")
         for s in raw_sections:
             shifted_start = s.start + shift_seconds
-            final_sections.append(asdict(s) | {"start": shifted_start}) # Store for stats
+            final_sections.append(asdict(s) | {"start": shifted_start}) 
             pm.lyrics.append(pretty_midi.Lyric(f"[section {s.name}]", float(shifted_start)))
         pm.instruments.append(evt)
 
@@ -175,11 +233,8 @@ def write_real_notes_mid(
 
     # 5. Stats
     if stats_out_path:
-        # Re-wrap final_sections for stats consumption
-        # (This is a bit hacky, but stats is internal only)
         from charter.sections import Section
         sec_objs = [Section(s["name"], s["start"]) for s in final_sections]
-
         stats = compute_section_stats(
             note_starts=times, chord_starts=chord_starts,
             sections=sec_objs, duration_sec=duration
