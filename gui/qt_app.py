@@ -438,7 +438,7 @@ class MainWindow(QMainWindow):
 
         row_clear = QHBoxLayout()
         row_clear.addStretch()
-        row_clear.addWidget(QLabel("Clear fields"))
+        row_clear.addWidget(QLabel("Clear Fields"))
         row_clear.addWidget(self.btn_clear_meta)
         form_meta.addRow("", row_clear)
 
