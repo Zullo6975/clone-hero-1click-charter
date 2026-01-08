@@ -1,11 +1,11 @@
 from __future__ import annotations
-import json
 import sys
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QProcess, QSize
-from PySide6.QtGui import QFont, QPixmap, QAction, QTextCursor
+from PySide6.QtGui import QFont, QPixmap, QAction, QPalette, QColor, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -31,6 +31,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QSizePolicy,
+    QStyleFactory,
+    QStyle,
 )
 
 # ---------------- Paths ----------------
@@ -39,26 +41,15 @@ def is_frozen() -> bool:
 
 def repo_root() -> Path:
     if is_frozen():
-        # In a bundle, we are in a temp folder (_MEIxxxx)
         return Path(sys._MEIPASS)
-    
-    # DEV MODE:
-    # File is in:   ProjectRoot/gui/qt_app.py
-    # .parent =     ProjectRoot/gui
-    # .parents[1] = ProjectRoot
     return Path(__file__).resolve().parents[1]
 
 def get_python_exec() -> str | Path:
     if is_frozen():
         return sys.executable
-    
-    # Path to venv python relative to the Project Root
     return repo_root() / ".venv" / "bin" / "python"
 
 # ---------------- Difficulty presets ----------------
-# We’re mapping "feel" to ONLY the CLI args you already have.
-# - max_nps: higher = denser
-# - min_gap_ms: lower = tighter spacing
 DIFFICULTY_PRESETS: dict[str, dict[str, float | int] | None] = {
     "Medium (Casual)":   {"max_nps": 2.25, "min_gap_ms": 170},
     "Medium (Balanced)": {"max_nps": 2.80, "min_gap_ms": 140},
@@ -67,303 +58,117 @@ DIFFICULTY_PRESETS: dict[str, dict[str, float | int] | None] = {
     "Custom…":           None,
 }
 
+# ---------------- Theme Manager ----------------
+class ThemeManager:
+    """
+    Manages the Fusion palette to ensure consistent, non-clashing colors
+    across the entire application.
+    """
+    @staticmethod
+    def apply_style(app: QApplication, dark_mode: bool):
+        app.setStyle("Fusion")
 
-# ---------------- Themes ----------------
-LIGHT_QSS = """
-QMainWindow { background: #f3f6fb; }
-QWidget { color: #0f172a; font-size: 14px; }
+        palette = QPalette()
+        if dark_mode:
+            # Modern Dark Slate Palette
+            base = QColor(25, 30, 40)
+            alt_base = QColor(35, 40, 50)
+            text = QColor(240, 240, 240)
+            disabled_text = QColor(127, 127, 127)
+            highlight = QColor(64, 156, 255)  # Soft Blue
 
-/* Clean Scrollbars */
-QScrollArea { background: transparent; border: none; }
-QScrollBar:vertical { background: transparent; width: 8px; margin: 0px; }
-QScrollBar::handle:vertical { background: rgba(15,23,42,0.15); min-height: 30px; border-radius: 4px; }
-QScrollBar::handle:vertical:hover { background: rgba(15,23,42,0.3); }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
+            palette.setColor(QPalette.Window, base)
+            palette.setColor(QPalette.WindowText, text)
+            palette.setColor(QPalette.Base, alt_base)
+            palette.setColor(QPalette.AlternateBase, base)
+            palette.setColor(QPalette.ToolTipBase, text)
+            palette.setColor(QPalette.ToolTipText, base)
+            palette.setColor(QPalette.Text, text)
+            palette.setColor(QPalette.Button, base)
+            palette.setColor(QPalette.ButtonText, text)
+            palette.setColor(QPalette.BrightText, Qt.red)
+            palette.setColor(QPalette.Link, highlight)
+            palette.setColor(QPalette.Highlight, highlight)
+            palette.setColor(QPalette.HighlightedText, Qt.black)
+            palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
+            palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
+        else:
+            # Clean Light Palette
+            base = QColor(245, 245, 250)
+            white = QColor(255, 255, 255)
+            text = QColor(20, 25, 30)
+            disabled_text = QColor(120, 120, 120)
+            highlight = QColor(50, 100, 220)  # Deep Blue
 
-/* Panels */
-QFrame#Sidebar, QFrame#MainPanel {
-  background: rgba(255,255,255,0.72);
-  border: 1px solid rgba(15,23,42,0.10);
-  border-radius: 16px;
-}
+            palette.setColor(QPalette.Window, base)
+            palette.setColor(QPalette.WindowText, text)
+            palette.setColor(QPalette.Base, white)
+            palette.setColor(QPalette.AlternateBase, base)
+            palette.setColor(QPalette.ToolTipBase, white)
+            palette.setColor(QPalette.ToolTipText, text)
+            palette.setColor(QPalette.Text, text)
+            palette.setColor(QPalette.Button, base)
+            palette.setColor(QPalette.ButtonText, text)
+            palette.setColor(QPalette.BrightText, Qt.red)
+            palette.setColor(QPalette.Link, highlight)
+            palette.setColor(QPalette.Highlight, highlight)
+            palette.setColor(QPalette.HighlightedText, white)
+            palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
+            palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
 
-/* Group containers */
-QGroupBox {
-  border: 1px solid rgba(15,23,42,0.10);
-  border-radius: 14px;
-  margin-top: 10px;
-  padding: 12px;
-  background: rgba(255,255,255,0.55);
-}
-QGroupBox::title {
-  subcontrol-origin: margin;
-  subcontrol-position: top left;
-  padding: 0 8px;
-  color: rgba(15,23,42,0.88);
-  font-weight: 800;
-}
-QLabel#Muted { color: rgba(15,23,42,0.60); }
+        app.setPalette(palette)
 
-/* Inputs */
-QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QComboBox {
-  background: rgba(255,255,255,0.85);
-  border: 1px solid rgba(15,23,42,0.14);
-  border-radius: 10px;
-  padding: 8px 12px;
-  selection-background-color: rgba(59,130,246,0.20);
-}
-QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QComboBox:focus {
-  border: 1px solid rgba(59,130,246,0.65);
-  background: rgba(255,255,255,0.92);
-}
-
-/* Spinbox Arrows */
-QSpinBox::up-button, QDoubleSpinBox::up-button {
-    subcontrol-origin: border;
-    subcontrol-position: top right;
-    width: 24px;
-    border-left: 1px solid rgba(15,23,42,0.1);
-    border-bottom: 1px solid rgba(15,23,42,0.1);
-    background: rgba(240,242,245,1.0);
-    border-top-right-radius: 10px;
-}
-QSpinBox::down-button, QDoubleSpinBox::down-button {
-    subcontrol-origin: border;
-    subcontrol-position: bottom right;
-    width: 24px;
-    border-left: 1px solid rgba(15,23,42,0.1);
-    background: rgba(240,242,245,1.0);
-    border-bottom-right-radius: 10px;
-}
-QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
-QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
-    background: rgba(59,130,246,0.1);
-}
-
-/* Radio Buttons - Clean Blue Dot Style */
-QRadioButton { spacing: 8px; font-weight: 500; }
-QRadioButton::indicator {
-    width: 16px; height: 16px;
-    border-radius: 9px;
-    border: 1px solid #9ca3af;
-    background: white;
-}
-QRadioButton::indicator:checked {
-    border: 1px solid #3b82f6;
-    background: qradialgradient(
-        cx: 0.5, cy: 0.5, radius: 0.4,
-        fx: 0.5, fy: 0.5,
-        stop: 0.0 #3b82f6,
-        stop: 1.0 #3b82f6
-    );
-}
-QRadioButton::indicator:hover { border-color: #3b82f6; }
-
-/* Buttons */
-QPushButton, QToolButton {
-  background: rgba(15,23,42,0.04);
-  border: 1px solid rgba(15,23,42,0.14);
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-weight: 700;
-}
-QPushButton:hover, QToolButton:hover { background: rgba(15,23,42,0.06); border-color: rgba(15,23,42,0.18); }
-QPushButton:pressed, QToolButton:pressed { background: rgba(15,23,42,0.03); }
-
-/* Primary Action */
-QPushButton#Primary {
-  color: white;
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 rgba(59,130,246,0.98), stop:1 rgba(99,102,241,0.98));
-  border: 1px solid rgba(15,23,42,0.10);
-}
-QPushButton#Primary:hover {
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 rgba(37,99,235,0.98), stop:1 rgba(79,70,229,0.98));
-}
-
-/* Toggle Buttons (Advanced/Logs) */
-QPushButton#Toggle {
-    text-align: left;
-    background: transparent;
-    border: 1px solid transparent;
-    color: rgba(15,23,42,0.7);
-}
-QPushButton#Toggle:checked {
-    background: rgba(15,23,42,0.05);
-    border: 1px solid rgba(15,23,42,0.1);
-    color: rgba(15,23,42,1.0);
-}
-QPushButton#Toggle:hover { background: rgba(15,23,42,0.03); color: rgba(15,23,42,0.9); }
-
-/* Art preview */
-QLabel#ArtFrame {
-  background: rgba(255,255,255,0.55);
-  border: 1px dashed rgba(15,23,42,0.22);
-  border-radius: 14px;
-  color: rgba(15,23,42,0.55);
-}
-
-/* Logs */
-QTextEdit#Log {
-  background: #0b0f17;
-  border: 1px solid rgba(15,23,42,0.14);
-  border-radius: 14px;
-  padding: 12px;
-  color: rgba(232,238,248,0.92);
-}
-QFrame#Divider { background: rgba(15,23,42,0.10); }
-"""
-
-DARK_QSS = """
-QMainWindow { background: #0b0f17; }
-QWidget { color: #e8eef8; font-size: 14px; }
-
-/* Scrollbars */
-QScrollArea { background: transparent; border: none; }
-QScrollBar:vertical { background: transparent; width: 8px; margin: 0px; }
-QScrollBar::handle:vertical { background: rgba(255,255,255,0.15); min-height: 30px; border-radius: 4px; }
-QScrollBar::handle:vertical:hover { background: rgba(255,255,255,0.3); }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0px; }
-QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: none; }
-
-QFrame#Sidebar, QFrame#MainPanel {
-  background: rgba(15,22,35,0.78);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-}
-QGroupBox {
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 14px;
-  margin-top: 10px;
-  padding: 12px;
-  background: rgba(255,255,255,0.03);
-}
-QGroupBox::title {
-  subcontrol-origin: margin;
-  subcontrol-position: top left;
-  padding: 0 8px;
-  color: rgba(232,238,248,0.90);
-  font-weight: 800;
-}
-QLabel#Muted { color: rgba(232,238,248,0.65); }
-
-QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit, QComboBox {
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 10px;
-  padding: 8px 12px;
-  selection-background-color: rgba(80, 140, 255, 0.35);
-}
-QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QComboBox:focus {
-  border: 1px solid rgba(90,160,255,0.75);
-  background: rgba(255,255,255,0.07);
-}
-
-QSpinBox::up-button, QDoubleSpinBox::up-button {
-    subcontrol-origin: border;
-    subcontrol-position: top right;
-    width: 24px;
-    border-left: 1px solid rgba(255,255,255,0.1);
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.05);
-    border-top-right-radius: 10px;
-}
-QSpinBox::down-button, QDoubleSpinBox::down-button {
-    subcontrol-origin: border;
-    subcontrol-position: bottom right;
-    width: 24px;
-    border-left: 1px solid rgba(255,255,255,0.1);
-    background: rgba(255,255,255,0.05);
-    border-bottom-right-radius: 10px;
-}
-QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
-QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
-    background: rgba(255,255,255,0.15);
-}
-
-QRadioButton { spacing: 8px; font-weight: 500; }
-QRadioButton::indicator {
-    width: 16px; height: 16px;
-    border-radius: 9px;
-    border: 1px solid rgba(255,255,255,0.4);
-    background: transparent;
-}
-QRadioButton::indicator:checked {
-    border: 1px solid #3b82f6;
-    background: qradialgradient(
-        cx: 0.5, cy: 0.5, radius: 0.55,
-        fx: 0.5, fy: 0.5,
-        stop: 0.0 #3b82f6,
-        stop: 0.45 #3b82f6,
-        stop: 0.46 white,
-        stop: 1.0 white
-    );
-}
-
-QPushButton, QToolButton {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 10px;
-  padding: 10px 16px;
-  font-weight: 700;
-}
-QPushButton:hover, QToolButton:hover { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.18); }
-QPushButton:pressed, QToolButton:pressed { background: rgba(255,255,255,0.05); }
-
-QPushButton#Primary {
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 rgba(72,118,255,0.95), stop:1 rgba(122,72,255,0.95));
-  border: 1px solid rgba(255,255,255,0.18);
-}
-QPushButton#Primary:hover {
-  background: qlineargradient(x1:0,y1:0,x2:1,y2:0, stop:0 rgba(86,132,255,0.98), stop:1 rgba(138,88,255,0.98));
-}
-
-QPushButton#Toggle {
-    text-align: left;
-    background: transparent;
-    border: 1px solid transparent;
-    color: rgba(255,255,255,0.6);
-}
-QPushButton#Toggle:checked {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.95);
-}
-QPushButton#Toggle:hover { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.8); }
-
-QLabel#ArtFrame {
-  background: rgba(255,255,255,0.03);
-  border: 1px dashed rgba(255,255,255,0.18);
-  border-radius: 14px;
-  color: rgba(232,238,248,0.55);
-}
-
-QTextEdit#Log {
-  background: #0b0f17;
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 14px;
-  padding: 12px;
-  color: rgba(232,238,248,0.92);
-}
-QFrame#Divider { background: rgba(255,255,255,0.08); }
-"""
-
+        # Minimal stylesheet just for specific tweaks (padding/radius)
+        # We rely on Palette for colors to avoid clashes.
+        app.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid palette(mid);
+                border-radius: 6px;
+                margin-top: 22px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                padding: 0 5px;
+                left: 10px;
+            }
+            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+                padding: 6px;
+                border-radius: 4px;
+                border: 1px solid palette(mid);
+            }
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
+                border: 1px solid palette(highlight);
+            }
+            QPushButton {
+                padding: 8px 16px;
+                border-radius: 4px;
+                border: 1px solid palette(mid);
+            }
+            QPushButton:hover {
+                background-color: palette(midlight);
+            }
+            QPushButton#Primary {
+                background-color: palette(highlight);
+                color: palette(highlighted-text);
+                font-weight: bold;
+                border: 1px solid palette(highlight);
+            }
+            QPushButton#Primary:hover {
+                border: 1px solid palette(text);
+            }
+        """)
 
 # ---------------- Helpers ----------------
-def human_ok(text: str) -> str:
-    return text.replace("\r\n", "\n").replace("\r", "\n")
-
-def arrow_text(expanded: bool) -> str:
-    return "▼" if expanded else "▶"
-
 def form_label(text: str) -> QLabel:
     lbl = QLabel(text)
-    lbl.setMinimumWidth(110)
     lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    # Allow label to shrink if needed, but prefer visible
+    lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
     return lbl
 
-
-# ---------------- Config ----------------
 @dataclass
 class RunConfig:
     audio: Path
@@ -379,13 +184,12 @@ class RunConfig:
     charter: str = "Zullo7569"
     fetch_metadata: bool = True
 
-
 # ---------------- Main Window ----------------
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("CH 1-Click Charter")
-        self.setMinimumSize(950, 720)
+        self.resize(1000, 750)
 
         self.audio_path: Path | None = None
         self.cover_path: Path | None = None
@@ -397,338 +201,276 @@ class MainWindow(QMainWindow):
 
         self._build_ui()
         self._wire()
-        self.apply_theme(dark=self.dark_mode)
 
-        # Apply default preset once the widgets exist
+        # Apply initial theme
+        ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
+
         self.apply_preset(self.preset_combo.currentText())
-
         self._update_state()
         self.statusBar().showMessage("Ready")
 
-    # ---------- UI ----------
     def _build_ui(self) -> None:
         central = QWidget()
         self.setCentralWidget(central)
-        outer = QHBoxLayout(central)
-        outer.setContentsMargins(18, 18, 18, 18)
-        outer.setSpacing(14)
+
+        # Use a vertical layout for the whole window first?
+        # No, horizontal splitter is good, but let's make it smarter.
+        main_layout = QHBoxLayout(central)
+        main_layout.setContentsMargins(16, 16, 16, 16)
+        main_layout.setSpacing(16)
 
         splitter = QSplitter(Qt.Horizontal)
+        splitter.setHandleWidth(2)
         splitter.setChildrenCollapsible(False)
-        outer.addWidget(splitter)
+        main_layout.addWidget(splitter)
 
-        # ---- Sidebar ----
-        sidebar_scroll = QScrollArea()
-        sidebar_scroll.setWidgetResizable(True)
-        sidebar_scroll.setFrameShape(QFrame.NoFrame)
-        sidebar_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        sidebar_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # ================= Sidebar =================
+        sidebar_widget = QWidget()
+        sidebar_layout = QVBoxLayout(sidebar_widget)
+        sidebar_layout.setContentsMargins(0, 0, 10, 0) # Right margin for separation
+        sidebar_layout.setSpacing(16)
 
-        sidebar = QFrame()
-        sidebar.setObjectName("Sidebar")
-        s = QVBoxLayout(sidebar)
-        s.setContentsMargins(16, 16, 16, 16)
-        s.setSpacing(12)
+        # Title Block
+        title_block = QVBoxLayout()
+        title_lbl = QLabel("CH 1-Click")
+        title_lbl.setFont(QFont("Segoe UI", 24, QFont.Bold))
+        sub_lbl = QLabel("Automated Charting Tool")
+        sub_lbl.setStyleSheet("color: palette(disabled-text);")
+        title_block.addWidget(title_lbl)
+        title_block.addWidget(sub_lbl)
+        sidebar_layout.addLayout(title_block)
 
-        title = QLabel("CH 1-Click Charter")
-        title_font = QFont()
-        title_font.setPointSize(20)
-        title_font.setWeight(QFont.DemiBold)
-        title.setFont(title_font)
+        # Theme Toggle
+        self.chk_dark = QCheckBox("Dark Mode")
+        sidebar_layout.addWidget(self.chk_dark)
 
-        subtitle = QLabel("A fast, portable chart generator UI powered by your CLI.")
-        subtitle.setObjectName("Muted")
-        subtitle.setWordWrap(True)
-
-        s.addWidget(title)
-        s.addWidget(subtitle)
-
-        # Theme toggle
-        theme_row = QHBoxLayout()
-        self.chk_dark = QCheckBox("Dark mode")
-        self.chk_dark.setChecked(False)
-        theme_row.addWidget(self.chk_dark)
-        theme_row.addStretch(1)
-        s.addLayout(theme_row)
-
-        # Audio group
-        audio_box = QGroupBox("Audio")
-        audio_layout = QVBoxLayout(audio_box)
-        audio_layout.setSpacing(10)
+        # Audio Section
+        grp_audio = QGroupBox("Input Audio")
+        grp_audio_layout = QVBoxLayout(grp_audio)
 
         self.audio_label = QLabel("No file selected")
-        self.audio_label.setObjectName("Muted")
+        self.audio_label.setStyleSheet("color: palette(disabled-text); font-style: italic;")
         self.audio_label.setWordWrap(True)
 
-        audio_btn_row = QHBoxLayout()
-        self.btn_pick_audio = QPushButton("Browse Audio…")
+        row_audio_btns = QHBoxLayout()
+        self.btn_pick_audio = QPushButton("Browse...")
+        self.btn_pick_audio.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
+
         self.btn_clear_audio = QToolButton()
-        self.btn_clear_audio.setText("Clear")
-        self.btn_clear_audio.setToolButtonStyle(Qt.ToolButtonTextOnly)
-        audio_btn_row.addWidget(self.btn_pick_audio, 1)
-        audio_btn_row.addWidget(self.btn_clear_audio)
+        self.btn_clear_audio.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
+        self.btn_clear_audio.setToolTip("Clear Selection")
 
-        audio_layout.addWidget(self.audio_label)
-        audio_layout.addLayout(audio_btn_row)
-        s.addWidget(audio_box)
+        row_audio_btns.addWidget(self.btn_pick_audio, 1)
+        row_audio_btns.addWidget(self.btn_clear_audio, 0)
 
-        # Album art
-        art_box = QGroupBox("Album Art")
-        art_layout = QVBoxLayout(art_box)
-        art_layout.setSpacing(12)
+        grp_audio_layout.addWidget(self.audio_label)
+        grp_audio_layout.addLayout(row_audio_btns)
+        sidebar_layout.addWidget(grp_audio)
 
-        self.cover_label = QLabel("No art selected")
-        self.cover_label.setObjectName("Muted")
-        self.cover_label.setWordWrap(True)
+        # Art Section
+        grp_art = QGroupBox("Album Art")
+        grp_art_layout = QVBoxLayout(grp_art)
 
         self.cover_preview = QLabel("Preview")
-        self.cover_preview.setObjectName("ArtFrame")
         self.cover_preview.setAlignment(Qt.AlignCenter)
-        self.cover_preview.setMinimumHeight(160)
-        self.cover_preview.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
+        self.cover_preview.setMinimumHeight(150)
+        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text);")
 
-        cover_btn_row = QHBoxLayout()
-        self.btn_pick_cover = QPushButton("Choose Image…")
+        row_art_btns = QHBoxLayout()
+        self.btn_pick_cover = QPushButton("Image...")
+        self.btn_pick_cover.setIcon(self.style().standardIcon(QStyle.SP_FileIcon))
+
         self.btn_clear_cover = QToolButton()
-        self.btn_clear_cover.setText("Clear")
-        self.btn_clear_cover.setToolButtonStyle(Qt.ToolButtonTextOnly)
-        cover_btn_row.addWidget(self.btn_pick_cover, 1)
-        cover_btn_row.addWidget(self.btn_clear_cover)
+        self.btn_clear_cover.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
 
-        art_layout.addWidget(self.cover_label)
-        art_layout.addWidget(self.cover_preview)
-        art_layout.addLayout(cover_btn_row)
-        s.addWidget(art_box)
+        row_art_btns.addWidget(self.btn_pick_cover, 1)
+        row_art_btns.addWidget(self.btn_clear_cover, 0)
 
-        # Convenience
-        util_box = QGroupBox("Convenience")
-        util_layout = QVBoxLayout(util_box)
-        util_layout.setSpacing(10)
+        grp_art_layout.addWidget(self.cover_preview)
+        grp_art_layout.addLayout(row_art_btns)
+        sidebar_layout.addWidget(grp_art)
+
+        # Tools Section
+        grp_tools = QGroupBox("Quick Actions")
+        grp_tools_layout = QVBoxLayout(grp_tools)
         self.btn_open_output = QPushButton("Open Output Folder")
-        self.btn_open_song = QPushButton("Open Last Song Folder")
-        util_layout.addWidget(self.btn_open_output)
-        util_layout.addWidget(self.btn_open_song)
-        s.addWidget(util_box)
+        self.btn_open_song = QPushButton("Open Last Song")
+        grp_tools_layout.addWidget(self.btn_open_output)
+        grp_tools_layout.addWidget(self.btn_open_song)
+        sidebar_layout.addWidget(grp_tools)
 
-        s.addStretch(1)
-        sidebar_scroll.setWidget(sidebar)
+        sidebar_layout.addStretch(1)
 
-        # ---- Main panel ----
-        main_scroll = QScrollArea()
-        main_scroll.setWidgetResizable(True)
-        main_scroll.setFrameShape(QFrame.NoFrame)
-        main_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        main_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        # Wrap sidebar in scroll area just in case small screen
+        sidebar_scroll = QScrollArea()
+        sidebar_scroll.setWidgetResizable(True)
+        sidebar_scroll.setWidget(sidebar_widget)
+        sidebar_scroll.setFrameShape(QFrame.NoFrame)
 
-        main = QFrame()
-        main.setObjectName("MainPanel")
+        # ================= Main Panel =================
+        main_widget = QWidget()
+        main_layout_inner = QVBoxLayout(main_widget)
+        main_layout_inner.setContentsMargins(10, 0, 0, 0)
+        main_layout_inner.setSpacing(20)
 
-        m = QVBoxLayout(main)
-        m.setContentsMargins(24, 24, 24, 24)
-        m.setSpacing(16)
+        # Metadata Group
+        grp_meta = QGroupBox("Song Metadata")
+        form_meta = QFormLayout(grp_meta)
+        form_meta.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        form_meta.setLabelAlignment(Qt.AlignRight)
 
-        # Styling
-        input_font = QFont()
-        input_font.setPointSize(14)
+        self.title_edit = QLineEdit()
+        self.artist_edit = QLineEdit()
+        self.album_edit = QLineEdit()
+        self.genre_edit = QLineEdit("Rock")
 
-        def beefy_line(edit: QLineEdit) -> QLineEdit:
-            edit.setFont(input_font)
-            edit.setMinimumHeight(42)
-            edit.setClearButtonEnabled(True)
-            return edit
+        form_meta.addRow(form_label("Title"), self.title_edit)
+        form_meta.addRow(form_label("Artist"), self.artist_edit)
+        form_meta.addRow(form_label("Album"), self.album_edit)
+        form_meta.addRow(form_label("Genre"), self.genre_edit)
 
-        def beefy_combo(combo: QComboBox) -> QComboBox:
-            combo.setFont(input_font)
-            combo.setMinimumHeight(42)
-            return combo
+        main_layout_inner.addWidget(grp_meta)
 
-        # Metadata
-        meta = QGroupBox("Metadata")
-        meta_form = QFormLayout(meta)
-        meta_form.setHorizontalSpacing(18)
-        meta_form.setVerticalSpacing(14)
-        meta_form.setContentsMargins(14, 16, 14, 14)
-        meta_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        # Output Path Group
+        grp_out = QGroupBox("Output Destination")
+        out_layout = QHBoxLayout(grp_out)
+        self.out_dir_edit = QLineEdit("output")
+        self.btn_pick_output = QPushButton("Browse...")
+        out_layout.addWidget(self.out_dir_edit, 1)
+        out_layout.addWidget(self.btn_pick_output, 0)
+        main_layout_inner.addWidget(grp_out)
 
-        self.title_edit = beefy_line(QLineEdit())
-        self.artist_edit = beefy_line(QLineEdit())
-        self.album_edit = beefy_line(QLineEdit())
-        self.genre_edit = beefy_line(QLineEdit("Rock"))
+        # Advanced Settings (Collapsible)
+        self.adv_container = QGroupBox("Configuration")
+        adv_layout = QVBoxLayout(self.adv_container)
 
-        meta_form.addRow(form_label("Title"), self.title_edit)
-        meta_form.addRow(form_label("Artist"), self.artist_edit)
-        meta_form.addRow(form_label("Album"), self.album_edit)
-        meta_form.addRow(form_label("Genre"), self.genre_edit)
-        m.addWidget(meta)
+        # Toggle Button for Advanced
+        self.btn_toggle_adv = QPushButton("Show Advanced Settings")
+        self.btn_toggle_adv.setCheckable(True)
+        self.btn_toggle_adv.setFlat(True)
+        # Use built-in arrow icon
+        self.btn_toggle_adv.setIcon(self.style().standardIcon(QStyle.SP_ToolBarHorizontalExtensionButton))
+        self.btn_toggle_adv.setStyleSheet("text-align: left; font-weight: bold;")
 
-        # Output
-        out = QGroupBox("Output")
-        out_row = QHBoxLayout(out)
-        out_row.setContentsMargins(14, 16, 14, 14)
-        out_row.setSpacing(12)
+        # Hidden Content
+        self.adv_content = QWidget()
+        self.adv_content.setVisible(False)
+        adv_form = QFormLayout(self.adv_content)
+        adv_form.setLabelAlignment(Qt.AlignRight)
 
-        self.out_dir_edit = beefy_line(QLineEdit("output"))
-        self.btn_pick_output = QPushButton("Browse…")
-
-        out_row.addWidget(form_label("Folder"), 0)
-        out_row.addWidget(self.out_dir_edit, 1)
-        out_row.addWidget(self.btn_pick_output, 0)
-        m.addWidget(out)
-
-        # Collapsible: Advanced
-        self.adv_header = QPushButton(f"{arrow_text(False)}  Advanced Settings")
-        self.adv_header.setObjectName("Toggle")
-        self.adv_header.setCheckable(True)
-        self.adv_header.setChecked(False)
-        self.adv_header.setCursor(Qt.PointingHandCursor)
-
-        self.adv_group = QGroupBox("")
-        self.adv_group.setTitle("")
-        self.adv_group.setFlat(True)
-        self.adv_group.setVisible(False)
-
-        adv_group_layout = QVBoxLayout(self.adv_group)
-        adv_group_layout.setContentsMargins(0, 0, 0, 0)
-
-        adv_body = QWidget()
-        adv_group_layout.addWidget(adv_body)
-
-        adv_form = QFormLayout(adv_body)
-        adv_form.setContentsMargins(14, 12, 14, 8)
-        adv_form.setHorizontalSpacing(18)
-        adv_form.setVerticalSpacing(12)
-        adv_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-
-        # Preset picker (human-friendly)
-        self.preset_combo = beefy_combo(QComboBox())
+        # Presets
+        self.preset_combo = QComboBox()
         self.preset_combo.addItems(list(DIFFICULTY_PRESETS.keys()))
         self.preset_combo.setCurrentText("Medium (Balanced)")
-
-        self.preset_hint = QLabel(
-            "Choose a feel. Balanced is your ‘default good’. Custom… unlocks the knobs."
-        )
-        self.preset_hint.setObjectName("Muted")
-        self.preset_hint.setWordWrap(True)
+        self.preset_hint = QLabel("Select a preset to auto-configure settings.")
+        self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11px;")
 
         adv_form.addRow(form_label("Difficulty"), self.preset_combo)
         adv_form.addRow(QLabel(""), self.preset_hint)
 
-        # Custom-only container (raw knobs)
-        self.custom_row_container = QWidget()
-        custom_form = QFormLayout(self.custom_row_container)
-        custom_form.setContentsMargins(0, 6, 0, 0)
-        custom_form.setHorizontalSpacing(18)
-        custom_form.setVerticalSpacing(12)
-        custom_form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
+        # Custom Controls
+        self.custom_controls = QWidget()
+        custom_form = QFormLayout(self.custom_controls)
+        custom_form.setContentsMargins(0,0,0,0)
 
-        # MODE radios
+        # Mode
         self.mode_group = QButtonGroup(self)
-        self.mode_real = QRadioButton("Real")
-        self.mode_dummy = QRadioButton("Dummy")
+        self.mode_real = QRadioButton("Real (Audio Analysis)")
+        self.mode_dummy = QRadioButton("Dummy (Metronome)")
+        self.mode_real.setChecked(True)
         self.mode_group.addButton(self.mode_real)
         self.mode_group.addButton(self.mode_dummy)
-        self.mode_real.setChecked(True)
 
-        mode_layout = QHBoxLayout()
-        mode_layout.addWidget(self.mode_real)
-        mode_layout.addWidget(self.mode_dummy)
-        mode_layout.addStretch(1)
+        row_mode = QHBoxLayout()
+        row_mode.addWidget(self.mode_real)
+        row_mode.addWidget(self.mode_dummy)
+        row_mode.addStretch()
 
-        def beefy_spin(spin: QSpinBox | QDoubleSpinBox) -> QWidget:
-            spin.setFont(input_font)
-            spin.setMinimumHeight(42)
-            return spin
-
-        self.max_nps_spin = beefy_spin(QDoubleSpinBox())
-        self.max_nps_spin.setRange(1.5, 6.0)
-        self.max_nps_spin.setSingleStep(0.05)
-        self.max_nps_spin.setValue(2.8)
-        self.max_nps_spin.setDecimals(2)
+        # Spinboxes
+        self.max_nps_spin = QDoubleSpinBox()
+        self.max_nps_spin.setRange(1.0, 10.0)
+        self.max_nps_spin.setSingleStep(0.1)
         self.max_nps_spin.setSuffix(" nps")
-        self.max_nps_spin.setToolTip("Higher = more notes per second (denser chart).")
 
-        self.min_gap_spin = beefy_spin(QSpinBox())
-        self.min_gap_spin.setRange(40, 400)
-        self.min_gap_spin.setSingleStep(5)
-        self.min_gap_spin.setValue(140)
+        self.min_gap_spin = QSpinBox()
+        self.min_gap_spin.setRange(10, 1000)
+        self.min_gap_spin.setSingleStep(10)
         self.min_gap_spin.setSuffix(" ms")
-        self.min_gap_spin.setToolTip("Lower = notes can be closer together (tighter).")
 
-        self.seed_spin = beefy_spin(QSpinBox())
-        self.seed_spin.setRange(0, 2_000_000_000)
-        self.seed_spin.setValue(42)
-        self.seed_spin.setToolTip("Changes the pattern/variation while keeping the same difficulty.")
+        self.seed_spin = QSpinBox()
+        self.seed_spin.setRange(0, 999999)
 
-        # Human labels
-        custom_form.addRow(form_label("Mode"), mode_layout)
-        custom_form.addRow(form_label("Note density"), self.max_nps_spin)
-        custom_form.addRow(form_label("Note spacing"), self.min_gap_spin)
-        custom_form.addRow(form_label("Variation"), self.seed_spin)
+        custom_form.addRow(form_label("Generation Mode"), row_mode)
+        custom_form.addRow(form_label("Max Density"), self.max_nps_spin)
+        custom_form.addRow(form_label("Min Note Gap"), self.min_gap_spin)
+        custom_form.addRow(form_label("Random Seed"), self.seed_spin)
 
-        self.custom_row_container.setVisible(False)
-        adv_group_layout.addWidget(self.custom_row_container)
+        adv_form.addRow(self.custom_controls)
 
-        m.addWidget(self.adv_header)
-        m.addWidget(self.adv_group)
+        adv_layout.addWidget(self.btn_toggle_adv)
+        adv_layout.addWidget(self.adv_content)
 
-        # Run row
-        run_row = QHBoxLayout()
-        run_row.setSpacing(12)
-        self.btn_generate = QPushButton("Generate Chart")
+        main_layout_inner.addWidget(self.adv_container)
+
+        # Action Buttons
+        row_actions = QHBoxLayout()
+        self.btn_generate = QPushButton("GENERATE CHART")
         self.btn_generate.setObjectName("Primary")
-        self.btn_generate.setMinimumHeight(52)
+        self.btn_generate.setMinimumHeight(50)
+        self.btn_generate.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        self.btn_generate.setCursor(Qt.PointingHandCursor)
+
         self.btn_cancel = QPushButton("Cancel")
-        self.btn_cancel.setMinimumHeight(52)
+        self.btn_cancel.setMinimumHeight(50)
 
-        run_row.addWidget(self.btn_generate, 1)
-        run_row.addWidget(self.btn_cancel, 0)
-        m.addLayout(run_row)
+        row_actions.addWidget(self.btn_generate, 1)
+        row_actions.addWidget(self.btn_cancel, 0)
+        main_layout_inner.addLayout(row_actions)
 
-        # Divider
-        div = QFrame()
-        div.setObjectName("Divider")
-        div.setFixedHeight(1)
-        m.addWidget(div)
+        # Logs
+        self.grp_logs = QGroupBox("Logs")
+        log_layout = QVBoxLayout(self.grp_logs)
+        self.log_view = QTextEdit()
+        self.log_view.setReadOnly(True)
+        self.log_view.setFont(QFont("Consolas", 9))
+        self.log_view.setPlaceholderText("Process output will appear here...")
+        log_layout.addWidget(self.log_view)
 
-        # Logs (Collapsible)
-        self.log_header = QPushButton(f"{arrow_text(False)}  Logs")
-        self.log_header.setObjectName("Toggle")
-        self.log_header.setCheckable(True)
-        self.log_header.setChecked(False)
-        self.log_header.setCursor(Qt.PointingHandCursor)
+        # Collapsible log logic
+        self.btn_toggle_log = QPushButton("Show Logs")
+        self.btn_toggle_log.setCheckable(True)
+        self.btn_toggle_log.setFlat(True)
+        self.btn_toggle_log.setIcon(self.style().standardIcon(QStyle.SP_ToolBarHorizontalExtensionButton))
 
-        self.log = QTextEdit()
-        self.log.setObjectName("Log")
-        self.log.setReadOnly(True)
-        self.log.setVisible(False)
-        self.log.setMinimumHeight(260)
-        self.log.setPlaceholderText("CLI output, errors, stats, etc.")
+        # Add to layout
+        main_layout_inner.addWidget(self.btn_toggle_log)
+        main_layout_inner.addWidget(self.grp_logs)
 
-        m.addWidget(self.log_header)
-        m.addWidget(self.log)
+        # Initially hide logs
+        self.grp_logs.setVisible(False)
 
-        m.addStretch(1)
-        main_scroll.setWidget(main)
+        # Add scroll to main area
+        main_scroll = QScrollArea()
+        main_scroll.setWidgetResizable(True)
+        main_scroll.setWidget(main_widget)
+        main_scroll.setFrameShape(QFrame.NoFrame)
 
         splitter.addWidget(sidebar_scroll)
         splitter.addWidget(main_scroll)
-        splitter.setSizes([320, 780])
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 3) # Main area is 3x larger
 
         # Menu
         act_quit = QAction("Quit", self)
         act_quit.triggered.connect(self.close)
-
         act_clear = QAction("Clear Log", self)
-        act_clear.triggered.connect(lambda: self.log.clear())
+        act_clear.triggered.connect(lambda: self.log_view.clear())
 
-        menu = self.menuBar().addMenu("App")
+        menu = self.menuBar().addMenu("File")
         menu.addAction(act_clear)
         menu.addSeparator()
         menu.addAction(act_quit)
 
-    # ---------- Wiring ----------
     def _wire(self) -> None:
         self.btn_pick_audio.clicked.connect(self.pick_audio)
         self.btn_clear_audio.clicked.connect(self.clear_audio)
@@ -741,59 +483,42 @@ class MainWindow(QMainWindow):
         self.btn_cancel.clicked.connect(self.cancel_run)
 
         self.title_edit.textEdited.connect(lambda _: setattr(self, "_title_user_edited", True))
-
-        self.adv_header.toggled.connect(self.toggle_advanced)
-        self.log_header.toggled.connect(self.toggle_logs)
         self.chk_dark.toggled.connect(self.on_dark_toggle)
-
         self.preset_combo.currentTextChanged.connect(self.apply_preset)
+
+        self.btn_toggle_adv.toggled.connect(self.on_toggle_advanced)
+        self.btn_toggle_log.toggled.connect(self.on_toggle_logs)
 
         for w in [self.out_dir_edit, self.title_edit]:
             w.textChanged.connect(self._update_state)
 
-    # ---------- Theme ----------
-    def apply_theme(self, dark: bool) -> None:
-        QApplication.instance().setStyleSheet(DARK_QSS if dark else LIGHT_QSS)
-
+    # ---------- Logic ----------
     def on_dark_toggle(self, checked: bool) -> None:
         self.dark_mode = checked
-        self.apply_theme(dark=self.dark_mode)
+        ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
 
-    # ---------- Presets ----------
+    def on_toggle_advanced(self, checked: bool) -> None:
+        self.adv_content.setVisible(checked)
+        icon = QStyle.SP_ArrowDown if checked else QStyle.SP_ToolBarHorizontalExtensionButton
+        self.btn_toggle_adv.setIcon(self.style().standardIcon(icon))
+
+    def on_toggle_logs(self, checked: bool) -> None:
+        self.grp_logs.setVisible(checked)
+        icon = QStyle.SP_ArrowDown if checked else QStyle.SP_ToolBarHorizontalExtensionButton
+        self.btn_toggle_log.setIcon(self.style().standardIcon(icon))
+
     def apply_preset(self, name: str) -> None:
         preset = DIFFICULTY_PRESETS.get(name)
         is_custom = preset is None
-
-        # Show/hide manual controls
-        self.custom_row_container.setVisible(is_custom)
+        self.custom_controls.setVisible(is_custom)
 
         if is_custom:
-            self.preset_hint.setText(
-                "Custom: tweak density + spacing. Higher density = more notes; lower spacing = tighter notes."
-            )
-            return
+            self.preset_hint.setText("Manual control enabled. Adjust density and gap below.")
+        else:
+            self.max_nps_spin.setValue(float(preset["max_nps"]))
+            self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
+            self.preset_hint.setText(f"Preset Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
 
-        # Apply preset values
-        assert preset is not None
-        self.max_nps_spin.setValue(float(preset["max_nps"]))
-        self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
-
-        # Leave seed as-is (your personal “riff style”)
-        self.preset_hint.setText(
-            f"Applied: {preset['max_nps']} nps density • {preset['min_gap_ms']}ms spacing. "
-            "Pick Custom… if you want to tune."
-        )
-
-    # ---------- Collapsibles ----------
-    def toggle_advanced(self, expanded: bool) -> None:
-        self.adv_header.setText(f"{arrow_text(expanded)}  Advanced Settings")
-        self.adv_group.setVisible(expanded)
-
-    def toggle_logs(self, expanded: bool) -> None:
-        self.log_header.setText(f"{arrow_text(expanded)}  Logs")
-        self.log.setVisible(expanded)
-
-    # ---------- State / log ----------
     def _update_state(self) -> None:
         running = self.proc is not None and self.proc.state() != QProcess.NotRunning
         has_audio = self.audio_path is not None and self.audio_path.exists()
@@ -803,26 +528,25 @@ class MainWindow(QMainWindow):
         self.btn_open_song.setEnabled(self.last_out_song is not None and self.last_out_song.exists())
 
     def append_log(self, text: str) -> None:
-        t = human_ok(text).strip("\n")
-        if not t:
-            return
-        self.log.append(t)
-        self.log.moveCursor(QTextCursor.End)
+        t = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+        if not t: return
+        self.log_view.append(t)
+        # Auto-scroll
+        self.log_view.verticalScrollBar().setValue(self.log_view.verticalScrollBar().maximum())
 
-    # ---------- Album art preview ----------
     def update_cover_preview(self, image_path: Path | None) -> None:
         if not image_path or not image_path.exists():
             self.cover_preview.setPixmap(QPixmap())
             self.cover_preview.setText("Preview")
-            self.cover_preview.setMinimumHeight(160)
+            self.cover_preview.setMinimumHeight(150)
             return
 
         pix = QPixmap(str(image_path))
         if pix.isNull():
-            self.cover_preview.setPixmap(QPixmap())
-            self.cover_preview.setText("Invalid image")
+            self.cover_preview.setText("Invalid Image")
             return
 
+        # Scale nicely
         scaled = pix.scaled(QSize(250, 250), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.cover_preview.setText("")
         self.cover_preview.setPixmap(scaled)
@@ -830,54 +554,37 @@ class MainWindow(QMainWindow):
 
     # ---------- Pickers ----------
     def pick_audio(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Choose Audio File", "", "Audio Files (*.mp3 *.wav *.ogg *.flac)"
-        )
-        if not path:
-            return
+        path, _ = QFileDialog.getOpenFileName(self, "Choose Audio", "", "Audio (*.mp3 *.wav *.ogg *.flac)")
+        if not path: return
         self.audio_path = Path(path)
         self.audio_label.setText(self.audio_path.name)
-        self.audio_label.setObjectName("")
+        self.audio_label.setStyleSheet("color: palette(text); font-weight: bold;")
 
         if (not self._title_user_edited) and (not self.title_edit.text().strip()):
             self.title_edit.setText(self.audio_path.stem)
 
-        self.statusBar().showMessage(f"Selected audio: {self.audio_path.name}")
+        self.statusBar().showMessage(f"Selected: {self.audio_path.name}")
         self._update_state()
 
     def clear_audio(self) -> None:
         self.audio_path = None
         self.audio_label.setText("No file selected")
-        self.audio_label.setObjectName("Muted")
-        self.statusBar().showMessage("Audio cleared")
+        self.audio_label.setStyleSheet("color: palette(disabled-text); font-style: italic;")
         self._update_state()
 
     def pick_cover(self) -> None:
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Choose Album Art", "", "Images (*.png *.jpg *.jpeg)"
-        )
-        if not path:
-            return
+        path, _ = QFileDialog.getOpenFileName(self, "Choose Art", "", "Images (*.png *.jpg *.jpeg)")
+        if not path: return
         self.cover_path = Path(path)
-        self.cover_label.setText(self.cover_path.name)
-        self.cover_label.setObjectName("")
         self.update_cover_preview(self.cover_path)
 
     def clear_cover(self) -> None:
         self.cover_path = None
-        self.cover_label.setText("No art selected")
-        self.cover_label.setObjectName("Muted")
         self.update_cover_preview(None)
 
     def pick_output_dir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Choose Output Folder")
-        if path:
-            self.out_dir_edit.setText(path)
-
-    # ---------- Open helpers ----------
-    def _open_in_finder(self, p: Path) -> None:
-        proc = QProcess(self)
-        proc.start("open", [str(p)])
+        if path: self.out_dir_edit.setText(path)
 
     def open_output_root(self) -> None:
         out_root = Path(self.out_dir_edit.text()).expanduser().resolve()
@@ -888,14 +595,22 @@ class MainWindow(QMainWindow):
         if self.last_out_song and self.last_out_song.exists():
             self._open_in_finder(self.last_out_song)
 
-    # ---------- Run CLI ----------
-    def build_cfg(self) -> RunConfig | None:
-        if not self.audio_path:
-            return None
+    def _open_in_finder(self, p: Path) -> None:
+        # Cross-platform open
+        proc = QProcess(self)
+        if sys.platform == "darwin":
+            proc.start("open", [str(p)])
+        elif sys.platform == "win32":
+            proc.start("explorer", [str(p)])
+        else:
+            proc.start("xdg-open", [str(p)])
 
+    # ---------- Execution ----------
+    def build_cfg(self) -> RunConfig | None:
+        if not self.audio_path: return None
         audio = self.audio_path.expanduser().resolve()
         if not audio.exists():
-            QMessageBox.critical(self, "Audio missing", f"Audio file not found:\n{audio}")
+            QMessageBox.critical(self, "Error", "Audio file missing.")
             return None
 
         out_root = Path(self.out_dir_edit.text()).expanduser().resolve()
@@ -916,36 +631,24 @@ class MainWindow(QMainWindow):
         )
 
     def run_generate(self) -> None:
-        if self.proc and self.proc.state() != QProcess.NotRunning:
-            return
-
+        if self.proc and self.proc.state() != QProcess.NotRunning: return
         cfg = self.build_cfg()
-        if not cfg:
+        if not cfg: return
+
+        py_exec = get_python_exec()
+        if not is_frozen() and not Path(py_exec).exists():
+            QMessageBox.critical(self, "Error", "Missing .venv python.")
             return
 
-        # 1. Determine which executable to run (Venv Python vs. The App Itself)
-        py_exec = get_python_exec()
-        
-        # 2. Safety Check (Dev mode only)
-        # If we are NOT frozen, we expect a venv. If frozen, we are self-contained.
-        if not is_frozen() and not Path(py_exec).exists():
-             QMessageBox.critical(self, "Missing venv", "Missing .venv.\n\nRun:\n  make install")
-             return
-        
         out_song = (cfg.out_root / cfg.title).resolve()
         out_song.mkdir(parents=True, exist_ok=True)
         self.last_out_song = out_song
 
-        # 3. Build Command
         if is_frozen():
-            # APP MODE: Run the app executable with a secret flag.
-            # wrapper.py will see "--internal-cli" and switch to CLI mode.
             cmd = [str(py_exec), "--internal-cli"]
         else:
-            # DEV MODE: Standard "python -m charter.cli"
             cmd = [str(py_exec), "-m", "charter.cli"]
 
-        # 4. Append Standard Arguments
         cmd.extend([
             "--audio", str(cfg.audio),
             "--out", str(out_song),
@@ -959,103 +662,80 @@ class MainWindow(QMainWindow):
             "--max-nps", f"{cfg.max_nps:.2f}",
             "--seed", str(cfg.seed),
         ])
-
         if cfg.fetch_metadata:
             cmd.append("--fetch-metadata")
 
-        self.append_log(f"$ {' '.join(cmd)}\n")
-        self.statusBar().showMessage("Generating chart…")
-        self.btn_generate.setText("Generating…")
+        self.log_view.clear()
+        if not self.grp_logs.isVisible():
+            self.btn_toggle_log.setChecked(True)
+
+        self.append_log(f"Starting generation for: {cfg.title}...")
+        self.btn_generate.setText("Generating...")
 
         self.proc = QProcess(self)
         self.proc.setProcessChannelMode(QProcess.SeparateChannels)
-        
-        # 5. Set Working Directory
-        # In Dev mode, we must be in root so "import charter" works.
-        # In App mode, we rely on the absolute paths in 'cmd', so we don't change CWD.
         if not is_frozen():
             self.proc.setWorkingDirectory(str(repo_root()))
 
         self.proc.readyReadStandardOutput.connect(self._on_stdout)
         self.proc.readyReadStandardError.connect(self._on_stderr)
-        self.proc.finished.connect(lambda code, status: self._on_finished(code, status, out_song))
+        self.proc.finished.connect(lambda c, s: self._on_finished(c, s, out_song))
 
         self.proc.start(cmd[0], cmd[1:])
         self._update_state()
 
     def cancel_run(self) -> None:
-        if self.proc and self.proc.state() != QProcess.NotRunning:
-            self.append_log("\n⏹ Cancel requested…")
+        if self.proc:
             self.proc.kill()
+            self.append_log("Cancelled by user.")
 
     def _on_stdout(self) -> None:
-        if not self.proc:
-            return
+        if not self.proc: return
         data = bytes(self.proc.readAllStandardOutput()).decode("utf-8", errors="replace")
         self.append_log(data)
 
     def _on_stderr(self) -> None:
-        if not self.proc:
-            return
+        if not self.proc: return
         data = bytes(self.proc.readAllStandardError()).decode("utf-8", errors="replace")
-        if data.strip():
-            if not self.log.isVisible():
-                self.log_header.setChecked(True)
-            self.append_log(data)
+        self.append_log(data)
 
     def _on_finished(self, code: int, status: QProcess.ExitStatus, out_song: Path) -> None:
-        self.btn_generate.setText("Generate Chart")
+        self.btn_generate.setText("GENERATE CHART")
         ok = (status == QProcess.NormalExit) and (code == 0)
 
         if ok and self.cover_path and self.cover_path.exists():
             try:
                 dest = out_song / "album.png"
                 dest.write_bytes(self.cover_path.read_bytes())
-                self.append_log(f"🖼 Copied album art → {dest}")
+                self.append_log(f"Cover copied to {dest}")
             except Exception as e:
-                self.append_log(f"⚠️ Failed copying album art: {e}")
+                self.append_log(f"Cover copy failed: {e}")
 
-        generated_cover = out_song / "album.png"
-        if generated_cover.exists():
-            self.update_cover_preview(generated_cover)
+        # Update preview if we fetched one
+        gen_cover = out_song / "album.png"
+        if gen_cover.exists():
+            self.update_cover_preview(gen_cover)
 
         if ok:
-            msg = self._stats_message(out_song) or f"✅ Chart generated.\n\nFolder:\n{out_song}"
-            QMessageBox.information(self, "Chart generated", msg)
-            self.statusBar().showMessage("Done")
+            QMessageBox.information(self, "Success", f"Chart created!\n\nLocation:\n{out_song}")
+            self.statusBar().showMessage("Generation Complete")
         else:
-            if not self.log.isVisible():
-                self.log_header.setChecked(True)
-            QMessageBox.critical(self, "Generation failed", f"CLI exited with code {code}.\n\n(Logs expanded below.)")
-            self.statusBar().showMessage("Failed")
+            QMessageBox.critical(self, "Failed", f"Process exited with code {code}. See logs.")
+            self.statusBar().showMessage("Generation Failed")
 
         self.proc = None
         self._update_state()
 
-    def _stats_message(self, out_song: Path) -> str | None:
-        stats_path = out_song / "stats.json"
-        if not stats_path.exists():
-            return None
-        try:
-            stats = json.loads(stats_path.read_text(encoding="utf-8"))
-            return (
-                "✅ Chart generated successfully.\n\n"
-                f"Notes: {stats.get('total_notes')} | Chords: {stats.get('total_chords')} | Sustains: {stats.get('total_sustains')}\n"
-                f"Max NPS (1s): {stats.get('max_nps_1s')} | Avg NPS: {stats.get('avg_nps')}\n"
-                f"Chart end: {stats.get('chart_duration_sec')}s\n\n"
-                f"Folder:\n{out_song}"
-            )
-        except Exception:
-            return f"✅ Chart generated.\n\nFolder:\n{out_song}"
-
-
 def main() -> None:
     app = QApplication(sys.argv)
+    # Default to system font
+    font = QApplication.font()
+    font.setPointSize(10)
+    app.setFont(font)
+
     w = MainWindow()
-    w.apply_theme(dark=w.dark_mode)
     w.show()
     sys.exit(app.exec())
-
 
 if __name__ == "__main__":
     main()
