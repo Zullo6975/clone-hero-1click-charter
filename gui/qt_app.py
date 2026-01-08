@@ -4,8 +4,8 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QProcess, QSize
-from PySide6.QtGui import QFont, QPixmap, QAction, QPalette, QColor, QIcon
+from PySide6.QtCore import Qt, QProcess, QSize, QTimer, QSettings
+from PySide6.QtGui import QFont, QPixmap, QAction, QPalette, QColor, QDragEnterEvent, QDropEvent, QFontDatabase
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -31,7 +31,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QSizePolicy,
-    QStyleFactory,
     QStyle,
 )
 
@@ -49,7 +48,20 @@ def get_python_exec() -> str | Path:
         return sys.executable
     return repo_root() / ".venv" / "bin" / "python"
 
-# ---------------- Difficulty presets ----------------
+# ---------------- Helpers ----------------
+def form_label(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    return lbl
+
+def get_font(size: int = 10, bold: bool = False) -> QFont:
+    """Safely get the system default font."""
+    f = QApplication.font()
+    f.setPointSize(size)
+    f.setBold(bold)
+    return f
+
+# ---------------- Config ----------------
 DIFFICULTY_PRESETS: dict[str, dict[str, float | int] | None] = {
     "Medium (Casual)":   {"max_nps": 2.25, "min_gap_ms": 170},
     "Medium (Balanced)": {"max_nps": 2.80, "min_gap_ms": 140},
@@ -57,117 +69,6 @@ DIFFICULTY_PRESETS: dict[str, dict[str, float | int] | None] = {
     "Medium (Chaotic)":  {"max_nps": 3.90, "min_gap_ms": 95},
     "Custom…":           None,
 }
-
-# ---------------- Theme Manager ----------------
-class ThemeManager:
-    """
-    Manages the Fusion palette to ensure consistent, non-clashing colors
-    across the entire application.
-    """
-    @staticmethod
-    def apply_style(app: QApplication, dark_mode: bool):
-        app.setStyle("Fusion")
-
-        palette = QPalette()
-        if dark_mode:
-            # Modern Dark Slate Palette
-            base = QColor(25, 30, 40)
-            alt_base = QColor(35, 40, 50)
-            text = QColor(240, 240, 240)
-            disabled_text = QColor(127, 127, 127)
-            highlight = QColor(64, 156, 255)  # Soft Blue
-
-            palette.setColor(QPalette.Window, base)
-            palette.setColor(QPalette.WindowText, text)
-            palette.setColor(QPalette.Base, alt_base)
-            palette.setColor(QPalette.AlternateBase, base)
-            palette.setColor(QPalette.ToolTipBase, text)
-            palette.setColor(QPalette.ToolTipText, base)
-            palette.setColor(QPalette.Text, text)
-            palette.setColor(QPalette.Button, base)
-            palette.setColor(QPalette.ButtonText, text)
-            palette.setColor(QPalette.BrightText, Qt.red)
-            palette.setColor(QPalette.Link, highlight)
-            palette.setColor(QPalette.Highlight, highlight)
-            palette.setColor(QPalette.HighlightedText, Qt.black)
-            palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
-            palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
-        else:
-            # Clean Light Palette
-            base = QColor(245, 245, 250)
-            white = QColor(255, 255, 255)
-            text = QColor(20, 25, 30)
-            disabled_text = QColor(120, 120, 120)
-            highlight = QColor(50, 100, 220)  # Deep Blue
-
-            palette.setColor(QPalette.Window, base)
-            palette.setColor(QPalette.WindowText, text)
-            palette.setColor(QPalette.Base, white)
-            palette.setColor(QPalette.AlternateBase, base)
-            palette.setColor(QPalette.ToolTipBase, white)
-            palette.setColor(QPalette.ToolTipText, text)
-            palette.setColor(QPalette.Text, text)
-            palette.setColor(QPalette.Button, base)
-            palette.setColor(QPalette.ButtonText, text)
-            palette.setColor(QPalette.BrightText, Qt.red)
-            palette.setColor(QPalette.Link, highlight)
-            palette.setColor(QPalette.Highlight, highlight)
-            palette.setColor(QPalette.HighlightedText, white)
-            palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
-            palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
-
-        app.setPalette(palette)
-
-        # Minimal stylesheet just for specific tweaks (padding/radius)
-        # We rely on Palette for colors to avoid clashes.
-        app.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid palette(mid);
-                border-radius: 6px;
-                margin-top: 22px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                padding: 0 5px;
-                left: 10px;
-            }
-            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
-                padding: 6px;
-                border-radius: 4px;
-                border: 1px solid palette(mid);
-            }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {
-                border: 1px solid palette(highlight);
-            }
-            QPushButton {
-                padding: 8px 16px;
-                border-radius: 4px;
-                border: 1px solid palette(mid);
-            }
-            QPushButton:hover {
-                background-color: palette(midlight);
-            }
-            QPushButton#Primary {
-                background-color: palette(highlight);
-                color: palette(highlighted-text);
-                font-weight: bold;
-                border: 1px solid palette(highlight);
-            }
-            QPushButton#Primary:hover {
-                border: 1px solid palette(text);
-            }
-        """)
-
-# ---------------- Helpers ----------------
-def form_label(text: str) -> QLabel:
-    lbl = QLabel(text)
-    lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-    # Allow label to shrink if needed, but prefer visible
-    lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-    return lbl
 
 @dataclass
 class RunConfig:
@@ -184,73 +85,166 @@ class RunConfig:
     charter: str = "Zullo7569"
     fetch_metadata: bool = True
 
+# ---------------- Theme Manager ----------------
+class ThemeManager:
+    @staticmethod
+    def apply_style(app: QApplication, dark_mode: bool):
+        app.setStyle("Fusion")
+
+        palette = QPalette()
+        if dark_mode:
+            base = QColor(30, 35, 40)
+            mid = QColor(45, 50, 55)
+            text = QColor(220, 220, 220)
+            highlight = QColor(50, 120, 210)
+
+            palette.setColor(QPalette.Window, base)
+            palette.setColor(QPalette.WindowText, text)
+            palette.setColor(QPalette.Base, mid)
+            palette.setColor(QPalette.AlternateBase, base)
+            palette.setColor(QPalette.Text, text)
+            palette.setColor(QPalette.Button, mid)
+            palette.setColor(QPalette.ButtonText, text)
+            palette.setColor(QPalette.Highlight, highlight)
+            palette.setColor(QPalette.HighlightedText, Qt.white)
+            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(100, 100, 100))
+            palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(100, 100, 100))
+            palette.setColor(QPalette.PlaceholderText, QColor(120, 130, 140))
+        else:
+            base = QColor(240, 240, 245)
+            white = QColor(255, 255, 255)
+            text = QColor(20, 20, 30)
+            highlight = QColor(0, 100, 200)
+
+            palette.setColor(QPalette.Window, base)
+            palette.setColor(QPalette.WindowText, text)
+            palette.setColor(QPalette.Base, white)
+            palette.setColor(QPalette.AlternateBase, base)
+            palette.setColor(QPalette.Text, text)
+            palette.setColor(QPalette.Button, white)
+            palette.setColor(QPalette.ButtonText, text)
+            palette.setColor(QPalette.Highlight, highlight)
+            palette.setColor(QPalette.HighlightedText, white)
+            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(150, 150, 160))
+            palette.setColor(QPalette.PlaceholderText, QColor(140, 140, 150))
+
+        app.setPalette(palette)
+
+        app.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid palette(mid);
+                border-radius: 6px;
+                margin-top: 24px;
+                padding-top: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+            }
+            QLineEdit, QComboBox {
+                padding: 6px;
+                border-radius: 4px;
+                border: 1px solid palette(mid);
+                background-color: palette(base);
+            }
+            QLineEdit:focus, QComboBox:focus {
+                border: 1px solid palette(highlight);
+            }
+            QPushButton {
+                padding: 8px 16px;
+                border-radius: 5px;
+                border: 1px solid palette(mid);
+                background-color: palette(button);
+            }
+            QPushButton:hover {
+                background-color: palette(light);
+            }
+            QPushButton#Primary {
+                background-color: palette(highlight);
+                color: palette(highlighted-text);
+                font-weight: bold;
+                border: 1px solid palette(highlight);
+            }
+            QPushButton#Primary:hover {
+                border: 1px solid palette(text);
+            }
+            QCheckBox {
+                spacing: 8px;
+            }
+            QLabel#HealthGood { color: #2ecc71; font-weight: bold; }
+            QLabel#HealthWarn { color: #f1c40f; font-weight: bold; }
+            QLabel#HealthBad { color: #e74c3c; font-weight: bold; }
+        """)
+
 # ---------------- Main Window ----------------
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("CH 1-Click Charter")
-        self.resize(1000, 750)
+        self.setAcceptDrops(True)
+
+        self.settings = QSettings("Zullo", "1ClickCharter")
 
         self.audio_path: Path | None = None
         self.cover_path: Path | None = None
         self.last_out_song: Path | None = None
         self.proc: QProcess | None = None
+        self.validator_proc: QProcess | None = None
 
-        self.dark_mode = False
+        self.dark_mode = self.settings.value("dark_mode", True, type=bool)
         self._title_user_edited = False
 
         self._build_ui()
         self._wire()
+        self._restore_settings()
 
-        # Apply initial theme
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
-
         self.apply_preset(self.preset_combo.currentText())
         self._update_state()
+
+        QTimer.singleShot(0, self.snap_to_content)
         self.statusBar().showMessage("Ready")
 
     def _build_ui(self) -> None:
         central = QWidget()
         self.setCentralWidget(central)
 
-        # Use a vertical layout for the whole window first?
-        # No, horizontal splitter is good, but let's make it smarter.
         main_layout = QHBoxLayout(central)
         main_layout.setContentsMargins(16, 16, 16, 16)
         main_layout.setSpacing(16)
 
         splitter = QSplitter(Qt.Horizontal)
-        splitter.setHandleWidth(2)
+        splitter.setHandleWidth(1)
         splitter.setChildrenCollapsible(False)
         main_layout.addWidget(splitter)
 
         # ================= Sidebar =================
         sidebar_widget = QWidget()
-        sidebar_layout = QVBoxLayout(sidebar_widget)
-        sidebar_layout.setContentsMargins(0, 0, 10, 0) # Right margin for separation
-        sidebar_layout.setSpacing(16)
+        sidebar_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
 
-        # Title Block
+        sidebar_layout = QVBoxLayout(sidebar_widget)
+        sidebar_layout.setContentsMargins(0, 0, 12, 0)
+        sidebar_layout.setSpacing(18)
+
+        # Title
         title_block = QVBoxLayout()
         title_lbl = QLabel("CH 1-Click")
-        title_lbl.setFont(QFont("Segoe UI", 24, QFont.Bold))
+        title_lbl.setFont(get_font(22, True))
         sub_lbl = QLabel("Automated Charting Tool")
-        sub_lbl.setStyleSheet("color: palette(disabled-text);")
+        sub_lbl.setStyleSheet("color: palette(disabled-text); font-size: 13px;")
         title_block.addWidget(title_lbl)
         title_block.addWidget(sub_lbl)
         sidebar_layout.addLayout(title_block)
 
-        # Theme Toggle
-        self.chk_dark = QCheckBox("Dark Mode")
-        sidebar_layout.addWidget(self.chk_dark)
-
-        # Audio Section
+        # Audio
         grp_audio = QGroupBox("Input Audio")
         grp_audio_layout = QVBoxLayout(grp_audio)
 
-        self.audio_label = QLabel("No file selected")
-        self.audio_label.setStyleSheet("color: palette(disabled-text); font-style: italic;")
+        self.audio_label = QLabel("Drag & drop audio here")
         self.audio_label.setWordWrap(True)
+        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
 
         row_audio_btns = QHBoxLayout()
         self.btn_pick_audio = QPushButton("Browse...")
@@ -258,7 +252,6 @@ class MainWindow(QMainWindow):
 
         self.btn_clear_audio = QToolButton()
         self.btn_clear_audio.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
-        self.btn_clear_audio.setToolTip("Clear Selection")
 
         row_audio_btns.addWidget(self.btn_pick_audio, 1)
         row_audio_btns.addWidget(self.btn_clear_audio, 0)
@@ -267,13 +260,13 @@ class MainWindow(QMainWindow):
         grp_audio_layout.addLayout(row_audio_btns)
         sidebar_layout.addWidget(grp_audio)
 
-        # Art Section
+        # Art
         grp_art = QGroupBox("Album Art")
         grp_art_layout = QVBoxLayout(grp_art)
 
-        self.cover_preview = QLabel("Preview")
+        self.cover_preview = QLabel("Drag Art Here")
         self.cover_preview.setAlignment(Qt.AlignCenter)
-        self.cover_preview.setMinimumHeight(150)
+        self.cover_preview.setFixedSize(260, 260)
         self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text);")
 
         row_art_btns = QHBoxLayout()
@@ -290,7 +283,7 @@ class MainWindow(QMainWindow):
         grp_art_layout.addLayout(row_art_btns)
         sidebar_layout.addWidget(grp_art)
 
-        # Tools Section
+        # Tools
         grp_tools = QGroupBox("Quick Actions")
         grp_tools_layout = QVBoxLayout(grp_tools)
         self.btn_open_output = QPushButton("Open Output Folder")
@@ -301,38 +294,42 @@ class MainWindow(QMainWindow):
 
         sidebar_layout.addStretch(1)
 
-        # Wrap sidebar in scroll area just in case small screen
-        sidebar_scroll = QScrollArea()
-        sidebar_scroll.setWidgetResizable(True)
-        sidebar_scroll.setWidget(sidebar_widget)
-        sidebar_scroll.setFrameShape(QFrame.NoFrame)
-
         # ================= Main Panel =================
         main_widget = QWidget()
-        main_layout_inner = QVBoxLayout(main_widget)
-        main_layout_inner.setContentsMargins(10, 0, 0, 0)
-        main_layout_inner.setSpacing(20)
+        main_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        main_widget.setMinimumWidth(525)
 
-        # Metadata Group
+        main_layout_inner = QVBoxLayout(main_widget)
+        main_layout_inner.setContentsMargins(12, 0, 0, 0)
+        main_layout_inner.setSpacing(22)
+
+        # Metadata
         grp_meta = QGroupBox("Song Metadata")
+        grp_meta.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+
         form_meta = QFormLayout(grp_meta)
         form_meta.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         form_meta.setLabelAlignment(Qt.AlignRight)
+        form_meta.setVerticalSpacing(12)
 
         self.title_edit = QLineEdit()
         self.artist_edit = QLineEdit()
         self.album_edit = QLineEdit()
         self.genre_edit = QLineEdit("Rock")
+        self.charter_edit = QLineEdit("Zullo7569")
 
         form_meta.addRow(form_label("Title"), self.title_edit)
         form_meta.addRow(form_label("Artist"), self.artist_edit)
         form_meta.addRow(form_label("Album"), self.album_edit)
         form_meta.addRow(form_label("Genre"), self.genre_edit)
+        form_meta.addRow(form_label("Charter"), self.charter_edit)
 
         main_layout_inner.addWidget(grp_meta)
 
-        # Output Path Group
+        # Output
         grp_out = QGroupBox("Output Destination")
+        grp_out.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+
         out_layout = QHBoxLayout(grp_out)
         self.out_dir_edit = QLineEdit("output")
         self.btn_pick_output = QPushButton("Browse...")
@@ -340,25 +337,22 @@ class MainWindow(QMainWindow):
         out_layout.addWidget(self.btn_pick_output, 0)
         main_layout_inner.addWidget(grp_out)
 
-        # Advanced Settings (Collapsible)
+        # Advanced
         self.adv_container = QGroupBox("Configuration")
+        self.adv_container.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+
         adv_layout = QVBoxLayout(self.adv_container)
 
-        # Toggle Button for Advanced
-        self.btn_toggle_adv = QPushButton("Show Advanced Settings")
-        self.btn_toggle_adv.setCheckable(True)
-        self.btn_toggle_adv.setFlat(True)
-        # Use built-in arrow icon
-        self.btn_toggle_adv.setIcon(self.style().standardIcon(QStyle.SP_ToolBarHorizontalExtensionButton))
-        self.btn_toggle_adv.setStyleSheet("text-align: left; font-weight: bold;")
+        self.chk_adv = QCheckBox("Show Advanced Settings")
+        self.chk_adv.setStyleSheet("font-weight: bold; margin-bottom: 6px;")
 
-        # Hidden Content
         self.adv_content = QWidget()
         self.adv_content.setVisible(False)
         adv_form = QFormLayout(self.adv_content)
         adv_form.setLabelAlignment(Qt.AlignRight)
+        adv_form.setVerticalSpacing(10)
+        adv_form.setContentsMargins(10, 0, 0, 0)
 
-        # Presets
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(list(DIFFICULTY_PRESETS.keys()))
         self.preset_combo.setCurrentText("Medium (Balanced)")
@@ -368,12 +362,11 @@ class MainWindow(QMainWindow):
         adv_form.addRow(form_label("Difficulty"), self.preset_combo)
         adv_form.addRow(QLabel(""), self.preset_hint)
 
-        # Custom Controls
         self.custom_controls = QWidget()
         custom_form = QFormLayout(self.custom_controls)
-        custom_form.setContentsMargins(0,0,0,0)
+        custom_form.setContentsMargins(0, 0, 0, 0)
+        custom_form.setVerticalSpacing(10)
 
-        # Mode
         self.mode_group = QButtonGroup(self)
         self.mode_real = QRadioButton("Real (Audio Analysis)")
         self.mode_dummy = QRadioButton("Dummy (Metronome)")
@@ -386,42 +379,62 @@ class MainWindow(QMainWindow):
         row_mode.addWidget(self.mode_dummy)
         row_mode.addStretch()
 
-        # Spinboxes
+        # --- UPDATED LABELS & TOOLTIPS ---
         self.max_nps_spin = QDoubleSpinBox()
         self.max_nps_spin.setRange(1.0, 10.0)
         self.max_nps_spin.setSingleStep(0.1)
-        self.max_nps_spin.setSuffix(" nps")
+        self.max_nps_spin.setSuffix(" NPS")
+        self.max_nps_spin.setMinimumHeight(30)
+        self.max_nps_spin.setToolTip("Controls the peak intensity. Higher values allow for denser note streams.")
 
         self.min_gap_spin = QSpinBox()
         self.min_gap_spin.setRange(10, 1000)
         self.min_gap_spin.setSingleStep(10)
         self.min_gap_spin.setSuffix(" ms")
+        self.min_gap_spin.setMinimumHeight(30)
+        self.min_gap_spin.setToolTip("The smallest gap allowed between notes. Lower values allow faster playing speeds.")
 
         self.seed_spin = QSpinBox()
         self.seed_spin.setRange(0, 999999)
+        self.seed_spin.setMinimumHeight(30)
+        self.seed_spin.setToolTip("Change this number to generate a completely different chart pattern.")
 
         custom_form.addRow(form_label("Generation Mode"), row_mode)
-        custom_form.addRow(form_label("Max Density"), self.max_nps_spin)
-        custom_form.addRow(form_label("Min Note Gap"), self.min_gap_spin)
-        custom_form.addRow(form_label("Random Seed"), self.seed_spin)
+        custom_form.addRow(form_label("Max Notes/Sec"), self.max_nps_spin)
+        custom_form.addRow(form_label("Min Note Spacing"), self.min_gap_spin)
+        custom_form.addRow(form_label("Pattern Variation"), self.seed_spin)
 
         adv_form.addRow(self.custom_controls)
-
-        adv_layout.addWidget(self.btn_toggle_adv)
+        adv_layout.addWidget(self.chk_adv)
         adv_layout.addWidget(self.adv_content)
-
         main_layout_inner.addWidget(self.adv_container)
 
-        # Action Buttons
+        # Health Status
+        self.health_bar = QFrame()
+        self.health_bar.setVisible(False)
+        self.health_bar.setStyleSheet("background-color: palette(alternate-base); border-radius: 6px; padding: 4px;")
+        hb_layout = QHBoxLayout(self.health_bar)
+        hb_layout.setContentsMargins(8, 4, 8, 4)
+
+        self.health_icon = QLabel("●")
+        self.health_icon.setFont(get_font(14, True))
+        self.health_text = QLabel("Checking...")
+        self.health_text.setFont(get_font(10, True))
+
+        hb_layout.addWidget(self.health_icon)
+        hb_layout.addWidget(self.health_text, 1)
+        main_layout_inner.addWidget(self.health_bar)
+
+        # Actions
         row_actions = QHBoxLayout()
         self.btn_generate = QPushButton("GENERATE CHART")
         self.btn_generate.setObjectName("Primary")
-        self.btn_generate.setMinimumHeight(50)
-        self.btn_generate.setFont(QFont("Segoe UI", 12, QFont.Bold))
+        self.btn_generate.setMinimumHeight(48)
+        self.btn_generate.setFont(get_font(11, True))
         self.btn_generate.setCursor(Qt.PointingHandCursor)
 
         self.btn_cancel = QPushButton("Cancel")
-        self.btn_cancel.setMinimumHeight(50)
+        self.btn_cancel.setMinimumHeight(48)
 
         row_actions.addWidget(self.btn_generate, 1)
         row_actions.addWidget(self.btn_cancel, 0)
@@ -432,33 +445,40 @@ class MainWindow(QMainWindow):
         log_layout = QVBoxLayout(self.grp_logs)
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
-        self.log_view.setFont(QFont("Consolas", 9))
-        self.log_view.setPlaceholderText("Process output will appear here...")
+
+        # --- FIXED FONT LOGIC ---
+        mono_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
+        mono_font.setPointSize(10)
+        self.log_view.setFont(mono_font)
+
+        self.log_view.setPlaceholderText("Process output...")
         log_layout.addWidget(self.log_view)
 
-        # Collapsible log logic
-        self.btn_toggle_log = QPushButton("Show Logs")
-        self.btn_toggle_log.setCheckable(True)
-        self.btn_toggle_log.setFlat(True)
-        self.btn_toggle_log.setIcon(self.style().standardIcon(QStyle.SP_ToolBarHorizontalExtensionButton))
+        # Toggles
+        row_toggles = QHBoxLayout()
+        row_toggles.setSpacing(16)
 
-        # Add to layout
-        main_layout_inner.addWidget(self.btn_toggle_log)
+        self.chk_dark = QCheckBox("Dark Mode")
+        self.chk_dark.setChecked(self.dark_mode)
+        self.chk_dark.setStyleSheet("font-weight: bold;")
+
+        self.chk_log = QCheckBox("Show Logs")
+        self.chk_log.setStyleSheet("font-weight: bold;")
+
+        row_toggles.addWidget(self.chk_dark)
+        row_toggles.addWidget(self.chk_log)
+        row_toggles.addStretch(1)
+
+        main_layout_inner.addLayout(row_toggles)
         main_layout_inner.addWidget(self.grp_logs)
-
-        # Initially hide logs
         self.grp_logs.setVisible(False)
 
-        # Add scroll to main area
-        main_scroll = QScrollArea()
-        main_scroll.setWidgetResizable(True)
-        main_scroll.setWidget(main_widget)
-        main_scroll.setFrameShape(QFrame.NoFrame)
+        main_layout_inner.addStretch(1)
 
-        splitter.addWidget(sidebar_scroll)
-        splitter.addWidget(main_scroll)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 3) # Main area is 3x larger
+        splitter.addWidget(sidebar_widget)
+        splitter.addWidget(main_widget)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
 
         # Menu
         act_quit = QAction("Quit", self)
@@ -486,11 +506,55 @@ class MainWindow(QMainWindow):
         self.chk_dark.toggled.connect(self.on_dark_toggle)
         self.preset_combo.currentTextChanged.connect(self.apply_preset)
 
-        self.btn_toggle_adv.toggled.connect(self.on_toggle_advanced)
-        self.btn_toggle_log.toggled.connect(self.on_toggle_logs)
+        self.chk_adv.toggled.connect(self.on_toggle_advanced)
+        self.chk_log.toggled.connect(self.on_toggle_logs)
 
         for w in [self.out_dir_edit, self.title_edit]:
             w.textChanged.connect(self._update_state)
+
+    def snap_to_content(self) -> None:
+        QApplication.processEvents()
+        if self.centralWidget():
+            self.centralWidget().layout().activate()
+        self.resize(self.width(), 0)
+        self.adjustSize()
+
+    # ---------- Persistence ----------
+    def _restore_settings(self) -> None:
+        self.charter_edit.setText(self.settings.value("charter", "Zullo7569", type=str))
+        self.out_dir_edit.setText(self.settings.value("out_dir", "output", type=str))
+
+        last_preset = self.settings.value("preset", "Medium (Balanced)", type=str)
+        self.preset_combo.setCurrentText(last_preset)
+
+        geom = self.settings.value("geometry")
+        if geom: self.restoreGeometry(geom)
+
+    def closeEvent(self, event) -> None:
+        self.settings.setValue("dark_mode", self.chk_dark.isChecked())
+        self.settings.setValue("charter", self.charter_edit.text())
+        self.settings.setValue("out_dir", self.out_dir_edit.text())
+        self.settings.setValue("preset", self.preset_combo.currentText())
+        self.settings.setValue("geometry", self.saveGeometry())
+        super().closeEvent(event)
+
+    # ---------- Drag & Drop ----------
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+
+    def dropEvent(self, event: QDropEvent) -> None:
+        for url in event.mimeData().urls():
+            path = Path(url.toLocalFile())
+            if not path.exists(): continue
+
+            suffix = path.suffix.lower()
+            if suffix in {".mp3", ".wav", ".ogg", ".flac"}:
+                self.load_audio(path)
+                break
+            elif suffix in {".jpg", ".jpeg", ".png"}:
+                self.load_cover(path)
+                break
 
     # ---------- Logic ----------
     def on_dark_toggle(self, checked: bool) -> None:
@@ -499,13 +563,11 @@ class MainWindow(QMainWindow):
 
     def on_toggle_advanced(self, checked: bool) -> None:
         self.adv_content.setVisible(checked)
-        icon = QStyle.SP_ArrowDown if checked else QStyle.SP_ToolBarHorizontalExtensionButton
-        self.btn_toggle_adv.setIcon(self.style().standardIcon(icon))
+        QTimer.singleShot(0, self.snap_to_content)
 
     def on_toggle_logs(self, checked: bool) -> None:
         self.grp_logs.setVisible(checked)
-        icon = QStyle.SP_ArrowDown if checked else QStyle.SP_ToolBarHorizontalExtensionButton
-        self.btn_toggle_log.setIcon(self.style().standardIcon(icon))
+        QTimer.singleShot(0, self.snap_to_content)
 
     def apply_preset(self, name: str) -> None:
         preset = DIFFICULTY_PRESETS.get(name)
@@ -519,6 +581,8 @@ class MainWindow(QMainWindow):
             self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
             self.preset_hint.setText(f"Preset Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
 
+        QTimer.singleShot(0, self.snap_to_content)
+
     def _update_state(self) -> None:
         running = self.proc is not None and self.proc.state() != QProcess.NotRunning
         has_audio = self.audio_path is not None and self.audio_path.exists()
@@ -531,14 +595,12 @@ class MainWindow(QMainWindow):
         t = text.replace("\r\n", "\n").replace("\r", "\n").strip()
         if not t: return
         self.log_view.append(t)
-        # Auto-scroll
         self.log_view.verticalScrollBar().setValue(self.log_view.verticalScrollBar().maximum())
 
     def update_cover_preview(self, image_path: Path | None) -> None:
         if not image_path or not image_path.exists():
             self.cover_preview.setPixmap(QPixmap())
-            self.cover_preview.setText("Preview")
-            self.cover_preview.setMinimumHeight(150)
+            self.cover_preview.setText("Drag Art Here")
             return
 
         pix = QPixmap(str(image_path))
@@ -546,36 +608,43 @@ class MainWindow(QMainWindow):
             self.cover_preview.setText("Invalid Image")
             return
 
-        # Scale nicely
         scaled = pix.scaled(QSize(250, 250), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.cover_preview.setText("")
         self.cover_preview.setPixmap(scaled)
-        self.cover_preview.setMinimumHeight(scaled.height() + 10)
 
-    # ---------- Pickers ----------
     def pick_audio(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Choose Audio", "", "Audio (*.mp3 *.wav *.ogg *.flac)")
         if not path: return
-        self.audio_path = Path(path)
+        self.load_audio(Path(path))
+
+    def load_audio(self, path: Path) -> None:
+        self.audio_path = path
         self.audio_label.setText(self.audio_path.name)
         self.audio_label.setStyleSheet("color: palette(text); font-weight: bold;")
 
         if (not self._title_user_edited) and (not self.title_edit.text().strip()):
             self.title_edit.setText(self.audio_path.stem)
 
-        self.statusBar().showMessage(f"Selected: {self.audio_path.name}")
+        self.statusBar().showMessage(f"Loaded: {self.audio_path.name}")
         self._update_state()
+        QTimer.singleShot(0, self.snap_to_content)
 
     def clear_audio(self) -> None:
         self.audio_path = None
-        self.audio_label.setText("No file selected")
-        self.audio_label.setStyleSheet("color: palette(disabled-text); font-style: italic;")
+        self.audio_label.setText("Drag & drop audio here")
+        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
         self._update_state()
+
+        self.audio_label.adjustSize()
+        QTimer.singleShot(10, self.snap_to_content)
 
     def pick_cover(self) -> None:
         path, _ = QFileDialog.getOpenFileName(self, "Choose Art", "", "Images (*.png *.jpg *.jpeg)")
         if not path: return
-        self.cover_path = Path(path)
+        self.load_cover(Path(path))
+
+    def load_cover(self, path: Path) -> None:
+        self.cover_path = path
         self.update_cover_preview(self.cover_path)
 
     def clear_cover(self) -> None:
@@ -596,7 +665,6 @@ class MainWindow(QMainWindow):
             self._open_in_finder(self.last_out_song)
 
     def _open_in_finder(self, p: Path) -> None:
-        # Cross-platform open
         proc = QProcess(self)
         if sys.platform == "darwin":
             proc.start("open", [str(p)])
@@ -605,7 +673,6 @@ class MainWindow(QMainWindow):
         else:
             proc.start("xdg-open", [str(p)])
 
-    # ---------- Execution ----------
     def build_cfg(self) -> RunConfig | None:
         if not self.audio_path: return None
         audio = self.audio_path.expanduser().resolve()
@@ -628,6 +695,7 @@ class MainWindow(QMainWindow):
             max_nps=float(self.max_nps_spin.value()),
             min_gap_ms=int(self.min_gap_spin.value()),
             seed=int(self.seed_spin.value()),
+            charter=self.charter_edit.text().strip()
         )
 
     def run_generate(self) -> None:
@@ -667,8 +735,9 @@ class MainWindow(QMainWindow):
 
         self.log_view.clear()
         if not self.grp_logs.isVisible():
-            self.btn_toggle_log.setChecked(True)
+            self.chk_log.setChecked(True)
 
+        self.health_bar.setVisible(False)
         self.append_log(f"Starting generation for: {cfg.title}...")
         self.btn_generate.setText("Generating...")
 
@@ -711,13 +780,12 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self.append_log(f"Cover copy failed: {e}")
 
-        # Update preview if we fetched one
         gen_cover = out_song / "album.png"
         if gen_cover.exists():
             self.update_cover_preview(gen_cover)
 
         if ok:
-            QMessageBox.information(self, "Success", f"Chart created!\n\nLocation:\n{out_song}")
+            self.run_health_check(out_song)
             self.statusBar().showMessage("Generation Complete")
         else:
             QMessageBox.critical(self, "Failed", f"Process exited with code {code}. See logs.")
@@ -726,9 +794,48 @@ class MainWindow(QMainWindow):
         self.proc = None
         self._update_state()
 
+    def run_health_check(self, song_dir: Path) -> None:
+        self.health_bar.setVisible(True)
+        self.health_icon.setText("⏳")
+        self.health_text.setText("Validating chart health...")
+        self.health_icon.setObjectName("HealthWarn")
+        self.health_text.setStyleSheet("")
+        QTimer.singleShot(0, self.snap_to_content)
+
+        py_exec = get_python_exec()
+        script = repo_root() / "tools" / "validator.py"
+
+        self.validator_proc = QProcess(self)
+        self.validator_proc.finished.connect(lambda c, s: self._on_health_finished(c, s))
+
+        self.validator_proc.start(str(py_exec), [str(script), str(song_dir), "--summary"])
+
+    def _on_health_finished(self, code: int, status: QProcess.ExitStatus) -> None:
+        output = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8")
+
+        if code == 0:
+            self.health_icon.setText("●")
+            self.health_icon.setObjectName("HealthGood")
+            self.health_text.setText("Chart Healthy (Ready to Play)")
+            self.health_text.setStyleSheet("color: palette(text);")
+
+            if "WARNINGS:" in output:
+                self.health_icon.setObjectName("HealthWarn")
+                self.health_text.setText("Playable (See Logs for Warnings)")
+        else:
+            self.health_icon.setText("●")
+            self.health_icon.setObjectName("HealthBad")
+            self.health_text.setText("Chart Errors Detected")
+
+        self.health_icon.style().unpolish(self.health_icon)
+        self.health_icon.style().polish(self.health_icon)
+
+        self.append_log("\n--- VALIDATION REPORT ---")
+        self.append_log(output)
+        self.validator_proc = None
+
 def main() -> None:
     app = QApplication(sys.argv)
-    # Default to system font
     font = QApplication.font()
     font.setPointSize(10)
     app.setFont(font)
