@@ -7,7 +7,7 @@ SP_PITCH = 116
 
 # CLONE HERO PITCH MAP
 # Easy:   60-64
-# Medium: 72-76  <-- We are here now
+# Medium: 72-76
 # Hard:   84-88
 # Expert: 96-100
 LANE_PITCHES = {
@@ -28,13 +28,17 @@ class ChartConfig:
     min_gap_ms: int = 140
     seed: int = 42
 
-    # --- Gameplay Customization (New v0.4) ---
+    # --- Gameplay Customization ---
     allow_orange: bool = True       # If False, limits to G/R/Y/B
     chord_prob: float = 0.12        # 0.0 (None) to 0.5 (Heavy)
-    sustain_len: float = 0.5        # 0.0 (Staccato) to 1.0 (Flowing)
+    sustain_len: float = 0.5        # Probability (0.0 to 1.0)
     movement_bias: float = 0.5      # 0.0 (Static) to 1.0 (Active)
     grid_snap: str = "1/8"          # "1/4", "1/8", "1/16"
     force_taps: bool = False        # If True, avoids HOPO logic (force strum)
+
+    # --- Sustain Fine-Tuning (New v1.1.2) ---
+    sustain_threshold: float = 0.8  # Min gap (seconds) required to trigger a sustain
+    sustain_buffer: float = 0.15    # Gap (seconds) left at the end of a sustain
 
     # --- Structural ---
     add_sections: bool = True

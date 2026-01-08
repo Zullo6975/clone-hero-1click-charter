@@ -67,7 +67,6 @@ def _assign_lane(
 
     semitone_diff = _pitch_diff_semitones(prev_pitch, curr_pitch)
 
-    # Pitch Direction Logic
     if abs(semitone_diff) > 0.5:
         for i, lane in enumerate(options):
             if semitone_diff > 0: # Up
@@ -77,8 +76,6 @@ def _assign_lane(
                 if lane < prev_lane: weights[i] *= 4.0
                 elif lane > prev_lane: weights[i] *= 0.1
     else:
-        # Boredom Breaker: If pitch is flat, increase chance of hopping 2 lanes
-        # prevents endless Trills (0-1-0-1)
         for i, lane in enumerate(options):
             if abs(lane - prev_lane) >= 2:
                 weights[i] *= 1.25
@@ -101,12 +98,10 @@ def write_real_notes_mid(
     onsets = detect_onsets(audio_path)
     notes = _filter_onsets(onsets, duration, cfg)
 
-    # 1. Pitch Detection
     raw_times = [n.t for n in notes]
     pitches = estimate_pitches(audio_path, raw_times)
     pitch_map = {t: p for t, p in zip(raw_times, pitches)}
 
-    # 2. Grid Snap
     times = [n.t for n in notes]
     tempo, beats = librosa.beat.beat_track(y=y, sr=sr)
     beat_times = librosa.frames_to_time(beats, sr=sr)
@@ -126,7 +121,6 @@ def write_real_notes_mid(
             idx = (np.abs(grid - t)).argmin()
             snapped.append(grid[idx])
 
-        # Re-associate pitches
         combined = []
         for t, original_t in zip(snapped, times):
             combined.append((t, pitch_map.get(original_t)))
@@ -143,14 +137,12 @@ def write_real_notes_mid(
         times = final_times
         pitches = final_pitches
 
-    # Lead-in
     shift_seconds = 0.0
     if times and times[0] < 3.0:
         shift_seconds = 3.0 - times[0]
     times = [t + shift_seconds for t in times]
     duration += shift_seconds
 
-    # 3. Note Generation
     pm = pretty_midi.PrettyMIDI(initial_tempo=float(tempo))
     guitar = pretty_midi.Instrument(program=0, name=TRACK_NAME)
 
@@ -164,28 +156,21 @@ def write_real_notes_mid(
         prev_lane = lane
         prev_pitch = curr_pitch
 
-        # --- SUSTAIN LOGIC TUNING (v1.1.1) ---
         next_t = times[i+1] if i+1 < len(times) else t + 2.0
         gap = next_t - t
         is_sustain = False
 
-        # Rule: Gap must be LARGE (> 0.8s) to consider sustaining
-        # This prevents "Medium" density from feeling like a snake
-        if gap > 0.8 and rng.random() < cfg.sustain_len:
+        # USE CONFIG VALUE
+        if gap > cfg.sustain_threshold and rng.random() < cfg.sustain_len:
             is_sustain = True
 
-        # Default Tap: 0.1s (Crisp)
         dur = 0.1
-
         if is_sustain:
-            # Leave a 0.25s breath at the end of the note so it doesn't touch the next one
-            dur = gap - 0.15
-            # Hard cap sustain at 2.5s so it doesn't drag forever
+            # USE CONFIG VALUE
+            dur = gap - cfg.sustain_buffer
             dur = min(dur, 2.5)
-            # Safety floor
             dur = max(dur, 0.2)
 
-        # Chord Logic
         lanes = [lane]
         if rng.random() < cfg.chord_prob:
             opts = [l for l in [lane-1, lane+1] if 0 <= l <= 4]
@@ -202,7 +187,6 @@ def write_real_notes_mid(
 
     pm.instruments.append(guitar)
 
-    # 4. Events
     final_sections = []
     if cfg.add_sections:
         raw_sections = generate_sections(str(audio_path), duration - shift_seconds)

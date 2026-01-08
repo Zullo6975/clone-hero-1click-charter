@@ -78,34 +78,12 @@ class SafeDoubleSpinBox(QDoubleSpinBox):
     def wheelEvent(self, event):
         event.ignore()
 
-# --- FINE TUNED PRESETS (v1.1) ---
-# Drastically reduced sustain probabilities to avoid "mushy" charts
 DIFFICULTY_PRESETS: dict[str, dict[str, float | int] | None] = {
-    "Medium (Casual)":   {
-        "max_nps": 2.25,
-        "min_gap_ms": 170,
-        "sustain": 50,  # Was 70
-        "chord": 5
-    },
-    "Medium (Balanced)": {
-        "max_nps": 2.80,
-        "min_gap_ms": 140,
-        "sustain": 15,  # Was 50 (Major reduction)
-        "chord": 12
-    },
-    "Medium (Intense)":  {
-        "max_nps": 3.40,
-        "min_gap_ms": 110,
-        "sustain": 5,   # Was 25
-        "chord": 25
-    },
-    "Medium (Chaotic)":  {
-        "max_nps": 4.20,
-        "min_gap_ms": 85,
-        "sustain": 0,   # Was 5 (Staccato only)
-        "chord": 40
-    },
-    "Custom…": None,
+    "Medium (Casual)":   {"max_nps": 2.25, "min_gap_ms": 170, "sustain": 50, "chord": 5},
+    "Medium (Balanced)": {"max_nps": 2.80, "min_gap_ms": 140, "sustain": 15, "chord": 12},
+    "Medium (Intense)":  {"max_nps": 3.40, "min_gap_ms": 110, "sustain": 5,  "chord": 25},
+    "Medium (Chaotic)":  {"max_nps": 4.20, "min_gap_ms": 85,  "sustain": 0,  "chord": 40},
+    "Custom…":           None,
 }
 
 @dataclass
@@ -124,6 +102,8 @@ class RunConfig:
     chord_prob: float
     sustain_len: float
     grid_snap: str
+    sustain_threshold: float # New
+    sustain_buffer: float    # New
     charter: str = "Zullo7569"
     fetch_metadata: bool = True
 
@@ -546,6 +526,19 @@ class MainWindow(QMainWindow):
         self.grid_combo.setCurrentText("1/8")
         self.grid_combo.setCursor(Qt.PointingHandCursor)
 
+        # New Sustain Tuning
+        self.sustain_gap_spin = SafeDoubleSpinBox()
+        self.sustain_gap_spin.setRange(0.1, 2.0)
+        self.sustain_gap_spin.setSingleStep(0.1)
+        self.sustain_gap_spin.setValue(0.8)
+        self.sustain_gap_spin.setSuffix(" s")
+
+        self.sustain_buffer_spin = SafeDoubleSpinBox()
+        self.sustain_buffer_spin.setRange(0.05, 0.5)
+        self.sustain_buffer_spin.setSingleStep(0.05)
+        self.sustain_buffer_spin.setValue(0.15)
+        self.sustain_buffer_spin.setSuffix(" s")
+
         custom_form.addRow(form_label("Generation Mode"), row_mode)
         custom_form.addRow(form_label("Max Notes/Sec"), self.max_nps_spin)
         custom_form.addRow(form_label("Min Note Spacing"), self.min_gap_spin)
@@ -559,7 +552,11 @@ class MainWindow(QMainWindow):
         custom_form.addRow(form_label("Grid Snap"), self.grid_combo)
         custom_form.addRow(form_label("5th Lane"), self.chk_orange)
         custom_form.addRow(form_label("Chord Density"), self.chord_slider)
-        custom_form.addRow(form_label("Sustain Length"), self.sustain_slider)
+        custom_form.addRow(form_label("Sustain Prob."), self.sustain_slider) # Renamed slightly
+
+        # Sustain Tuning Group
+        custom_form.addRow(form_label("Min Gap for Sustain"), self.sustain_gap_spin)
+        custom_form.addRow(form_label("Sustain End Buffer"), self.sustain_buffer_spin)
 
         adv_form.addRow(self.custom_controls)
         adv_layout.addWidget(self.chk_adv)
@@ -642,7 +639,7 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0) # Indeterminate mode (bouncing)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedWidth(75)
+        self.progress_bar.setFixedWidth(30)
         self.progress_bar.setVisible(False)
         self.progress_bar.setFixedHeight(12)
 
@@ -849,7 +846,6 @@ class MainWindow(QMainWindow):
         else:
             self.max_nps_spin.setValue(float(preset["max_nps"]))
             self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
-            # NEW: Apply sustain and chord settings
             self.sustain_slider.setValue(int(preset["sustain"]))
             self.chord_slider.setValue(int(preset["chord"]))
 
@@ -976,7 +972,9 @@ class MainWindow(QMainWindow):
             allow_orange=self.chk_orange.isChecked(),
             chord_prob=self.chord_slider.value() / 100.0,
             sustain_len=self.sustain_slider.value() / 100.0,
-            grid_snap=self.grid_combo.currentText()
+            grid_snap=self.grid_combo.currentText(),
+            sustain_threshold=float(self.sustain_gap_spin.value()),
+            sustain_buffer=float(self.sustain_buffer_spin.value())
         )
 
     def run_generate(self) -> None:
@@ -1001,14 +999,15 @@ class MainWindow(QMainWindow):
             "--seed", str(cfg.seed),
             "--chord-prob", str(cfg.chord_prob),
             "--sustain-len", str(cfg.sustain_len),
-            "--grid-snap", cfg.grid_snap
+            "--grid-snap", cfg.grid_snap,
+            "--sustain-threshold", str(cfg.sustain_threshold),
+            "--sustain-buffer", str(cfg.sustain_buffer)
         ])
         if not cfg.allow_orange: cmd.append("--no-orange")
         if cfg.fetch_metadata: cmd.append("--fetch-metadata")
         self.log_window.clear()
         self.append_log(f"Starting generation for: {cfg.title}...")
 
-        # UI Feedback for Long Process
         self.btn_generate.setText("Analyzing...")
         self.btn_generate.setEnabled(False)
         self.progress_bar.setVisible(True)
@@ -1054,7 +1053,6 @@ class MainWindow(QMainWindow):
             if gen_cover.exists(): self.update_cover_preview(gen_cover)
             self.run_health_check(out_song)
 
-            # --- QUEUE LOGIC ---
             if self.song_queue:
                 next_song = self.song_queue.pop(0)
                 self.clear_song_info()
