@@ -48,17 +48,19 @@ def estimate_pitches(audio_path: Path, times: list[float]) -> list[float | None]
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
 
     # fmin/fmax range covers typical guitar/bass frequencies (approx C1 to C7)
-    # This analysis is heavy, but runs only once per song.
+    # We increase frame_length to 4096 to safely detect C1 (32.7Hz) without warnings.
     f0, _, _ = librosa.pyin(
         y,
         fmin=librosa.note_to_hz('C1'),
         fmax=librosa.note_to_hz('C7'),
-        sr=sr
+        sr=sr,
+        frame_length=4096
     )
 
     # Map our target times to the f0 frames
-    frame_indices = librosa.time_to_frames(times, sr=sr, hop_length=512)
-    
+    # pyin uses hop_length = frame_length // 4 by default = 1024
+    frame_indices = librosa.time_to_frames(times, sr=sr, hop_length=1024)
+
     pitches = []
     for idx in frame_indices:
         if 0 <= idx < len(f0):
@@ -69,5 +71,5 @@ def estimate_pitches(audio_path: Path, times: list[float]) -> list[float | None]
                 pitches.append(float(val))
         else:
             pitches.append(None)
-            
+
     return pitches
