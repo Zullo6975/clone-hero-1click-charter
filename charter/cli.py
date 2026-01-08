@@ -41,7 +41,10 @@ def parse_args() -> argparse.Namespace:
 
     # Sustain Tuning (v1.1.2)
     p.add_argument("--sustain-threshold", type=float, default=0.8)
-    p.add_argument("--sustain-buffer", type=float, default=0.15)
+    p.add_argument("--sustain-buffer", type=float, default=0.25)
+
+    # Rhythm (v1.2)
+    p.add_argument("--no-rhythmic-glue", action="store_true")
 
     p.add_argument("--no-stats", action="store_true")
 
@@ -66,7 +69,8 @@ def main():
         movement_bias=args.movement_bias,
         grid_snap=args.grid_snap,
         sustain_threshold=args.sustain_threshold,
-        sustain_buffer=args.sustain_buffer
+        sustain_buffer=args.sustain_buffer,
+        rhythmic_glue=not args.no_rhythmic_glue
     )
 
     audio_path = Path(args.audio).resolve()

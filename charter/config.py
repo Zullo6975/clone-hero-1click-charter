@@ -36,10 +36,11 @@ class ChartConfig:
     grid_snap: str = "1/8"          # "1/4", "1/8", "1/16"
     force_taps: bool = False        # If True, avoids HOPO logic (force strum)
 
-    # --- Sustain Fine-Tuning (New v1.1.2) ---
+    # --- Sustain Fine-Tuning ---
     sustain_threshold: float = 0.8  # Min gap (seconds) required to trigger a sustain
-    sustain_buffer: float = 0.15    # Gap (seconds) left at the end of a sustain
+    sustain_buffer: float = 0.25    # Gap (seconds) left at the end of a sustain
 
     # --- Structural ---
+    rhythmic_glue: bool = True      # New v1.2: Enforce consistent patterns for repeated rhythms
     add_sections: bool = True
     add_star_power: bool = True

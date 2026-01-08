@@ -102,8 +102,9 @@ class RunConfig:
     chord_prob: float
     sustain_len: float
     grid_snap: str
-    sustain_threshold: float # New
-    sustain_buffer: float    # New
+    sustain_threshold: float
+    sustain_buffer: float
+    rhythmic_glue: bool
     charter: str = "Zullo7569"
     fetch_metadata: bool = True
 
@@ -539,6 +540,11 @@ class MainWindow(QMainWindow):
         self.sustain_buffer_spin.setValue(0.15)
         self.sustain_buffer_spin.setSuffix(" s")
 
+        # NEW CHECKBOX
+        self.chk_rhythm_glue = QCheckBox("Rhythmic Glue (Repeat Patterns)")
+        self.chk_rhythm_glue.setChecked(True)
+        self.chk_rhythm_glue.setToolTip("If a rhythm repeats, force the same strum/chord pattern.")
+
         custom_form.addRow(form_label("Generation Mode"), row_mode)
         custom_form.addRow(form_label("Max Notes/Sec"), self.max_nps_spin)
         custom_form.addRow(form_label("Min Note Spacing"), self.min_gap_spin)
@@ -551,8 +557,9 @@ class MainWindow(QMainWindow):
 
         custom_form.addRow(form_label("Grid Snap"), self.grid_combo)
         custom_form.addRow(form_label("5th Lane"), self.chk_orange)
+        custom_form.addRow(form_label("Consistency"), self.chk_rhythm_glue) # Added Here
         custom_form.addRow(form_label("Chord Density"), self.chord_slider)
-        custom_form.addRow(form_label("Sustain Prob."), self.sustain_slider) # Renamed slightly
+        custom_form.addRow(form_label("Sustain Prob."), self.sustain_slider)
 
         # Sustain Tuning Group
         custom_form.addRow(form_label("Min Gap for Sustain"), self.sustain_gap_spin)
@@ -974,7 +981,8 @@ class MainWindow(QMainWindow):
             sustain_len=self.sustain_slider.value() / 100.0,
             grid_snap=self.grid_combo.currentText(),
             sustain_threshold=float(self.sustain_gap_spin.value()),
-            sustain_buffer=float(self.sustain_buffer_spin.value())
+            sustain_buffer=float(self.sustain_buffer_spin.value()),
+            rhythmic_glue=self.chk_rhythm_glue.isChecked()
         )
 
     def run_generate(self) -> None:
@@ -1004,6 +1012,7 @@ class MainWindow(QMainWindow):
             "--sustain-buffer", str(cfg.sustain_buffer)
         ])
         if not cfg.allow_orange: cmd.append("--no-orange")
+        if not self.chk_rhythm_glue.isChecked(): cmd.append("--no-rhythmic-glue")
         if cfg.fetch_metadata: cmd.append("--fetch-metadata")
         self.log_window.clear()
         self.append_log(f"Starting generation for: {cfg.title}...")
