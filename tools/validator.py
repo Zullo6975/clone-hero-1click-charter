@@ -11,7 +11,12 @@ import pretty_midi  # type: ignore
 
 # ---- Your chart conventions ----
 TRACK_NAME = "PART GUITAR"
-LANE_PITCHES = {60, 61, 62, 63, 64}  # G R Y B O
+
+# CLONE HERO PITCH MAP (Medium Difficulty)
+# 72=Green, 73=Red, 74=Yellow, 75=Blue, 76=Orange
+LANE_PITCHES = {72, 73, 74, 75, 76}
+ORANGE_PITCH = 76
+
 DEFAULT_MIN_NOTE_START = 1.0
 DEFAULT_SP_PITCH = 116
 
@@ -182,7 +187,7 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
 
         if n.pitch in LANE_PITCHES:
             lane_notes += 1
-            if n.pitch == 64:
+            if n.pitch == ORANGE_PITCH:
                 orange_notes += 1
             lane_note_starts.append(float(n.start))
         elif n.pitch == sp_pitch:
@@ -197,7 +202,7 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
         errors.append(f"{bad_dur} notes have non-positive duration (end <= start).")
 
     if lane_notes == 0:
-        errors.append("No lane notes found in PART GUITAR (expected pitches 60–64).")
+        errors.append("No lane notes found in PART GUITAR (expected Medium pitches 72–76).")
 
     if too_early:
         warnings.append(
@@ -209,7 +214,7 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
         warnings.append(f"No Star Power notes found (expected SP pitch={sp_pitch}).")
 
     if orange_notes > 0:
-        warnings.append(f"Orange notes present: {orange_notes} (OK).")
+        warnings.append(f"{orange_notes} orange notes found! Safe to play.")
 
     sections = _parse_sections(pm)
     if not sections:
@@ -239,12 +244,14 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
     sp_starts: list[float] = []
     sp_ends: list[float] = []
 
-    lane_pitch_counts = {60: 0, 61: 0, 62: 0, 63: 0, 64: 0}
+    # Map for Medium Difficulty (72-76)
+    lane_pitch_counts = {72: 0, 73: 0, 74: 0, 75: 0, 76: 0}
 
     for n in guitar.notes:
         if n.pitch in LANE_PITCHES:
             lane_note_starts.append(float(n.start))
-            lane_pitch_counts[n.pitch] = lane_pitch_counts.get(n.pitch, 0) + 1
+            if n.pitch in lane_pitch_counts:
+                lane_pitch_counts[n.pitch] += 1
         elif n.pitch == sp_pitch:
             sp_starts.append(float(n.start))
             sp_ends.append(float(n.end))
@@ -255,7 +262,7 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
     sections = _parse_sections(pm)
     sp_phrases = _group_sp_phrases(sp_starts, sp_ends, gap_join_sec=0.45)
 
-    print("\n--- SUMMARY ---")
+    print("\n--- SUMMARY (Medium Difficulty) ---")
     print(f"Folder: {song_dir}")
     print(f"notes.mid: {notes_mid.name}")
 
@@ -268,11 +275,11 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
     print(f"  Lane notes: {total_lane}")
     print(f"  Chords (est): {chords_est}")
     print("  Lane counts:")
-    print(f"    Green(60):  {lane_pitch_counts[60]}")
-    print(f"    Red(61):    {lane_pitch_counts[61]}")
-    print(f"    Yellow(62): {lane_pitch_counts[62]}")
-    print(f"    Blue(63):   {lane_pitch_counts[63]}")
-    print(f"    Orange(64): {lane_pitch_counts[64]}")
+    print(f"    Green(72):  {lane_pitch_counts[72]}")
+    print(f"    Red(73):    {lane_pitch_counts[73]}")
+    print(f"    Yellow(74): {lane_pitch_counts[74]}")
+    print(f"    Blue(75):   {lane_pitch_counts[75]}")
+    print(f"    Orange(76): {lane_pitch_counts[76]}")
 
     print("\nSTAR POWER:")
     print(f"  SP pitch: {sp_pitch}")
