@@ -39,26 +39,25 @@ def detect_onsets(audio_path: Path, *, hop_length: int = 512) -> list[OnsetCandi
 
 def estimate_pitches(audio_path: Path, times: list[float]) -> list[float | None]:
     """
-    Estimates the fundamental frequency (pitch) at specific timestamps.
-    Returns a list of frequencies (Hz) or None if unpitched (silence/noise).
+    Estimates pitch only in the guitar frequency range (E2 to C6).
+    This prevents 'sub-bass' warnings and runs much faster.
     """
     if not times:
         return []
 
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
 
-    # fmin/fmax range covers typical guitar/bass frequencies (approx C1 to C7)
-    # We increase frame_length to 4096 to safely detect C1 (32.7Hz) without warnings.
+    # Optimized for Speed:
+    # 1. fmin='E2' (82Hz) avoids the need for massive window sizes (4096).
+    # 2. frame_length=2048 is standard and fast.
     f0, _, _ = librosa.pyin(
         y,
-        fmin=librosa.note_to_hz('C1'),
-        fmax=librosa.note_to_hz('C7'),
+        fmin=librosa.note_to_hz('E2'), # was C1
+        fmax=librosa.note_to_hz('C6'), # was C7
         sr=sr,
         frame_length=4096
     )
 
-    # Map our target times to the f0 frames
-    # pyin uses hop_length = frame_length // 4 by default = 1024
     frame_indices = librosa.time_to_frames(times, sr=sr, hop_length=1024)
 
     pitches = []

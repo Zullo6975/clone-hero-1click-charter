@@ -41,60 +41,50 @@ def _filter_onsets(candidates: list, duration: float, cfg: ChartConfig) -> list:
     return selected
 
 def _pitch_diff_semitones(p1: float | None, p2: float | None) -> float:
-    """Returns semitone difference between two frequencies. +ve = Up, -ve = Down."""
-    if p1 is None or p2 is None or p1 <= 0 or p2 <= 0:
-        return 0.0
+    if p1 is None or p2 is None or p1 <= 0 or p2 <= 0: return 0.0
     return 12 * math.log2(p2 / p1)
 
 def _assign_lane(
-    prev_lane: int, 
+    prev_lane: int,
     curr_pitch: float | None,
     prev_pitch: float | None,
-    rng: random.Random, 
+    rng: random.Random,
     cfg: ChartConfig
 ) -> int:
     options = [0, 1, 2, 3]
     if cfg.allow_orange:
         options.append(4)
 
-    # 1. Base Weights (Favor movement based on bias)
     weights = []
     for lane in options:
-        base_w = 0.05 if lane == 4 else 1.0 # Orange is rare spice
+        base_w = 0.05 if lane == 4 else 1.0
         dist = abs(lane - prev_lane)
-        
-        if dist == 0:
-            w = 2.0 * (1.0 - cfg.movement_bias)
-        elif dist == 1:
-            w = 2.0
-        elif dist == 2:
-            w = 1.0 + (cfg.movement_bias * 0.5)
-        else:
-            w = 0.2 + (cfg.movement_bias * 0.8)
-        
+        if dist == 0: w = 2.0 * (1.0 - cfg.movement_bias)
+        elif dist == 1: w = 2.0
+        elif dist == 2: w = 1.3 + (cfg.movement_bias * 0.5)
+        else: w = 0.3 + (cfg.movement_bias * 0.8)
         weights.append(max(0.01, w * base_w))
 
-    # 2. Pitch Direction Modification
-    # If we have pitch data, bias the weights towards the direction of the music
     semitone_diff = _pitch_diff_semitones(prev_pitch, curr_pitch)
-    
-    # Significant change threshold (e.g., 1 semitone)
+
+    # Pitch Direction Logic
     if abs(semitone_diff) > 0.5:
         for i, lane in enumerate(options):
-            # If pitch went UP, boost lanes > prev_lane
-            if semitone_diff > 0: 
-                if lane > prev_lane: weights[i] *= 3.5
-                elif lane < prev_lane: weights[i] *= 0.2
-            
-            # If pitch went DOWN, boost lanes < prev_lane
-            elif semitone_diff < 0:
-                if lane < prev_lane: weights[i] *= 3.5
-                elif lane > prev_lane: weights[i] *= 0.2
+            if semitone_diff > 0: # Up
+                if lane > prev_lane: weights[i] *= 4.0
+                elif lane < prev_lane: weights[i] *= 0.1
+            elif semitone_diff < 0: # Down
+                if lane < prev_lane: weights[i] *= 4.0
+                elif lane > prev_lane: weights[i] *= 0.1
+    else:
+        # Boredom Breaker: If pitch is flat, increase chance of hopping 2 lanes
+        # prevents endless Trills (0-1-0-1)
+        for i, lane in enumerate(options):
+            if abs(lane - prev_lane) >= 2:
+                weights[i] *= 1.25
 
-    # Normalize weights
     total = sum(weights)
     weights = [w / total for w in weights]
-
     return rng.choices(options, weights=weights, k=1)[0]
 
 def write_real_notes_mid(
@@ -104,25 +94,19 @@ def write_real_notes_mid(
     cfg: ChartConfig,
     stats_out_path: Path | None = None,
 ) -> float:
-    """
-    Generates the MIDI chart.
-    Returns: shift_seconds (float) - amount the chart was shifted to create a lead-in.
-    """
     rng = random.Random(cfg.seed)
 
-    # 1. Analyze
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
     duration = float(librosa.get_duration(y=y, sr=sr))
     onsets = detect_onsets(audio_path)
-
-    # 2. Filter & Quantize
     notes = _filter_onsets(onsets, duration, cfg)
-    
-    # v1.1: Get Pitches BEFORE quantizing
+
+    # 1. Pitch Detection
     raw_times = [n.t for n in notes]
     pitches = estimate_pitches(audio_path, raw_times)
     pitch_map = {t: p for t, p in zip(raw_times, pitches)}
 
+    # 2. Grid Snap
     times = [n.t for n in notes]
     tempo, beats = librosa.beat.beat_track(y=y, sr=sr)
     beat_times = librosa.frames_to_time(beats, sr=sr)
@@ -141,14 +125,13 @@ def write_real_notes_mid(
         for t in times:
             idx = (np.abs(grid - t)).argmin()
             snapped.append(grid[idx])
-        
-        # Remap pitches to snapped times
+
+        # Re-associate pitches
         combined = []
         for t, original_t in zip(snapped, times):
             combined.append((t, pitch_map.get(original_t)))
-        
         combined.sort(key=lambda x: x[0])
-        
+
         final_times = []
         final_pitches = []
         seen_times = set()
@@ -157,19 +140,17 @@ def write_real_notes_mid(
                 final_times.append(t)
                 final_pitches.append(p)
                 seen_times.add(t)
-                
         times = final_times
         pitches = final_pitches
 
-    # --- LEAD-IN LOGIC ---
+    # Lead-in
     shift_seconds = 0.0
     if times and times[0] < 3.0:
         shift_seconds = 3.0 - times[0]
-
     times = [t + shift_seconds for t in times]
     duration += shift_seconds
 
-    # 3. Write Notes
+    # 3. Note Generation
     pm = pretty_midi.PrettyMIDI(initial_tempo=float(tempo))
     guitar = pretty_midi.Instrument(program=0, name=TRACK_NAME)
 
@@ -179,21 +160,30 @@ def write_real_notes_mid(
 
     for i, t in enumerate(times):
         curr_pitch = pitches[i]
-        
         lane = _assign_lane(prev_lane, curr_pitch, prev_pitch, rng, cfg)
-        
         prev_lane = lane
         prev_pitch = curr_pitch
 
-        # Sustain Logic
+        # --- SUSTAIN LOGIC TUNING (v1.1.1) ---
         next_t = times[i+1] if i+1 < len(times) else t + 2.0
         gap = next_t - t
         is_sustain = False
-        if gap > 0.4 and rng.random() < cfg.sustain_len:
+
+        # Rule: Gap must be LARGE (> 0.8s) to consider sustaining
+        # This prevents "Medium" density from feeling like a snake
+        if gap > 0.8 and rng.random() < cfg.sustain_len:
             is_sustain = True
 
-        dur = min(gap - 0.05, 0.15)
-        if is_sustain: dur = gap - 0.1
+        # Default Tap: 0.1s (Crisp)
+        dur = 0.1
+
+        if is_sustain:
+            # Leave a 0.25s breath at the end of the note so it doesn't touch the next one
+            dur = gap - 0.15
+            # Hard cap sustain at 2.5s so it doesn't drag forever
+            dur = min(dur, 2.5)
+            # Safety floor
+            dur = max(dur, 0.2)
 
         # Chord Logic
         lanes = [lane]
@@ -219,7 +209,7 @@ def write_real_notes_mid(
         evt = pretty_midi.Instrument(0, name="EVENTS")
         for s in raw_sections:
             shifted_start = s.start + shift_seconds
-            final_sections.append(asdict(s) | {"start": shifted_start}) 
+            final_sections.append(asdict(s) | {"start": shifted_start})
             pm.lyrics.append(pretty_midi.Lyric(f"[section {s.name}]", float(shifted_start)))
         pm.instruments.append(evt)
 
@@ -231,7 +221,6 @@ def write_real_notes_mid(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pm.write(str(out_path))
 
-    # 5. Stats
     if stats_out_path:
         from charter.sections import Section
         sec_objs = [Section(s["name"], s["start"]) for s in final_sections]
