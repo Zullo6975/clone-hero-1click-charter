@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] - 2026-01-08
+
+### Documentation
+
+Highlighting the usage of AI.
+
 ## [1.0.0] - 2026-01-08
 
 ### Initial Release
