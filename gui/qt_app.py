@@ -677,7 +677,7 @@ class MainWindow(QMainWindow):
 
         adv_form.addRow(form_label("Difficulty"), preset_row)
         adv_form.addRow(QLabel(""), self.preset_hint)
-        adv_form.addRow(form_label("Manual"), self.chk_review) # Add review box here
+        adv_form.addRow(form_label("Override Section Names"), self.chk_review) # Add review box here
 
         self.custom_controls = QWidget()
         custom_form = QFormLayout(self.custom_controls)
