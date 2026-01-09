@@ -92,7 +92,6 @@ def normalize_and_save(src: Path, dst: Path, target_dbfs: float = -14.0) -> None
 
         # Export as standard 192k MP3 for Clone Hero
         normalized.export(str(dst), format="mp3", bitrate="192k")
-        print(f"DEBUG: Normalized audio. Avg: {audio.dBFS:.1f} -> {normalized.dBFS:.1f} dBFS")
         
     except Exception as e:
         print(f"WARNING: Audio normalization failed ({e}). Using raw copy.")

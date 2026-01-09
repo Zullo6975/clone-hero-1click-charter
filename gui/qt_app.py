@@ -251,7 +251,7 @@ class ThemeManager:
 
             QCheckBox { spacing: 8px; }
 
-            QStatusBar { background: palette(window); border-top: 1px solid palette(mid); min-height: 50px; }
+            QStatusBar { background: palette(window); border-top: 1px solid palette(mid); min-height: 50px; max-height: 50px; }
             QStatusBar::item { border: none; }
 
             QProgressBar {
@@ -702,29 +702,30 @@ class MainWindow(QMainWindow):
 
         self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.setCursor(Qt.PointingHandCursor)
-        self.btn_cancel.setMinimumHeight(36)
+        self.btn_cancel.setMinimumHeight(18)
 
         # New Progress Bar
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0) # Indeterminate mode (bouncing)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedWidth(30)
+        self.progress_bar.setFixedWidth(45)
         self.progress_bar.setVisible(False)
-        self.progress_bar.setFixedHeight(12)
+        self.progress_bar.setFixedHeight(18)
 
         self.btn_generate = QPushButton("GENERATE CHART")
         self.btn_generate.setObjectName("Primary")
         self.btn_generate.setCursor(Qt.PointingHandCursor)
         self.btn_generate.setMinimumHeight(18)
 
-        footer_layout.addWidget(self.progress_bar)
-        footer_layout.addWidget(self.chk_dark)
-        footer_layout.addWidget(self.btn_show_logs)
-        footer_layout.addWidget(self.btn_help)
-
         sep = QFrame()
         sep.setFrameShape(QFrame.VLine)
         sep.setStyleSheet("color: palette(mid);")
+
+        footer_layout.addWidget(self.progress_bar)
+        footer_layout.addWidget(sep)
+        footer_layout.addWidget(self.chk_dark)
+        footer_layout.addWidget(self.btn_show_logs)
+        footer_layout.addWidget(self.btn_help)
         footer_layout.addWidget(sep)
 
         footer_layout.addWidget(self.btn_cancel)

@@ -119,8 +119,6 @@ def _rename_sections_based_on_density(sections: list, note_times: list[float], t
     # Minimum floor 2.0 NPS (was 3.0)
     solo_threshold = max(avg_nps * 1.15, 2.0) 
 
-    print(f"DEBUG: Audio Avg NPS: {avg_nps:.2f} | Solo Threshold: {solo_threshold:.2f}")
-
     new_sections = []
     
     for i, s in enumerate(sections):
@@ -132,13 +130,10 @@ def _rename_sections_based_on_density(sections: list, note_times: list[float], t
         notes_in_section = sum(1 for t in note_times if start <= t < end)
         section_nps = notes_in_section / duration if duration > 0.5 else 0.0
         
-        print(f"DEBUG: Section '{s.name}' ({start:.1f}s): {section_nps:.2f} NPS")
-        
         # If this section spikes above threshold, rename it
         if (section_nps > solo_threshold 
             and s.name not in ["Intro", "Outro"] 
             and duration > 5.0):
-            print(f"DEBUG: -> Renaming '{s.name}' to 'Guitar Solo' (Spike Detected!)")
             new_sections.append(asdict(s) | {"name": "Guitar Solo"})
         else:
             new_sections.append(asdict(s))
