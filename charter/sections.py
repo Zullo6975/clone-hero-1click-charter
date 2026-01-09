@@ -8,7 +8,7 @@ class Section:
     name: str
     start: float
 
-# UPDATED: Removed "Solo" from defaults so it's only used when genuinely detected.
+# UPDATED: Removed "Solo" so it is only used when detected dynamically
 SECTION_LABELS = ["Verse", "Chorus", "Verse", "Chorus", "Bridge", "Breakdown", "Chorus", "Outro"]
 
 def generate_sections(
@@ -32,10 +32,7 @@ def generate_sections(
         times = [0.0]
 
     # 2. Merge "Analysis" times with "Safety" times
-    # If the gap between t[i] and t[i+1] is huge, inject points
     filled_times = [0.0]
-
-    # We'll use the analysis times, but ensure we don't skip too far
     analysis_times = [t for t in times if t > 0.1]
     analysis_times.append(duration_sec)
 
@@ -56,7 +53,6 @@ def generate_sections(
     # 3. Labeling
     sections: list[Section] = []
 
-    # Always start with Intro at 0.0
     if not filled_times or filled_times[0] != 0.0:
         filled_times.insert(0, 0.0)
 
@@ -70,7 +66,7 @@ def generate_sections(
 
     return sections
 
-# --- Stats logic (Unchanged) ---
+# --- Stats logic ---
 @dataclass(frozen=True)
 class SectionStats:
     name: str

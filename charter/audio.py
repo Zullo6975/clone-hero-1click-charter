@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import shutil
 
 import librosa  # type: ignore
 import numpy as np  # type: ignore
+from pydub import AudioSegment # type: ignore
 
 
 @dataclass(frozen=True)
@@ -40,16 +42,12 @@ def detect_onsets(audio_path: Path, *, hop_length: int = 512) -> list[OnsetCandi
 def estimate_pitches(audio_path: Path, times: list[float]) -> list[float | None]:
     """
     Estimates pitch only in the guitar frequency range (E2 to C6).
-    This prevents 'sub-bass' warnings and runs much faster.
     """
     if not times:
         return []
 
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
 
-    # Optimized for Speed:
-    # 1. fmin='E2' (82Hz) avoids the need for massive window sizes (4096).
-    # 2. frame_length=2048 is standard and fast.
     f0, _, _ = librosa.pyin(
         y,
         fmin=librosa.note_to_hz('E2'), # was C1
@@ -72,3 +70,32 @@ def estimate_pitches(audio_path: Path, times: list[float]) -> list[float | None]
             pitches.append(None)
 
     return pitches
+
+def normalize_and_save(src: Path, dst: Path, target_dbfs: float = -14.0) -> None:
+    """
+    Normalizes audio to a target average loudness (dBFS) and saves as MP3.
+    Includes a peak limiter to prevent clipping.
+    """
+    try:
+        # Load audio (pydub auto-detects format)
+        audio = AudioSegment.from_file(str(src))
+        
+        # Calculate gain needed to hit target average
+        change_needed = target_dbfs - audio.dBFS
+        normalized = audio.apply_gain(change_needed)
+        
+        # Safety Check: If peak is > -0.5 dB, limit it down
+        # (This prevents clipping on loud tracks)
+        if normalized.max_dBFS > -0.5:
+            safety_reduction = -0.5 - normalized.max_dBFS
+            normalized = normalized.apply_gain(safety_reduction)
+
+        # Export as standard 192k MP3 for Clone Hero
+        normalized.export(str(dst), format="mp3", bitrate="192k")
+        print(f"DEBUG: Normalized audio. Avg: {audio.dBFS:.1f} -> {normalized.dBFS:.1f} dBFS")
+        
+    except Exception as e:
+        print(f"WARNING: Audio normalization failed ({e}). Using raw copy.")
+        # Fallback to simple copy if user doesn't have ffmpeg installed
+        if src.resolve() != dst.resolve():
+            shutil.copy2(src, dst)

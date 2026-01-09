@@ -9,6 +9,7 @@ from charter.ini import write_song_ini
 from charter.metadata import enrich_from_musicbrainz
 from charter.midi import write_dummy_notes_mid, write_real_notes_mid
 from charter.stats import compute_chart_stats, write_stats_json, format_stats_summary
+from charter.audio import normalize_and_save
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="1clickcharter CLI")
@@ -78,7 +79,11 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     title = args.title or audio_path.stem
-    shutil.copy2(audio_path, out_dir / "song.mp3")
+    
+    # --- AUDIO PROCESSING (Normalize) ---
+    dest_audio = out_dir / "song.mp3"
+    print(f"Processing audio: {audio_path.name}...")
+    normalize_and_save(audio_path, dest_audio)
 
     if args.fetch_metadata and args.artist:
         try:

@@ -1,22 +1,18 @@
 # Project Roadmap
 
-## 🟢 v1.1: The "Musicality" Update (Current)
+## 🟢 v1.1: The "Musicality" Update (COMPLETE)
 
 **Focus:** Making the engine smarter so charts feel less "random" and more like the song.
 
-- [x] **Pitch Contouring:** Analyze audio pitch direction.
-  - *Goal:* If the melody climbs, notes move Right (Green -> Orange). If it falls, notes move Left.
+- [x] **Pitch Contouring:** Analyze audio pitch direction (Up/Down).
 - [x] **Sustain Physics:** Tuned sustain engine with adjustable gap and buffer logic.
-- [x] **Rhythmic Glue:** Detect repeated rhythmic motifs (e.g., "dun-dun-bap").
-  - *Goal:* Force the engine to use the same chord/strum pattern when the audio repeats a rhythm.
-- [ ] **Smart Sections:** Improve segmentation logic.
-  - *Goal:* Identify "Solo" sections based on high note density/frequency and label them automatically.
-- [ ] **Audio Normalization:** Auto-gain input audio to a standard -14 LUFS.
-  - *Goal:* Consistent volume levels in-game for all charts.
+- [x] **Rhythmic Glue:** Detect repeated rhythmic motifs and force consistent patterns.
+- [x] **Smart Sections:** Dynamic "Solo" detection based on note density spikes.
+- [x] **Audio Normalization:** Auto-gain input audio to a standard -14 LUFS.
 
 ---
 
-## 🟡 v1.2: Power User Controls
+## 🟡 v1.2: Power User Controls (Next)
 
 **Focus:** Giving users granular control over the generation parameters.
 
@@ -41,7 +37,7 @@
 
 ---
 
-## 🔴 v2.1 and beyond: Community & Polish (Long Term)
+## 🔴 Long-term Goals
 
 **Focus:** Features for sharing and distribution.
 
