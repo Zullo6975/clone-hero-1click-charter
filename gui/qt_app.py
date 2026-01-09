@@ -32,10 +32,10 @@ def get_python_exec() -> str | Path:
     if is_frozen(): return sys.executable
     return repo_root() / ".venv" / "bin" / "python"
 
-def form_label(text: str, required: bool = False) -> QLabel:
+def form_label(text: str, required: bool = False, align=Qt.AlignRight | Qt.AlignVCenter) -> QLabel:
     txt = f"{text} <span style='color:#ff4444;'>*</span>" if required else text
     lbl = QLabel(txt)
-    lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    lbl.setAlignment(align)
     lbl.setMinimumWidth(110)
     return lbl
 
@@ -530,11 +530,16 @@ class MainWindow(QMainWindow):
         form_meta.setVerticalSpacing(14)
 
         self.title_edit = QLineEdit()
+        self.title_edit.setAlignment(Qt.AlignLeft) # Centered
         self.artist_edit = QLineEdit()
+        self.artist_edit.setAlignment(Qt.AlignLeft) # Centered
         self.album_edit = QLineEdit()
+        self.album_edit.setAlignment(Qt.AlignLeft) # Centered
         self.genre_edit = QLineEdit()
+        self.genre_edit.setAlignment(Qt.AlignLeft) # Centered
         self.genre_edit.setPlaceholderText("Default: Rock")
         self.charter_edit = QLineEdit()
+        self.charter_edit.setAlignment(Qt.AlignLeft) # Centered
         self.charter_edit.setPlaceholderText("Default: Zullo7569")
 
         self.btn_clear_meta = QToolButton()
@@ -542,11 +547,11 @@ class MainWindow(QMainWindow):
         self.btn_clear_meta.setToolTip("Clear all metadata fields")
         self.btn_clear_meta.setCursor(Qt.PointingHandCursor)
 
-        form_meta.addRow(form_label("Title", required=True), self.title_edit)
-        form_meta.addRow(form_label("Artist", required=True), self.artist_edit)
-        form_meta.addRow(form_label("Album"), self.album_edit)
-        form_meta.addRow(form_label("Genre"), self.genre_edit)
-        form_meta.addRow(form_label("Charter"), self.charter_edit)
+        form_meta.addRow(form_label("Title", required=True, align=Qt.AlignCenter), self.title_edit) # Centered label
+        form_meta.addRow(form_label("Artist", required=True, align=Qt.AlignCenter), self.artist_edit) # Centered label
+        form_meta.addRow(form_label("Album", align=Qt.AlignCenter), self.album_edit) # Centered label
+        form_meta.addRow(form_label("Genre", align=Qt.AlignCenter), self.genre_edit) # Centered label
+        form_meta.addRow(form_label("Charter", align=Qt.AlignCenter), self.charter_edit) # Centered label
 
         row_clear = QHBoxLayout()
         row_clear.addStretch()
