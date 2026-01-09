@@ -113,6 +113,9 @@ class ThemeManager:
     @staticmethod
     def apply_style(app: QApplication, dark_mode: bool):
         app.setStyle("Fusion")
+        font = app.font()
+        font.setPointSize(10)
+        app.setFont(font)
         palette = QPalette()
 
         if dark_mode:
