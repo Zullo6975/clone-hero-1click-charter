@@ -45,10 +45,10 @@ def _pitch_diff_semitones(p1: float | None, p2: float | None) -> float:
     return 12 * math.log2(p2 / p1)
 
 def _assign_lane(
-    prev_lane: int,
+    prev_lane: int, 
     curr_pitch: float | None,
     prev_pitch: float | None,
-    rng: random.Random,
+    rng: random.Random, 
     cfg: ChartConfig
 ) -> int:
     options = [0, 1, 2, 3]
@@ -61,12 +61,12 @@ def _assign_lane(
         dist = abs(lane - prev_lane)
         if dist == 0: w = 2.0 * (1.0 - cfg.movement_bias)
         elif dist == 1: w = 2.0
-        elif dist == 2: w = 1.3 + (cfg.movement_bias * 0.5)
+        elif dist == 2: w = 1.3 + (cfg.movement_bias * 0.5) 
         else: w = 0.3 + (cfg.movement_bias * 0.8)
         weights.append(max(0.01, w * base_w))
 
     semitone_diff = _pitch_diff_semitones(prev_pitch, curr_pitch)
-
+    
     if abs(semitone_diff) > 0.5:
         for i, lane in enumerate(options):
             if semitone_diff > 0: # Up
@@ -88,25 +88,25 @@ def _quantize_to_measure(time: float, beat_times: list[float]) -> tuple[int, flo
     """Returns (measure_index, offset_from_measure_start)"""
     if not beat_times:
         return 0, 0.0
-
+    
     idx = (np.abs(np.array(beat_times) - time)).argmin()
     measure_idx = idx // 4
     measure_start_beat_idx = measure_idx * 4
-
+    
     if measure_start_beat_idx >= len(beat_times):
         return measure_idx, 0.0
-
+        
     measure_start_time = beat_times[measure_start_beat_idx]
-    # Simple relative offset calculation
     beat_dur = beat_times[1] - beat_times[0] if len(beat_times) > 1 else 0.5
     offset_beats = (time - measure_start_time) / beat_dur
     quantized_offset = round(offset_beats * 4) / 4
-
+    
     return measure_idx, quantized_offset
 
 def _rename_sections_based_on_density(sections: list, note_times: list[float], total_duration: float) -> list:
     """
     Identifies 'Guitar Solo' sections by finding areas with high note density (NPS).
+    Uses raw audio onsets (note_times) to find the 'true' busy-ness of the song.
     """
     if not note_times:
         return sections
@@ -114,8 +114,12 @@ def _rename_sections_based_on_density(sections: list, note_times: list[float], t
     # 1. Calculate Song Average NPS
     avg_nps = len(note_times) / total_duration if total_duration > 0 else 0.0
     
-    # Threshold: If a section is 60% busier than the song average, it's likely a solo.
-    solo_threshold = max(avg_nps * 1.6, 2.5) 
+    # Tuned Thresholds (v1.1.4): Aggressive Sensitivity
+    # 1.15x average density (was 1.4x)
+    # Minimum floor 2.0 NPS (was 3.0)
+    solo_threshold = max(avg_nps * 1.15, 2.0) 
+
+    print(f"DEBUG: Audio Avg NPS: {avg_nps:.2f} | Solo Threshold: {solo_threshold:.2f}")
 
     new_sections = []
     
@@ -124,23 +128,21 @@ def _rename_sections_based_on_density(sections: list, note_times: list[float], t
         end = sections[i+1].start if i+1 < len(sections) else total_duration
         duration = end - start
         
-        # Count notes in this section
+        # Count raw audio events in this section
         notes_in_section = sum(1 for t in note_times if start <= t < end)
         section_nps = notes_in_section / duration if duration > 0.5 else 0.0
         
-        # Rules for renaming:
-        # 1. Must exceed threshold
-        # 2. Don't rename Intro or Outro (structural integrity)
-        # 3. Must be at least 5 seconds long
+        print(f"DEBUG: Section '{s.name}' ({start:.1f}s): {section_nps:.2f} NPS")
+        
+        # If this section spikes above threshold, rename it
         if (section_nps > solo_threshold 
             and s.name not in ["Intro", "Outro"] 
             and duration > 5.0):
+            print(f"DEBUG: -> Renaming '{s.name}' to 'Guitar Solo' (Spike Detected!)")
             new_sections.append(asdict(s) | {"name": "Guitar Solo"})
         else:
             new_sections.append(asdict(s))
             
-    # Convert back to objects if needed, but we used asdict previously. 
-    # Actually `final_sections` expects dictionaries for stats, so we return dicts.
     return new_sections
 
 def write_real_notes_mid(
@@ -157,7 +159,7 @@ def write_real_notes_mid(
     duration = float(librosa.get_duration(y=y, sr=sr))
     onsets = detect_onsets(audio_path)
     notes = _filter_onsets(onsets, duration, cfg)
-
+    
     raw_times = [n.t for n in notes]
     pitches = estimate_pitches(audio_path, raw_times)
     pitch_map = {t: p for t, p in zip(raw_times, pitches)}
@@ -180,12 +182,12 @@ def write_real_notes_mid(
         for t in times:
             idx = (np.abs(grid - t)).argmin()
             snapped.append(grid[idx])
-
+        
         combined = []
         for t, original_t in zip(snapped, times):
             combined.append((t, pitch_map.get(original_t)))
         combined.sort(key=lambda x: x[0])
-
+        
         final_times = []
         final_pitches = []
         seen_times = set()
@@ -206,8 +208,8 @@ def write_real_notes_mid(
     # --- RHYTHMIC GLUE ---
     shifted_beat_times = [b + shift_seconds for b in beat_times]
     measure_notes = {}
-    pattern_memory = {}
-
+    pattern_memory = {} 
+    
     if cfg.rhythmic_glue and len(shifted_beat_times) > 4:
         for i, t in enumerate(times):
             m_idx, m_offset = _quantize_to_measure(t, shifted_beat_times)
@@ -231,36 +233,31 @@ def write_real_notes_mid(
         is_sustain = False
         is_chord = False
         found_memory = False
-
+        
         if cfg.rhythmic_glue and len(shifted_beat_times) > 4:
             m_idx, m_offset = _quantize_to_measure(t, shifted_beat_times)
-            # Build current measure signature
             sig = ""
             if m_idx in measure_notes:
                 offsets = sorted([x[0] for x in measure_notes[m_idx]])
                 sig = ",".join([f"{x:.2f}" for x in offsets])
-
+            
             if sig and sig in pattern_memory:
-                # RECALL
                 saved_decisions = pattern_memory[sig]
                 for saved_offset, decision in saved_decisions.items():
                     if abs(saved_offset - m_offset) < 0.05:
                         is_sustain, is_chord = decision
                         found_memory = True
                         break
-
+        
         if not found_memory:
-            # GENERATE NEW
             next_t = times[i+1] if i+1 < len(times) else t + 2.0
             gap = next_t - t
-
+            
             if gap > cfg.sustain_threshold and rng.random() < cfg.sustain_len:
                 is_sustain = True
-
             if rng.random() < cfg.chord_prob:
                 is_chord = True
-
-            # SAVE
+                
             if cfg.rhythmic_glue and len(shifted_beat_times) > 4:
                 m_idx, m_offset = _quantize_to_measure(t, shifted_beat_times)
                 if m_idx in measure_notes:
@@ -270,7 +267,6 @@ def write_real_notes_mid(
                         pattern_memory[sig] = {}
                     pattern_memory[sig][m_offset] = (is_sustain, is_chord)
 
-        # Apply
         dur = 0.1
         if is_sustain:
             next_t = times[i+1] if i+1 < len(times) else t + 2.0
@@ -298,23 +294,22 @@ def write_real_notes_mid(
     # 4. Events & Smart Sections
     final_sections = []
     if cfg.add_sections:
-        # 1. Get raw sections
         raw_sections = generate_sections(str(audio_path), duration - shift_seconds)
         
-        # 2. Shift time to match chart
         shifted_sections = []
         for s in raw_sections:
             shifted_start = s.start + shift_seconds
             shifted_sections.append(asdict(s) | {"start": shifted_start})
             
-        # 3. Apply Smart Naming (Solo Detection)
-        # Note: We pass objects, but get dicts back from the helper
+        # RAW ONSETS FOR DENSITY CHECK
+        raw_onset_times = [o.t + shift_seconds for o in onsets]
+        
         from charter.sections import Section
         obj_sections = [Section(s["name"], s["start"]) for s in shifted_sections]
         
         final_sections = _rename_sections_based_on_density(
             obj_sections, 
-            times, 
+            raw_onset_times, 
             duration
         )
 
@@ -331,10 +326,8 @@ def write_real_notes_mid(
     out_path.parent.mkdir(parents=True, exist_ok=True)
     pm.write(str(out_path))
 
-    # 5. Stats
     if stats_out_path:
         from charter.sections import Section
-        # Re-wrap for stats since final_sections are now dicts
         sec_objs = [Section(s["name"], s["start"]) for s in final_sections]
         stats = compute_section_stats(
             note_starts=times, chord_starts=chord_starts,

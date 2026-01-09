@@ -8,7 +8,8 @@ class Section:
     name: str
     start: float
 
-SECTION_LABELS = ["Verse", "Chorus", "Verse", "Chorus", "Bridge", "Solo", "Chorus", "Outro"]
+# UPDATED: Removed "Solo" from defaults so it's only used when genuinely detected.
+SECTION_LABELS = ["Verse", "Chorus", "Verse", "Chorus", "Bridge", "Breakdown", "Chorus", "Outro"]
 
 def generate_sections(
     audio_path: str,
@@ -56,7 +57,6 @@ def generate_sections(
     sections: list[Section] = []
 
     # Always start with Intro at 0.0
-    # (The loop above handles 0.0, but we explicitly naming it ensures consistency)
     if not filled_times or filled_times[0] != 0.0:
         filled_times.insert(0, 0.0)
 
