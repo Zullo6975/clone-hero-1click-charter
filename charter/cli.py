@@ -1,9 +1,8 @@
 from __future__ import annotations
 import argparse
-import shutil
+from dataclasses import asdict
 import json
 from pathlib import Path
-import librosa # type: ignore
 
 from charter.config import ChartConfig
 from charter.ini import write_song_ini

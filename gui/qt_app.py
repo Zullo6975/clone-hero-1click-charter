@@ -293,7 +293,6 @@ class ThemeManager:
                 border-top: 1px solid palette(mid);
                 min-height: 50px;
                 max-height: 50px;
-                padding-left: 20px; /* Padded to match right-side button margin */
             }
             QStatusBar::item { border: none; }
 
@@ -314,10 +313,14 @@ class LogWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Logs")
-        self.resize(700, 500)
+        self.resize(500, 350)
         layout = QVBoxLayout(self)
+
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
+        # Ensure it starts with reasonable size if layout is constrained
+        self.text_edit.setMinimumSize(500, 350)
+
         mono_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         mono_font.setPointSize(11)
         self.text_edit.setFont(mono_font)
@@ -348,7 +351,7 @@ class SectionReviewDialog(QDialog):
     def __init__(self, sections: list[dict], parent=None):
         super().__init__(parent)
         self.setWindowTitle("Review Sections")
-        self.resize(550, 650)
+        self.resize(600, 700)
         self.sections = sections
 
         layout = QVBoxLayout(self)
@@ -362,17 +365,22 @@ class SectionReviewDialog(QDialog):
         layout.addWidget(lbl)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(3) # Time, Name, Delete
-        self.table.setHorizontalHeaderLabels(["Start Time (s)", "Section Name", ""])
+        self.table.setColumnCount(3) # Time, Name, Actions
+        self.table.setHorizontalHeaderLabels(["Start Time (s)", "Section Name", "Actions"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
-        self.table.setColumnWidth(2, 45)
-        self.table.setSelectionMode(QAbstractItemView.NoSelection) # Focus on widgets
+        self.table.setColumnWidth(2, 110) # Enough for Up/Down/Del
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
 
         self._updating = False
         self.refresh_table()
         layout.addWidget(self.table)
+
+        # ADD BUTTON
+        btn_add = QPushButton("Add Section")
+        btn_add.clicked.connect(self.add_section)
+        layout.addWidget(btn_add)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self.accept)
@@ -388,35 +396,50 @@ class SectionReviewDialog(QDialog):
             # 1. TIME SPINNER
             start_val = float(s.get('start', 0.0))
             sb = SafeDoubleSpinBox()
-            sb.setRange(0.0, 9999.0)
+            sb.setRange(0.0, 99999.0)
             sb.setSingleStep(0.5)
             sb.setValue(start_val)
-            sb.setButtonSymbols(QAbstractSpinBox.NoButtons) # Cleaner look
+            sb.setButtonSymbols(QAbstractSpinBox.NoButtons)
             sb.setAlignment(Qt.AlignCenter)
             sb.valueChanged.connect(lambda val, idx=i: self.on_time_changed(idx, val))
 
             # 2. NAME EDIT
             le = QLineEdit(str(s.get('name', '')))
             le.setPlaceholderText("Section Name")
-            le.setClearButtonEnabled(True) # The "Trash" inside the cell
+            le.setClearButtonEnabled(True) # Adds the X
             le.textChanged.connect(lambda txt, idx=i: self.on_name_changed(idx, txt))
 
-            # 3. DELETE BUTTON
+            # 3. ACTIONS WIDGET
+            w_act = QWidget()
+            l_act = QHBoxLayout(w_act)
+            l_act.setContentsMargins(0,0,0,0)
+            l_act.setSpacing(4)
+            l_act.setAlignment(Qt.AlignCenter)
+
+            btn_up = QToolButton()
+            btn_up.setText("↑")
+            btn_up.setToolTip("Move Up")
+            btn_up.setEnabled(i > 0)
+            btn_up.clicked.connect(lambda checked=False, idx=i: self.move_row_up(idx))
+
+            btn_down = QToolButton()
+            btn_down.setText("↓")
+            btn_down.setToolTip("Move Down")
+            btn_down.setEnabled(i < len(self.sections) - 1)
+            btn_down.clicked.connect(lambda checked=False, idx=i: self.move_row_down(idx))
+
             btn_del = QToolButton()
             btn_del.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
             btn_del.setToolTip("Remove this section")
             btn_del.clicked.connect(lambda checked=False, idx=i: self.delete_row(idx))
 
-            # Layout for Delete Button to center it
-            w_del = QWidget()
-            l_del = QHBoxLayout(w_del)
-            l_del.setContentsMargins(0,0,0,0)
-            l_del.setAlignment(Qt.AlignCenter)
-            l_del.addWidget(btn_del)
+            l_act.addWidget(btn_up)
+            l_act.addWidget(btn_down)
+            l_act.addWidget(btn_del)
 
             self.table.setCellWidget(i, 0, sb)
             self.table.setCellWidget(i, 1, le)
-            self.table.setCellWidget(i, 2, w_del)
+            self.table.setCellWidget(i, 2, w_act)
 
         self._updating = False
 
@@ -446,6 +469,26 @@ class SectionReviewDialog(QDialog):
     def delete_row(self, index):
         if 0 <= index < len(self.sections):
             self.sections.pop(index)
+            self.refresh_table()
+
+    def add_section(self):
+        last_start = 0.0
+        if self.sections:
+            last_start = self.sections[-1]['start']
+
+        self.sections.append({"name": "New Section", "start": last_start + 10.0})
+        self.refresh_table()
+        # Scroll to bottom
+        self.table.scrollToBottom()
+
+    def move_row_up(self, index):
+        if index > 0:
+            self.sections[index], self.sections[index-1] = self.sections[index-1], self.sections[index]
+            self.refresh_table()
+
+    def move_row_down(self, index):
+        if index < len(self.sections) - 1:
+            self.sections[index], self.sections[index+1] = self.sections[index+1], self.sections[index]
             self.refresh_table()
 
     def get_sections(self) -> list[dict]:
@@ -489,15 +532,14 @@ class MainWindow(QMainWindow):
         else:
             self.preset_combo.setCurrentText("Medium 2 (Balanced)")
 
-        # CRITICAL FIX: Force application of the preset logic immediately
         self.apply_preset(self.preset_combo.currentText())
-
-        # CRITICAL FIX: Force queue display update to ensure button starts disabled
         self._update_queue_display()
 
         self._update_state()
         QTimer.singleShot(100, self.snap_to_content)
-        self.statusBar().showMessage("Ready")
+
+        # Initialize Status Label
+        self.status_label.setText("Ready")
 
     def closeEvent(self, event) -> None:
         self.log_window.close()
@@ -902,7 +944,16 @@ class MainWindow(QMainWindow):
         self.btn_cancel.setObjectName("FooterBtn")
         self.btn_cancel.setCursor(Qt.PointingHandCursor)
 
-        # New Progress Bar
+        # ---------------- STATUS BAR WIDGETS ----------------
+        # Container for Left side of status bar (Label + Progress)
+        self.status_container = QWidget()
+        self.status_layout = QHBoxLayout(self.status_container)
+        self.status_layout.setContentsMargins(20, 0, 0, 0) # 20px padding from left edge
+        self.status_layout.setSpacing(15)
+
+        self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet("color: palette(text); font-weight: bold;")
+
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0)
         self.progress_bar.setTextVisible(False)
@@ -910,7 +961,12 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         self.progress_bar.setFixedHeight(12)
 
-        self.statusBar().addWidget(self.progress_bar)
+        self.status_layout.addWidget(self.status_label)
+        self.status_layout.addWidget(self.progress_bar)
+        self.status_layout.addStretch() # Push everything else right if needed (not needed here as we add it left)
+
+        # Add container to status bar
+        self.statusBar().addWidget(self.status_container, 1)
 
         self.btn_generate = QPushButton("GENERATE CHART")
         self.btn_generate.setObjectName("Primary")
@@ -1209,7 +1265,7 @@ class MainWindow(QMainWindow):
         self.audio_label.setStyleSheet("color: palette(text); font-weight: bold;")
         if (not self._title_user_edited) and (not self.title_edit.text().strip()):
             self.title_edit.setText(self.audio_path.stem)
-        self.statusBar().showMessage(f"Loaded: {self.audio_path.name}")
+        self.status_label.setText(f"Loaded: {self.audio_path.name}")
         self._update_state()
         QTimer.singleShot(0, self.snap_to_content)
 
@@ -1219,14 +1275,14 @@ class MainWindow(QMainWindow):
             next_song = self.song_queue.pop(0)
             self._update_queue_display()
             self.load_audio(next_song)
-            self.statusBar().showMessage(f"Queue: Loaded {next_song.name}")
+            self.status_label.setText(f"Queue: Loaded {next_song.name}")
         else:
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
             self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
             self._update_state()
             self.audio_label.adjustSize()
-            self.statusBar().showMessage("Audio cleared")
+            self.status_label.setText("Audio cleared")
             QTimer.singleShot(10, self.snap_to_content)
 
     def pick_cover(self) -> None:
@@ -1348,7 +1404,7 @@ class MainWindow(QMainWindow):
             self.append_log(f"Starting generation for: {cfg.title}...")
 
         # Clear status bar text so progress bar stands out
-        self.statusBar().clearMessage()
+        self.status_label.setText("")
         self.btn_generate.setText(label)
         self.btn_generate.setEnabled(False)
         self.progress_bar.setVisible(True)
@@ -1391,7 +1447,7 @@ class MainWindow(QMainWindow):
                     reason = line.strip()
                     break
             QMessageBox.critical(self, "Process Failed", f"Failed.\n\nReason: {reason}\n\nCheck logs for full details.")
-            self.statusBar().showMessage("Failed")
+            self.status_label.setText("Failed")
             self.proc = None
             self._update_state()
             return
@@ -1418,7 +1474,7 @@ class MainWindow(QMainWindow):
                         # User Cancelled
                         self.btn_generate.setText("GENERATE CHART")
                         self.progress_bar.setVisible(False)
-                        self.statusBar().showMessage("Cancelled")
+                        self.status_label.setText("Cancelled")
                         self.proc = None
                         self._update_state()
                 except Exception as e:
@@ -1454,14 +1510,14 @@ class MainWindow(QMainWindow):
             self.clear_song_info()
             self.load_audio(next_song)
             self._update_queue_display()
-            self.statusBar().showMessage(f"Chart generated! Loaded next: {next_song.name}")
+            self.status_label.setText(f"Chart generated! Loaded next: {next_song.name}")
         else:
             self.clear_song_info()
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
             self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
             self._update_state()
-            self.statusBar().showMessage("Queue Finished")
+            self.status_label.setText("Queue Finished")
 
         self.proc = None
         self._update_state()
@@ -1507,7 +1563,7 @@ class MainWindow(QMainWindow):
         self.proc.start(cmd[0], cmd[1:])
 
     def run_health_check(self, song_dir: Path) -> None:
-        self.statusBar().showMessage("Validating...")
+        self.status_label.setText("Validating...")
         QTimer.singleShot(0, self.snap_to_content)
         py_exec = get_python_exec()
         script = repo_root() / "tools" / "validator.py"
@@ -1530,7 +1586,7 @@ class MainWindow(QMainWindow):
             if warnings: msg += "\n\nWarnings:\n" + "\n".join(f"• {w}" for w in warnings)
             title = "Generation Complete" if not warnings else "Complete (With Warnings)"
             QMessageBox.information(self, title, msg) if not warnings else QMessageBox.warning(self, title, msg)
-            self.statusBar().showMessage("Ready")
+            self.status_label.setText("Ready")
 
         self.validator_proc = None
 
