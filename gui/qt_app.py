@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
 
         # ADD Button
         self.btn_add_audio = QPushButton("Add Songs...")
-        self.btn_add_audio.setIcon(self.style().standardIcon(QStyle.SP_MediaPlay))
+        self.btn_add_audio.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
         self.btn_add_audio.setToolTip("Add files to queue")
         self.btn_add_audio.setCursor(Qt.PointingHandCursor)
 
