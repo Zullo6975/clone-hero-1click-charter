@@ -114,11 +114,14 @@ class ThemeManager:
     def apply_style(app: QApplication, dark_mode: bool):
         app.setStyle("Fusion")
         palette = QPalette()
+
         if dark_mode:
+            # Dark Theme
             base = QColor(30, 35, 40)
             mid = QColor(45, 50, 55)
             text = QColor(220, 220, 220)
             highlight = QColor(50, 120, 210)
+
             palette.setColor(QPalette.Window, base)
             palette.setColor(QPalette.WindowText, text)
             palette.setColor(QPalette.Base, mid)
@@ -128,29 +131,56 @@ class ThemeManager:
             palette.setColor(QPalette.ButtonText, text)
             palette.setColor(QPalette.Highlight, highlight)
             palette.setColor(QPalette.HighlightedText, Qt.white)
+
+            # Interactions
+            palette.setColor(QPalette.Light, QColor(60, 65, 70)) # Hover
             palette.setColor(QPalette.Disabled, QPalette.Text, QColor(100, 100, 100))
             palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(100, 100, 100))
             palette.setColor(QPalette.PlaceholderText, QColor(120, 130, 140))
+
         else:
-            base = QColor(240, 240, 245)
+            # Light Theme (Explicitly defined to override Dark OS defaults)
+            base = QColor(245, 245, 250)
             white = QColor(255, 255, 255)
-            text = QColor(20, 20, 30)
+            text = QColor(30, 30, 40)
             highlight = QColor(0, 100, 200)
+            btn_bg = QColor(255, 255, 255)
+
             palette.setColor(QPalette.Window, base)
             palette.setColor(QPalette.WindowText, text)
             palette.setColor(QPalette.Base, white)
             palette.setColor(QPalette.AlternateBase, base)
             palette.setColor(QPalette.Text, text)
-            palette.setColor(QPalette.Button, white)
+            palette.setColor(QPalette.Button, btn_bg)
             palette.setColor(QPalette.ButtonText, text)
             palette.setColor(QPalette.Highlight, highlight)
             palette.setColor(QPalette.HighlightedText, white)
-            palette.setColor(QPalette.Disabled, QPalette.Text, QColor(150, 150, 160))
-            palette.setColor(QPalette.PlaceholderText, QColor(140, 140, 150))
+
+            # Explicit Interaction Colors (Fixes OS Dark Mode bleed)
+            palette.setColor(QPalette.Light, QColor(255, 255, 255)) # Hover
+            palette.setColor(QPalette.Midlight, QColor(230, 230, 240))
+            palette.setColor(QPalette.Dark, QColor(200, 200, 210))
+            palette.setColor(QPalette.Mid, QColor(210, 210, 220)) # Borders
+            palette.setColor(QPalette.Shadow, QColor(150, 150, 160))
+
+            # Disabled States (Explicitly readable grey)
+            disabled_text = QColor(160, 160, 170)
+            palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
+            palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
+            palette.setColor(QPalette.Disabled, QPalette.WindowText, disabled_text)
+            palette.setColor(QPalette.PlaceholderText, QColor(150, 150, 160))
+
         app.setPalette(palette)
 
+        # Stylesheet overrides
         app.setStyleSheet("""
-            QGroupBox { border: 1px solid palette(mid); border-radius: 6px; margin-top: 24px; padding-top: 12px; font-weight: bold; }
+            QGroupBox {
+                border: 1px solid palette(mid);
+                border-radius: 6px;
+                margin-top: 24px;
+                padding-top: 12px;
+                font-weight: bold;
+            }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
 
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget {
@@ -164,6 +194,13 @@ class ThemeManager:
                 border: 1px solid palette(highlight);
             }
 
+            /* Disabled Inputs */
+            QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {
+                background-color: palette(window);
+                color: palette(disabled-text);
+                border: 1px dashed palette(mid);
+            }
+
             QComboBox QAbstractItemView {
                 background-color: palette(base);
                 color: palette(text);
@@ -171,16 +208,38 @@ class ThemeManager:
                 selection-color: palette(highlighted-text);
             }
 
-            QPushButton { padding: 8px 16px; border-radius: 5px; border: 1px solid palette(mid); background-color: palette(button); }
-            QPushButton:hover { background-color: palette(light); }
+            QPushButton {
+                padding: 8px 16px;
+                border-radius: 5px;
+                border: 1px solid palette(mid);
+                background-color: palette(button);
+                color: palette(text);
+            }
+            QPushButton:hover {
+                background-color: palette(midlight);
+                border: 1px solid palette(dark);
+            }
+            QPushButton:disabled {
+                background-color: palette(window);
+                color: palette(disabled-text);
+                border: 1px solid palette(mid);
+            }
 
+            /* PRIMARY BUTTON (Fixed Height) */
             QPushButton#Primary {
                 background-color: palette(highlight);
                 color: palette(highlighted-text);
                 font-weight: bold;
                 border: 1px solid palette(highlight);
+                min-height: 18px;
+                max-height: 18px;
+                min-width: 120px;
+                max-width: 120px;
             }
-            QPushButton#Primary:hover { border: 1px solid palette(text); }
+            QPushButton#Primary:hover {
+                border: 1px solid palette(text);
+                background-color: palette(highlight);
+            }
             QPushButton#Primary:disabled {
                 background-color: palette(mid);
                 color: palette(disabled-text);
@@ -557,7 +616,7 @@ class MainWindow(QMainWindow):
 
         custom_form.addRow(form_label("Grid Snap"), self.grid_combo)
         custom_form.addRow(form_label("5th Lane"), self.chk_orange)
-        custom_form.addRow(form_label("Consistency"), self.chk_rhythm_glue) # Added Here
+        custom_form.addRow(form_label("Consistency"), self.chk_rhythm_glue)
         custom_form.addRow(form_label("Chord Density"), self.chord_slider)
         custom_form.addRow(form_label("Sustain Prob."), self.sustain_slider)
 
@@ -653,7 +712,7 @@ class MainWindow(QMainWindow):
         self.btn_generate = QPushButton("GENERATE CHART")
         self.btn_generate.setObjectName("Primary")
         self.btn_generate.setCursor(Qt.PointingHandCursor)
-        self.btn_generate.setMinimumHeight(36)
+        self.btn_generate.setMinimumHeight(18)
 
         footer_layout.addWidget(self.progress_bar)
         footer_layout.addWidget(self.chk_dark)
