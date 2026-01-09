@@ -60,7 +60,7 @@ help:
 	$(BIN)/1clickcharter --help
 
 run:
-	$(BIN)/1clickcharter \
+	PATH="$(CURDIR)/bin:$$PATH" $(BIN)/1clickcharter \
 	  --audio "$(AUDIO)" \
 	  --out "$(OUT)" \
 	  --title "$(TITLE)" \
@@ -85,7 +85,7 @@ run-dummy:
 
 # ---- GUI ----
 gui: install
-	$(BIN)/1clickcharter-gui
+	PATH="$(CURDIR)/bin:$$PATH" $(BIN)/1clickcharter-gui
 
 # ---- dev ----
 test:
