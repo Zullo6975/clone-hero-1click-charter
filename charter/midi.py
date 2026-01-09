@@ -11,7 +11,7 @@ import numpy as np # type: ignore
 
 from charter.config import ChartConfig, LANE_PITCHES, TRACK_NAME, SP_PITCH
 from charter.audio import detect_onsets, estimate_pitches
-from charter.sections import generate_sections, compute_section_stats
+from charter.sections import generate_sections, compute_section_stats, Section
 from charter.star_power import generate_star_power_phrases
 
 def _filter_onsets(candidates: list, duration: float, cfg: ChartConfig) -> list:
@@ -45,10 +45,10 @@ def _pitch_diff_semitones(p1: float | None, p2: float | None) -> float:
     return 12 * math.log2(p2 / p1)
 
 def _assign_lane(
-    prev_lane: int, 
+    prev_lane: int,
     curr_pitch: float | None,
     prev_pitch: float | None,
-    rng: random.Random, 
+    rng: random.Random,
     cfg: ChartConfig
 ) -> int:
     options = [0, 1, 2, 3]
@@ -61,12 +61,12 @@ def _assign_lane(
         dist = abs(lane - prev_lane)
         if dist == 0: w = 2.0 * (1.0 - cfg.movement_bias)
         elif dist == 1: w = 2.0
-        elif dist == 2: w = 1.3 + (cfg.movement_bias * 0.5) 
+        elif dist == 2: w = 1.3 + (cfg.movement_bias * 0.5)
         else: w = 0.3 + (cfg.movement_bias * 0.8)
         weights.append(max(0.01, w * base_w))
 
     semitone_diff = _pitch_diff_semitones(prev_pitch, curr_pitch)
-    
+
     if abs(semitone_diff) > 0.5:
         for i, lane in enumerate(options):
             if semitone_diff > 0: # Up
@@ -88,19 +88,19 @@ def _quantize_to_measure(time: float, beat_times: list[float]) -> tuple[int, flo
     """Returns (measure_index, offset_from_measure_start)"""
     if not beat_times:
         return 0, 0.0
-    
+
     idx = (np.abs(np.array(beat_times) - time)).argmin()
     measure_idx = idx // 4
     measure_start_beat_idx = measure_idx * 4
-    
+
     if measure_start_beat_idx >= len(beat_times):
         return measure_idx, 0.0
-        
+
     measure_start_time = beat_times[measure_start_beat_idx]
     beat_dur = beat_times[1] - beat_times[0] if len(beat_times) > 1 else 0.5
     offset_beats = (time - measure_start_time) / beat_dur
     quantized_offset = round(offset_beats * 4) / 4
-    
+
     return measure_idx, quantized_offset
 
 def _rename_sections_based_on_density(sections: list, note_times: list[float], total_duration: float) -> list:
@@ -113,31 +113,31 @@ def _rename_sections_based_on_density(sections: list, note_times: list[float], t
 
     # 1. Calculate Song Average NPS
     avg_nps = len(note_times) / total_duration if total_duration > 0 else 0.0
-    
+
     # Tuned Thresholds (v1.1.4): Aggressive Sensitivity
     # 1.15x average density (was 1.4x)
     # Minimum floor 2.0 NPS (was 3.0)
-    solo_threshold = max(avg_nps * 1.15, 2.0) 
+    solo_threshold = max(avg_nps * 1.15, 2.0)
 
     new_sections = []
-    
+
     for i, s in enumerate(sections):
         start = s.start
         end = sections[i+1].start if i+1 < len(sections) else total_duration
         duration = end - start
-        
+
         # Count raw audio events in this section
         notes_in_section = sum(1 for t in note_times if start <= t < end)
         section_nps = notes_in_section / duration if duration > 0.5 else 0.0
-        
+
         # If this section spikes above threshold, rename it
-        if (section_nps > solo_threshold 
-            and s.name not in ["Intro", "Outro"] 
+        if (section_nps > solo_threshold
+            and s.name not in ["Intro", "Outro"]
             and duration > 5.0):
             new_sections.append(asdict(s) | {"name": "Guitar Solo"})
         else:
             new_sections.append(asdict(s))
-            
+
     return new_sections
 
 def write_real_notes_mid(
@@ -146,7 +146,9 @@ def write_real_notes_mid(
     out_path: Path,
     cfg: ChartConfig,
     stats_out_path: Path | None = None,
-) -> float:
+    override_sections: list[dict] | None = None,
+    dry_run: bool = False,
+) -> tuple[float, list[dict]]:
     rng = random.Random(cfg.seed)
 
     # 1. Analyze
@@ -154,7 +156,7 @@ def write_real_notes_mid(
     duration = float(librosa.get_duration(y=y, sr=sr))
     onsets = detect_onsets(audio_path)
     notes = _filter_onsets(onsets, duration, cfg)
-    
+
     raw_times = [n.t for n in notes]
     pitches = estimate_pitches(audio_path, raw_times)
     pitch_map = {t: p for t, p in zip(raw_times, pitches)}
@@ -177,12 +179,12 @@ def write_real_notes_mid(
         for t in times:
             idx = (np.abs(grid - t)).argmin()
             snapped.append(grid[idx])
-        
+
         combined = []
         for t, original_t in zip(snapped, times):
             combined.append((t, pitch_map.get(original_t)))
         combined.sort(key=lambda x: x[0])
-        
+
         final_times = []
         final_pitches = []
         seen_times = set()
@@ -203,8 +205,8 @@ def write_real_notes_mid(
     # --- RHYTHMIC GLUE ---
     shifted_beat_times = [b + shift_seconds for b in beat_times]
     measure_notes = {}
-    pattern_memory = {} 
-    
+    pattern_memory = {}
+
     if cfg.rhythmic_glue and len(shifted_beat_times) > 4:
         for i, t in enumerate(times):
             m_idx, m_offset = _quantize_to_measure(t, shifted_beat_times)
@@ -218,112 +220,131 @@ def write_real_notes_mid(
     prev_pitch = None
     chord_starts = []
 
-    for i, t in enumerate(times):
-        curr_pitch = pitches[i]
-        lane = _assign_lane(prev_lane, curr_pitch, prev_pitch, rng, cfg)
-        prev_lane = lane
-        prev_pitch = curr_pitch
+    # Skip note generation loop if dry_run
+    if not dry_run:
+        for i, t in enumerate(times):
+            curr_pitch = pitches[i]
+            lane = _assign_lane(prev_lane, curr_pitch, prev_pitch, rng, cfg)
+            prev_lane = lane
+            prev_pitch = curr_pitch
 
-        # Texture Decisions (Glue)
-        is_sustain = False
-        is_chord = False
-        found_memory = False
-        
-        if cfg.rhythmic_glue and len(shifted_beat_times) > 4:
-            m_idx, m_offset = _quantize_to_measure(t, shifted_beat_times)
-            sig = ""
-            if m_idx in measure_notes:
-                offsets = sorted([x[0] for x in measure_notes[m_idx]])
-                sig = ",".join([f"{x:.2f}" for x in offsets])
-            
-            if sig and sig in pattern_memory:
-                saved_decisions = pattern_memory[sig]
-                for saved_offset, decision in saved_decisions.items():
-                    if abs(saved_offset - m_offset) < 0.05:
-                        is_sustain, is_chord = decision
-                        found_memory = True
-                        break
-        
-        if not found_memory:
-            next_t = times[i+1] if i+1 < len(times) else t + 2.0
-            gap = next_t - t
-            
-            if gap > cfg.sustain_threshold and rng.random() < cfg.sustain_len:
-                is_sustain = True
-            if rng.random() < cfg.chord_prob:
-                is_chord = True
-                
+            # Texture Decisions (Glue)
+            is_sustain = False
+            is_chord = False
+            found_memory = False
+
             if cfg.rhythmic_glue and len(shifted_beat_times) > 4:
                 m_idx, m_offset = _quantize_to_measure(t, shifted_beat_times)
+                sig = ""
                 if m_idx in measure_notes:
                     offsets = sorted([x[0] for x in measure_notes[m_idx]])
                     sig = ",".join([f"{x:.2f}" for x in offsets])
-                    if sig not in pattern_memory:
-                        pattern_memory[sig] = {}
-                    pattern_memory[sig][m_offset] = (is_sustain, is_chord)
 
-        dur = 0.1
-        if is_sustain:
-            next_t = times[i+1] if i+1 < len(times) else t + 2.0
-            gap = next_t - t
-            dur = gap - cfg.sustain_buffer
-            dur = min(dur, 2.5)
-            dur = max(dur, 0.2)
+                if sig and sig in pattern_memory:
+                    saved_decisions = pattern_memory[sig]
+                    for saved_offset, decision in saved_decisions.items():
+                        if abs(saved_offset - m_offset) < 0.05:
+                            is_sustain, is_chord = decision
+                            found_memory = True
+                            break
 
-        lanes = [lane]
-        if is_chord:
-            opts = [l for l in [lane-1, lane+1] if 0 <= l <= 4]
-            if not cfg.allow_orange: opts = [l for l in opts if l != 4]
-            if opts:
-                l2 = rng.choice(opts)
-                lanes.append(l2)
-                chord_starts.append(t)
+            if not found_memory:
+                next_t = times[i+1] if i+1 < len(times) else t + 2.0
+                gap = next_t - t
 
-        for l in lanes:
-            guitar.notes.append(pretty_midi.Note(
-                velocity=100, pitch=LANE_PITCHES[l], start=t, end=t+dur
-            ))
+                if gap > cfg.sustain_threshold and rng.random() < cfg.sustain_len:
+                    is_sustain = True
+                if rng.random() < cfg.chord_prob:
+                    is_chord = True
 
-    pm.instruments.append(guitar)
+                if cfg.rhythmic_glue and len(shifted_beat_times) > 4:
+                    m_idx, m_offset = _quantize_to_measure(t, shifted_beat_times)
+                    if m_idx in measure_notes:
+                        offsets = sorted([x[0] for x in measure_notes[m_idx]])
+                        sig = ",".join([f"{x:.2f}" for x in offsets])
+                        if sig not in pattern_memory:
+                            pattern_memory[sig] = {}
+                        pattern_memory[sig][m_offset] = (is_sustain, is_chord)
+
+            dur = 0.1
+            if is_sustain:
+                next_t = times[i+1] if i+1 < len(times) else t + 2.0
+                gap = next_t - t
+                dur = gap - cfg.sustain_buffer
+                dur = min(dur, 2.5)
+                dur = max(dur, 0.2)
+
+            lanes = [lane]
+            if is_chord:
+                opts = [l for l in [lane-1, lane+1] if 0 <= l <= 4]
+                if not cfg.allow_orange: opts = [l for l in opts if l != 4]
+                if opts:
+                    l2 = rng.choice(opts)
+                    lanes.append(l2)
+                    chord_starts.append(t)
+
+            for l in lanes:
+                guitar.notes.append(pretty_midi.Note(
+                    velocity=100, pitch=LANE_PITCHES[l], start=t, end=t+dur
+                ))
+
+        pm.instruments.append(guitar)
 
     # 4. Events & Smart Sections
     final_sections = []
-    if cfg.add_sections:
+
+    # Priority: Overrides > Auto-Gen
+    if override_sections:
+        final_sections = override_sections
+        if not dry_run:
+            evt = pretty_midi.Instrument(0, name="EVENTS")
+            for s in final_sections:
+                pm.lyrics.append(pretty_midi.Lyric(f"[section {s['name']}]", float(s['start'])))
+            pm.instruments.append(evt)
+
+    elif cfg.add_sections:
         raw_sections = generate_sections(str(audio_path), duration - shift_seconds)
-        
+
         shifted_sections = []
         for s in raw_sections:
             shifted_start = s.start + shift_seconds
             shifted_sections.append(asdict(s) | {"start": shifted_start})
-            
+
         # RAW ONSETS FOR DENSITY CHECK
         raw_onset_times = [o.t + shift_seconds for o in onsets]
-        
-        from charter.sections import Section
+
         obj_sections = [Section(s["name"], s["start"]) for s in shifted_sections]
-        
+
         final_sections = _rename_sections_based_on_density(
-            obj_sections, 
-            raw_onset_times, 
+            obj_sections,
+            raw_onset_times,
             duration
         )
 
-        evt = pretty_midi.Instrument(0, name="EVENTS")
-        for s in final_sections:
-            pm.lyrics.append(pretty_midi.Lyric(f"[section {s['name']}]", float(s['start'])))
-        pm.instruments.append(evt)
+        if not dry_run:
+            evt = pretty_midi.Instrument(0, name="EVENTS")
+            for s in final_sections:
+                pm.lyrics.append(pretty_midi.Lyric(f"[section {s['name']}]", float(s['start'])))
+            pm.instruments.append(evt)
 
-    if cfg.add_star_power:
+    if not dry_run and cfg.add_star_power:
         phrases = generate_star_power_phrases(note_times=times, duration_sec=duration)
         for p in phrases:
             guitar.notes.append(pretty_midi.Note(100, SP_PITCH, p.start, p.end))
 
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    pm.write(str(out_path))
+    if not dry_run:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        pm.write(str(out_path))
 
-    if stats_out_path:
-        from charter.sections import Section
-        sec_objs = [Section(s["name"], s["start"]) for s in final_sections]
+    if stats_out_path and final_sections:
+        # Convert dicts back to objects if they are dicts (overrides)
+        sec_objs = []
+        for s in final_sections:
+            if isinstance(s, dict):
+                sec_objs.append(Section(s["name"], s["start"]))
+            else:
+                sec_objs.append(s)
+
         stats = compute_section_stats(
             note_starts=times, chord_starts=chord_starts,
             sections=sec_objs, duration_sec=duration
@@ -331,7 +352,7 @@ def write_real_notes_mid(
         data = { "stats": [asdict(s) for s in stats] }
         stats_out_path.write_text(json.dumps(data, indent=2))
 
-    return shift_seconds
+    return shift_seconds, final_sections
 
 def write_dummy_notes_mid(out_path: Path, bpm: float, bars: int, density: float) -> float:
     pm = pretty_midi.PrettyMIDI(initial_tempo=bpm)
