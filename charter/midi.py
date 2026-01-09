@@ -104,33 +104,21 @@ def _quantize_to_measure(time: float, beat_times: list[float]) -> tuple[int, flo
     return measure_idx, quantized_offset
 
 def _rename_sections_based_on_density(sections: list, note_times: list[float], total_duration: float) -> list:
-    """
-    Identifies 'Guitar Solo' sections by finding areas with high note density (NPS).
-    Uses raw audio onsets (note_times) to find the 'true' busy-ness of the song.
-    """
     if not note_times:
         return sections
 
-    # 1. Calculate Song Average NPS
     avg_nps = len(note_times) / total_duration if total_duration > 0 else 0.0
-
-    # Tuned Thresholds (v1.1.4): Aggressive Sensitivity
-    # 1.15x average density (was 1.4x)
-    # Minimum floor 2.0 NPS (was 3.0)
     solo_threshold = max(avg_nps * 1.15, 2.0)
 
     new_sections = []
-
     for i, s in enumerate(sections):
         start = s.start
         end = sections[i+1].start if i+1 < len(sections) else total_duration
         duration = end - start
 
-        # Count raw audio events in this section
         notes_in_section = sum(1 for t in note_times if start <= t < end)
         section_nps = notes_in_section / duration if duration > 0.5 else 0.0
 
-        # If this section spikes above threshold, rename it
         if (section_nps > solo_threshold
             and s.name not in ["Intro", "Outro"]
             and duration > 5.0):
@@ -140,6 +128,21 @@ def _rename_sections_based_on_density(sections: list, note_times: list[float], t
 
     return new_sections
 
+def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
+    """Calculates Notes Per Second (NPS) in 1-second windows, stepped every 0.5s."""
+    points = []
+    step = 0.5
+    window = 1.0
+    t = 0.0
+    times_sorted = sorted(times)
+
+    while t <= duration:
+        # Count notes in [t, t + window]
+        count = sum(1 for x in times_sorted if t <= x < t + window)
+        points.append({"t": round(t, 2), "nps": count})
+        t += step
+    return points
+
 def write_real_notes_mid(
     *,
     audio_path: Path,
@@ -148,7 +151,7 @@ def write_real_notes_mid(
     stats_out_path: Path | None = None,
     override_sections: list[dict] | None = None,
     dry_run: bool = False,
-) -> tuple[float, list[dict]]:
+) -> tuple[float, list[dict], list[dict]]:
     rng = random.Random(cfg.seed)
 
     # 1. Analyze
@@ -212,7 +215,7 @@ def write_real_notes_mid(
             m_idx, m_offset = _quantize_to_measure(t, shifted_beat_times)
             measure_notes.setdefault(m_idx, []).append((m_offset, i))
 
-    # 3. Note Generation
+    # 3. Note Generation (Skip if dry_run)
     pm = pretty_midi.PrettyMIDI(initial_tempo=float(tempo))
     guitar = pretty_midi.Instrument(program=0, name=TRACK_NAME)
 
@@ -220,7 +223,6 @@ def write_real_notes_mid(
     prev_pitch = None
     chord_starts = []
 
-    # Skip note generation loop if dry_run
     if not dry_run:
         for i, t in enumerate(times):
             curr_pitch = pitches[i]
@@ -228,7 +230,6 @@ def write_real_notes_mid(
             prev_lane = lane
             prev_pitch = curr_pitch
 
-            # Texture Decisions (Glue)
             is_sustain = False
             is_chord = False
             found_memory = False
@@ -293,7 +294,6 @@ def write_real_notes_mid(
     # 4. Events & Smart Sections
     final_sections = []
 
-    # Priority: Overrides > Auto-Gen
     if override_sections:
         final_sections = override_sections
         if not dry_run:
@@ -310,9 +310,7 @@ def write_real_notes_mid(
             shifted_start = s.start + shift_seconds
             shifted_sections.append(asdict(s) | {"start": shifted_start})
 
-        # RAW ONSETS FOR DENSITY CHECK
         raw_onset_times = [o.t + shift_seconds for o in onsets]
-
         obj_sections = [Section(s["name"], s["start"]) for s in shifted_sections]
 
         final_sections = _rename_sections_based_on_density(
@@ -336,8 +334,10 @@ def write_real_notes_mid(
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pm.write(str(out_path))
 
+    # --- Compute Density ---
+    density_data = _compute_rolling_density(times, duration)
+
     if stats_out_path and final_sections:
-        # Convert dicts back to objects if they are dicts (overrides)
         sec_objs = []
         for s in final_sections:
             if isinstance(s, dict):
@@ -352,7 +352,7 @@ def write_real_notes_mid(
         data = { "stats": [asdict(s) for s in stats] }
         stats_out_path.write_text(json.dumps(data, indent=2))
 
-    return shift_seconds, final_sections
+    return shift_seconds, final_sections, density_data
 
 def write_dummy_notes_mid(out_path: Path, bpm: float, bars: int, density: float) -> float:
     pm = pretty_midi.PrettyMIDI(initial_tempo=bpm)

@@ -86,12 +86,10 @@ def main():
     # --- AUDIO PROCESSING (Normalize) ---
     dest_audio = out_dir / "song.mp3"
 
-    # Check if we should skip heavy processing if just analyzing
     if not args.analyze_only:
         print(f"Processing audio: {audio_path.name}...")
         normalize_and_save(audio_path, dest_audio)
 
-    # Fetch metadata only if not analyze-only
     if args.fetch_metadata and args.artist and not args.analyze_only:
         try:
             cache_path = Path.home() / ".cache" / "1clickcharter" / "metadata.json"
@@ -123,11 +121,12 @@ def main():
 
     shift_seconds = 0.0
     final_sections = []
+    density_data = []
 
     if args.mode == "dummy":
         shift_seconds = write_dummy_notes_mid(notes_mid, args.bpm, args.bars, args.density)
     else:
-        shift_seconds, final_sections = write_real_notes_mid(
+        shift_seconds, final_sections, density_data = write_real_notes_mid(
             audio_path=audio_path,
             out_path=notes_mid,
             cfg=cfg,
@@ -138,14 +137,17 @@ def main():
 
     if args.analyze_only:
         out_json = out_dir / "sections.json"
-        # Ensure we serialize list of Section objects or dicts correctly
+
         serializable_sections = []
         for s in final_sections:
              if hasattr(s, "__dict__"): serializable_sections.append(asdict(s))
              elif isinstance(s, dict): serializable_sections.append(s)
              else: serializable_sections.append(s)
 
-        out_json.write_text(json.dumps({"sections": serializable_sections}, indent=2))
+        out_json.write_text(json.dumps({
+            "sections": serializable_sections,
+            "density": density_data
+        }, indent=2))
         print(f"✅ Analysis Complete. Data written to: {out_json}")
         return
 
