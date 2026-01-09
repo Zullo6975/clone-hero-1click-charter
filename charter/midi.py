@@ -113,33 +113,33 @@ def _rename_sections_based_on_density(sections: list, note_times: list[float], t
 
     # 1. Calculate Song Average NPS
     avg_nps = len(note_times) / total_duration if total_duration > 0 else 0.0
-
+    
     # Threshold: If a section is 60% busier than the song average, it's likely a solo.
-    solo_threshold = max(avg_nps * 1.6, 2.5)
+    solo_threshold = max(avg_nps * 1.6, 2.5) 
 
     new_sections = []
-
+    
     for i, s in enumerate(sections):
         start = s.start
         end = sections[i+1].start if i+1 < len(sections) else total_duration
         duration = end - start
-
+        
         # Count notes in this section
         notes_in_section = sum(1 for t in note_times if start <= t < end)
         section_nps = notes_in_section / duration if duration > 0.5 else 0.0
-
+        
         # Rules for renaming:
         # 1. Must exceed threshold
         # 2. Don't rename Intro or Outro (structural integrity)
         # 3. Must be at least 5 seconds long
-        if (section_nps > solo_threshold
-            and s.name not in ["Intro", "Outro"]
+        if (section_nps > solo_threshold 
+            and s.name not in ["Intro", "Outro"] 
             and duration > 5.0):
             new_sections.append(asdict(s) | {"name": "Guitar Solo"})
         else:
             new_sections.append(asdict(s))
-
-    # Convert back to objects if needed, but we used asdict previously.
+            
+    # Convert back to objects if needed, but we used asdict previously. 
     # Actually `final_sections` expects dictionaries for stats, so we return dicts.
     return new_sections
 
@@ -300,21 +300,21 @@ def write_real_notes_mid(
     if cfg.add_sections:
         # 1. Get raw sections
         raw_sections = generate_sections(str(audio_path), duration - shift_seconds)
-
+        
         # 2. Shift time to match chart
         shifted_sections = []
         for s in raw_sections:
             shifted_start = s.start + shift_seconds
             shifted_sections.append(asdict(s) | {"start": shifted_start})
-
+            
         # 3. Apply Smart Naming (Solo Detection)
         # Note: We pass objects, but get dicts back from the helper
         from charter.sections import Section
         obj_sections = [Section(s["name"], s["start"]) for s in shifted_sections]
-
+        
         final_sections = _rename_sections_based_on_density(
-            obj_sections,
-            times,
+            obj_sections, 
+            times, 
             duration
         )
 
