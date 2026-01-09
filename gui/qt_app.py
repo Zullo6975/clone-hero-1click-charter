@@ -375,6 +375,13 @@ class MainWindow(QMainWindow):
         else:
             self.preset_combo.setCurrentText("Medium 2 (Balanced)")
 
+        # CRITICAL FIX: Force application of the preset logic immediately
+        # This ensures the "Custom" controls are hidden if a preset is selected
+        self.apply_preset(self.preset_combo.currentText())
+
+        # CRITICAL FIX: Force queue display update to ensure button starts disabled
+        self._update_queue_display()
+
         self._update_state()
         QTimer.singleShot(100, self.snap_to_content)
         self.statusBar().showMessage("Ready")
