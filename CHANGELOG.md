@@ -1,8 +1,28 @@
 # Changelog
 
-## [1.1.0] - 2026-01-??
+## [1.1.0] - 2026-01-09
 
-Place holder.
+### The "Musicality" Update
+
+This major update focuses on making the generated charts feel less random and more like real music, while also making the app fully standalone.
+
+### 🎸 Audio Engine Overhaul
+
+- **Smart Sections:** The engine now analyzes note density to automatically detect and label **"Guitar Solos"**.
+- **Pitch Contouring:** Notes now statistically follow the direction of the melody (if the song goes up, the notes go Right; if down, Left).
+- **Rhythmic Glue:** Detected repeated rhythmic motifs in the audio and forced the chart to use consistent patterns for them.
+- **Sustain Physics:** Completely rewritten sustain logic with configurable "Minimum Gap" and "End Buffer" to prevent impossible holds.
+- **Audio Normalization:** All input songs are now auto-leveled to **-14 LUFS** to ensure consistent volume in-game.
+
+### 📦 Core & Packaging
+
+- **Standalone Audio Engine:** **FFmpeg** and **FFprobe** are now bundled inside the application. Users no longer need to install anything manually—just download and run.
+
+### 🖥️ UI/UX Improvements
+
+- **Cleaner Layout:** Moved the Progress Bar to the status bar to declutter the footer.
+- **Readability:** Increased global font size to 11pt and standardized button heights.
+- **Stability:** Fixed layout shifting when scrollbars appear and prevented text resizing bugs when toggling Dark Mode.
 
 ## [1.0.2] - 2026-01-08
 

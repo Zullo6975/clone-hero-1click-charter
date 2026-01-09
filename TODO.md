@@ -18,9 +18,9 @@
 
 - [ ] **User Presets:** Save and load custom configuration profiles (e.g., "My Thrash Metal Settings") to a local JSON file.
 - [ ] **Manual Overrides:** A simple table view to review/edit data before generation.
-  - *Features:* Rename sections, adjust specific section difficulty, or tweak the start offset manually.
+  - _Features:_ Rename sections, adjust specific section difficulty, or tweak the start offset manually.
 - [ ] **Density Visualizer:** A small graph in the UI showing note density over time.
-  - *Goal:* Let users see where the difficulty spikes are before they play.
+  - _Goal:_ Let users see where the difficulty spikes are before they play.
 
 ---
 
@@ -30,9 +30,9 @@
 
 - [ ] **The "Expert" Engine:** Create a new generation profile for Expert (1/16 grid, complex chords, 3-note chords allowed).
 - [ ] **Reduction Algorithm:** Create a logic system to "dumb down" an Expert chart.
-  - *Expert -> Hard:* Remove 20% of notes, simplify complex chords.
-  - *Hard -> Medium:* Remove Orange, enforce 1/8 grid strictness.
-  - *Medium -> Easy:* On-beat only, mostly single notes.
+  - _Expert -> Hard:_ Remove 20% of notes, simplify complex chords.
+  - _Hard -> Medium:_ Remove Orange, enforce 1/8 grid strictness.
+  - _Medium -> Easy:_ On-beat only, mostly single notes.
 - [ ] **Unified MIDI Writer:** Update `midi.py` to write `PART GUITAR`, `EASY`, `MEDIUM`, `HARD`, and `EXPERT` tracks into a single `.mid` file.
 
 ---
@@ -44,3 +44,4 @@
 - [ ] **Chart Export:** Option to export in `.chart` format (text-based) for editing in Moonscraper.
 - [ ] **Auto-Update:** In-app notification when a new GitHub Release is available.
 - [ ] **Batch Reporting:** A summary screen after a large batch job ("Processed 50 songs: 48 Success, 2 Failed").
+- [ ] **UI Refinement:** Always ongoing, nit-picking my GUI configurations
