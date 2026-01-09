@@ -9,6 +9,7 @@ from charter.ini import write_song_ini
 from charter.metadata import enrich_from_musicbrainz
 from charter.midi import write_dummy_notes_mid, write_real_notes_mid
 from charter.stats import compute_chart_stats, write_stats_json, format_stats_summary
+from charter.audio import normalize_and_save
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="1clickcharter CLI")
@@ -39,6 +40,13 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--movement-bias", type=float, default=0.5)
     p.add_argument("--grid-snap", default="1/8")
 
+    # Sustain Tuning (v1.1.2)
+    p.add_argument("--sustain-threshold", type=float, default=0.8)
+    p.add_argument("--sustain-buffer", type=float, default=0.25)
+
+    # Rhythm (v1.2)
+    p.add_argument("--no-rhythmic-glue", action="store_true")
+
     p.add_argument("--no-stats", action="store_true")
 
     # Dummy params
@@ -60,7 +68,10 @@ def main():
         chord_prob=args.chord_prob,
         sustain_len=args.sustain_len,
         movement_bias=args.movement_bias,
-        grid_snap=args.grid_snap
+        grid_snap=args.grid_snap,
+        sustain_threshold=args.sustain_threshold,
+        sustain_buffer=args.sustain_buffer,
+        rhythmic_glue=not args.no_rhythmic_glue
     )
 
     audio_path = Path(args.audio).resolve()
@@ -68,7 +79,11 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     title = args.title or audio_path.stem
-    shutil.copy2(audio_path, out_dir / "song.mp3")
+    
+    # --- AUDIO PROCESSING (Normalize) ---
+    dest_audio = out_dir / "song.mp3"
+    print(f"Processing audio: {audio_path.name}...")
+    normalize_and_save(audio_path, dest_audio)
 
     if args.fetch_metadata and args.artist:
         try:
@@ -98,19 +113,6 @@ def main():
             cfg=cfg,
             stats_out_path=stats_out
         )
-
-    # Add shift to existing delay (converted to ms)
-    # Clone Hero: Positive delay = chart starts LATER relative to audio.
-    # We pushed chart events later, so we need to tell the game the audio starts later too?
-    # No. If chart events are at 3.0s, and audio is at 0.0s, they are synced if the audio actually has silence.
-    # BUT we didn't add silence to audio.
-    # We moved notes from 0.5s -> 3.5s.
-    # Audio event at 0.5s is now visually at 3.5s.
-    # We need audio to start at 3.0s? No.
-    # We want 0.0s of chart to be Silence.
-    # If delay = 3000. Chart starts. 3s later, audio starts.
-    # Note at 3.5s will match audio point 0.5s.
-    # YES. Correct.
 
     final_delay = args.delay_ms + int(shift_seconds * 1000)
 

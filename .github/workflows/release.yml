@@ -22,6 +22,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install .[dev,gui] pyinstaller Pillow
 
+      - name: Download FFmpeg (macOS)
+        run: |
+          mkdir -p bin
+          # Download static builds
+          curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/getrelease/zip
+          curl -L -o ffprobe.zip https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
+          unzip ffmpeg.zip
+          unzip ffprobe.zip
+          mv ffmpeg bin/
+          mv ffprobe bin/
+          chmod +x bin/ffmpeg bin/ffprobe
+          echo "✅ FFmpeg installed to bin/"
+
       - name: Generate Icons
         run: |
           chmod +x tools/make_icons.sh
@@ -29,13 +42,14 @@ jobs:
 
       - name: Build .app with PyInstaller
         run: |
-          # Matches the logic in your Makefile 'package' target
           pyinstaller --noconfirm --clean \
             --name "1ClickCharter" \
             --windowed \
             --onefile \
             --icon "icons/AppIcon.icns" \
             --add-data "icons/icon_og.png:icons" \
+            --add-binary "bin/ffmpeg:." \
+            --add-binary "bin/ffprobe:." \
             --paths "." \
             --hidden-import "charter.cli" \
             --hidden-import "gui.qt_app" \
@@ -70,14 +84,25 @@ jobs:
           python -m pip install --upgrade pip
           pip install .[dev,gui] pyinstaller Pillow
 
+      - name: Download FFmpeg (Windows)
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path bin
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "ffmpeg.zip"
+          Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg_temp"
+          # Move binaries to bin/
+          $ffmpegPath = Get-ChildItem -Path "ffmpeg_temp" -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+          $ffprobePath = Get-ChildItem -Path "ffmpeg_temp" -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
+          Move-Item -Path $ffmpegPath.FullName -Destination "bin\"
+          Move-Item -Path $ffprobePath.FullName -Destination "bin\"
+          Write-Host "✅ FFmpeg installed to bin/"
+
       - name: Generate Icons (Python Fallback)
-        # Windows doesn't have bash/sips, but make_icons.sh has a Python fallback block.
-        # We'll just run the python snippet directly to be safe and avoid shell issues.
         run: |
           python -c "from PIL import Image; img = Image.open('icons/icon_og.png'); img.save('icons/AppIcon.ico', format='ICO', sizes=[(256,256), (128,128), (64,64), (48,48), (32,32), (16,16)])"
 
       - name: Build .exe with PyInstaller
-        # Note: Windows uses ';' as separator for add-data
+        # Note: Windows uses ';' as separator for binaries
         run: |
           pyinstaller --noconfirm --clean `
             --name "1ClickCharter" `
@@ -85,6 +110,8 @@ jobs:
             --onefile `
             --icon "icons/AppIcon.ico" `
             --add-data "icons/icon_og.png;icons" `
+            --add-binary "bin\ffmpeg.exe;." `
+            --add-binary "bin\ffprobe.exe;." `
             --paths "." `
             --hidden-import "charter.cli" `
             --hidden-import "gui.qt_app" `
