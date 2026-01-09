@@ -12,12 +12,12 @@ from PySide6.QtGui import (QAction, QColor, QDragEnterEvent, QDropEvent, QFont,
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup,
                                QCheckBox, QComboBox, QDoubleSpinBox,
                                QFileDialog, QFormLayout, QFrame, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit, QListWidget,
-                               QListWidgetItem, QMainWindow, QMessageBox,
-                               QProgressBar, QPushButton, QRadioButton,
-                               QScrollArea, QSizePolicy, QSlider, QSpinBox,
-                               QSplitter, QStyle, QTextEdit, QToolButton,
-                               QVBoxLayout, QWidget)
+                               QHBoxLayout, QInputDialog, QLabel, QLineEdit,
+                               QListWidget, QListWidgetItem, QMainWindow,
+                               QMessageBox, QProgressBar, QPushButton,
+                               QRadioButton, QScrollArea, QSizePolicy, QSlider,
+                               QSpinBox, QSplitter, QStyle, QTextEdit,
+                               QToolButton, QVBoxLayout, QWidget)
 
 
 # ---------------- Paths & Config ----------------
@@ -39,7 +39,7 @@ def form_label(text: str, required: bool = False) -> QLabel:
     lbl.setMinimumWidth(110)
     return lbl
 
-def get_font(size: int = 10, bold: bool = False) -> QFont:
+def get_font(size: int = 11, bold: bool = False) -> QFont:
     f = QApplication.font()
     f.setPointSize(size)
     f.setBold(bold)
@@ -62,13 +62,56 @@ class SafeSlider(QSlider):
     def wheelEvent(self, event):
         event.ignore()
 
-DIFFICULTY_PRESETS: dict[str, dict[str, float | int] | None] = {
+# --- PRESETS MANAGEMENT ---
+DEFAULT_PRESETS: dict[str, dict[str, float | int]] = {
     "Medium (Casual)":   {"max_nps": 2.25, "min_gap_ms": 170, "sustain": 50, "chord": 5},
     "Medium (Balanced)": {"max_nps": 2.80, "min_gap_ms": 140, "sustain": 15, "chord": 12},
     "Medium (Intense)":  {"max_nps": 3.40, "min_gap_ms": 110, "sustain": 5,  "chord": 25},
     "Medium (Chaotic)":  {"max_nps": 4.20, "min_gap_ms": 85,  "sustain": 0,  "chord": 40},
-    "Custom…":           None,
 }
+
+def get_user_preset_path() -> Path:
+    """Returns path to user_presets.json in home dir."""
+    p = Path.home() / ".1clickcharter" / "presets.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+def load_all_presets() -> dict[str, dict[str, float | int]]:
+    """Merges defaults with user presets."""
+    merged = DEFAULT_PRESETS.copy()
+    user_path = get_user_preset_path()
+    if user_path.exists():
+        try:
+            user_data = json.loads(user_path.read_text(encoding="utf-8"))
+            merged.update(user_data)
+        except Exception:
+            pass # Ignore corrupted file
+    return merged
+
+def save_user_preset(name: str, data: dict[str, float | int]) -> None:
+    """Saves a single preset to the JSON file (merging with existing)."""
+    user_path = get_user_preset_path()
+    current = {}
+    if user_path.exists():
+        try:
+            current = json.loads(user_path.read_text(encoding="utf-8"))
+        except Exception:
+            current = {}
+
+    current[name] = data
+    user_path.write_text(json.dumps(current, indent=2), encoding="utf-8")
+
+def delete_user_preset(name: str) -> None:
+    user_path = get_user_preset_path()
+    if not user_path.exists(): return
+
+    try:
+        current = json.loads(user_path.read_text(encoding="utf-8"))
+        if name in current:
+            del current[name]
+            user_path.write_text(json.dumps(current, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 
 @dataclass
 class RunConfig:
@@ -97,8 +140,10 @@ class ThemeManager:
     @staticmethod
     def apply_style(app: QApplication, dark_mode: bool):
         app.setStyle("Fusion")
-        font = app.font()
-        font.setPointSize(10)
+
+        # Enforce clean font state (11pt is the sweet spot)
+        font = QFont()
+        font.setPointSize(11)
         app.setFont(font)
         palette = QPalette()
 
@@ -126,7 +171,7 @@ class ThemeManager:
             palette.setColor(QPalette.PlaceholderText, QColor(120, 130, 140))
 
         else:
-            # Light Theme (Explicitly defined to override Dark OS defaults)
+            # Light Theme
             base = QColor(245, 245, 250)
             white = QColor(255, 255, 255)
             text = QColor(30, 30, 40)
@@ -143,14 +188,14 @@ class ThemeManager:
             palette.setColor(QPalette.Highlight, highlight)
             palette.setColor(QPalette.HighlightedText, white)
 
-            # Explicit Interaction Colors (Fixes OS Dark Mode bleed)
+            # Explicit Interaction Colors
             palette.setColor(QPalette.Light, QColor(255, 255, 255)) # Hover
             palette.setColor(QPalette.Midlight, QColor(230, 230, 240))
             palette.setColor(QPalette.Dark, QColor(200, 200, 210))
             palette.setColor(QPalette.Mid, QColor(210, 210, 220)) # Borders
             palette.setColor(QPalette.Shadow, QColor(150, 150, 160))
 
-            # Disabled States (Explicitly readable grey)
+            # Disabled States
             disabled_text = QColor(160, 160, 170)
             palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
             palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
@@ -167,17 +212,20 @@ class ThemeManager:
                 margin-top: 24px;
                 padding-top: 12px;
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 12pt;
+                max-width: 550px;
             }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
 
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget {
-                padding: 6px;
+                padding: 5px;
                 border-radius: 4px;
                 border: 1px solid palette(mid);
                 background-color: palette(base);
                 color: palette(text);
-                font-size: 11px;
+                min-height: 18px;
+                max-width: 425px;
+                font-size: 11pt;
             }
             QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus, QSlider:focus {
                 border: 1px solid palette(highlight);
@@ -197,13 +245,14 @@ class ThemeManager:
                 selection-color: palette(highlighted-text);
             }
 
+            /* STANDARD BUTTONS - SCALED DOWN */
             QPushButton {
-                padding: 8px 16px;
+                padding: 5px 10px;
                 border-radius: 5px;
                 border: 1px solid palette(mid);
                 background-color: palette(button);
                 color: palette(text);
-                font-size: 11px;
+                font-size: 11pt; /* Slightly smaller font */
             }
             QPushButton:hover {
                 background-color: palette(midlight);
@@ -215,16 +264,14 @@ class ThemeManager:
                 border: 1px solid palette(mid);
             }
 
-            /* PRIMARY BUTTON (Fixed Height) */
+            /* PRIMARY BUTTON (GENERATE) */
             QPushButton#Primary {
-                background-color: palette(highlight);
-                color: palette(highlighted-text);
-                font-weight: bold;
-                border: 1px solid palette(highlight);
-                min-height: 18px;
-                max-height: 18px;
-                min-width: 120px;
-                max-width: 120px;
+                padding: 6px 12px;
+                border-radius: 5px;
+                border: 1px solid palette(mid);
+                background-color: palette(button);
+                color: palette(text);
+                font-size: 11pt; /* Slightly smaller font */
             }
             QPushButton#Primary:hover {
                 border: 1px solid palette(text);
@@ -236,9 +283,15 @@ class ThemeManager:
                 border: 1px solid palette(mid);
             }
 
-            QCheckBox { spacing: 8px; font-size: 11px; }
+            QCheckBox { spacing: 8px; }
 
-            QStatusBar { background: palette(window); border-top: 1px solid palette(mid); min-height: 50px; max-height: 50px; }
+            /* STATUS BAR */
+            QStatusBar {
+                background: palette(window);
+                border-top: 1px solid palette(mid);
+                min-height: 50px;
+                max-height: 50px;
+            }
             QStatusBar::item { border: none; }
 
             QProgressBar {
@@ -312,9 +365,16 @@ class MainWindow(QMainWindow):
         self._wire()
         self._restore_settings()
 
-        self.resize(980, 750)
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
-        self.apply_preset(self.preset_combo.currentText())
+
+        # Load Presets
+        self.refresh_presets()
+        last_preset = self.settings.value("preset", "Medium (Balanced)", type=str)
+        if last_preset in self.all_presets:
+            self.preset_combo.setCurrentText(last_preset)
+        else:
+            self.preset_combo.setCurrentText("Medium (Balanced)")
+
         self._update_state()
         QTimer.singleShot(100, self.snap_to_content)
         self.statusBar().showMessage("Ready")
@@ -333,13 +393,13 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(24, 24, 24, 24)
+        main_layout.setSpacing(24)
 
         # --- HEADER ---
         header_widget = QWidget()
         header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(0, 0, 0, 8)
+        header_layout.setContentsMargins(0, 0, 0, 10)
         header_layout.setSpacing(16)
         header_layout.setAlignment(Qt.AlignCenter)
 
@@ -348,10 +408,11 @@ class MainWindow(QMainWindow):
         if icon_path.exists():
             pix = QPixmap(str(icon_path))
             if not pix.isNull():
-                pix = pix.scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                pix = pix.scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 icon_lbl.setPixmap(pix)
 
         title_lbl = QLabel("CloneHero 1-Click Charter")
+        # Header Font Size
         title_lbl.setFont(get_font(40, True))
         title_lbl.setStyleSheet("color: palette(text);")
 
@@ -368,12 +429,12 @@ class MainWindow(QMainWindow):
         # ================= Sidebar =================
         self.sidebar_widget = QWidget()
         self.sidebar_widget.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
-        self.sidebar_widget.setMinimumWidth(340)
+        self.sidebar_widget.setMinimumWidth(340) # Reverted to 340 to give space to right panel
         self.sidebar_widget.setMaximumWidth(340)
 
         sidebar_layout = QVBoxLayout(self.sidebar_widget)
-        sidebar_layout.setContentsMargins(0, 0, 12, 0)
-        sidebar_layout.setSpacing(18)
+        sidebar_layout.setContentsMargins(0, 0, 16, 0)
+        sidebar_layout.setSpacing(20)
 
         # Audio Input Group
         grp_audio = QGroupBox("Input Audio (REQUIRED)")
@@ -381,7 +442,7 @@ class MainWindow(QMainWindow):
         self.audio_label = QLabel("Drag Audio Files Here")
         self.audio_label.setAlignment(Qt.AlignCenter)
         self.audio_label.setWordWrap(True)
-        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11px;")
+        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
 
         # ADD Button
         self.btn_add_audio = QPushButton("Add Songs...")
@@ -407,12 +468,12 @@ class MainWindow(QMainWindow):
         self.grp_queue.setVisible(True)
 
         queue_layout = QVBoxLayout(self.grp_queue)
-        queue_layout.setContentsMargins(8, 8, 8, 8)
-        queue_layout.setSpacing(8)
+        queue_layout.setContentsMargins(10, 10, 10, 10)
+        queue_layout.setSpacing(10)
 
         self.queue_list = QListWidget()
         self.queue_list.setSelectionMode(QAbstractItemView.NoSelection)
-        self.queue_list.setMaximumHeight(65)
+        self.queue_list.setMaximumHeight(60)
         self.queue_list.setStyleSheet("border: 1px solid palette(mid); border-radius: 4px;")
 
         self.btn_clear_queue_all = QPushButton("Clear Queue")
@@ -429,8 +490,8 @@ class MainWindow(QMainWindow):
 
         self.cover_preview = QLabel("Drag Art Here")
         self.cover_preview.setAlignment(Qt.AlignCenter)
-        self.cover_preview.setFixedSize(260, 260)
-        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic; font-size: 11px;")
+        self.cover_preview.setFixedSize(280, 280)
+        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic; font-size: 11pt;")
 
         row_art_btns = QHBoxLayout()
         self.btn_pick_cover = QPushButton("Image...")
@@ -455,18 +516,18 @@ class MainWindow(QMainWindow):
         # ================= Main Panel =================
         self.main_widget = QWidget()
         self.main_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-        self.main_widget.setMinimumWidth(500)
+        self.main_widget.setMinimumWidth(700)
 
         main_layout_inner = QVBoxLayout(self.main_widget)
-        main_layout_inner.setContentsMargins(12, 0, 0, 0)
-        main_layout_inner.setSpacing(22)
+        main_layout_inner.setContentsMargins(16, 0, 0, 0)
+        main_layout_inner.setSpacing(24)
 
         # Metadata
         grp_meta = QGroupBox("Song Metadata")
         form_meta = QFormLayout(grp_meta)
         form_meta.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        form_meta.setLabelAlignment(Qt.AlignRight)
-        form_meta.setVerticalSpacing(12)
+        form_meta.setLabelAlignment(Qt.AlignVCenter)
+        form_meta.setVerticalSpacing(14)
 
         self.title_edit = QLineEdit()
         self.artist_edit = QLineEdit()
@@ -507,24 +568,39 @@ class MainWindow(QMainWindow):
         self.adv_content.setVisible(False)
         adv_form = QFormLayout(self.adv_content)
         adv_form.setLabelAlignment(Qt.AlignRight)
-        adv_form.setVerticalSpacing(10)
+        adv_form.setVerticalSpacing(12)
         adv_form.setContentsMargins(10, 0, 0, 0)
 
+        # PRESETS ROW
         self.preset_combo = SafeComboBox()
-        self.preset_combo.addItems(list(DIFFICULTY_PRESETS.keys()))
-        self.preset_combo.setCurrentText("Medium (Balanced)")
         self.preset_combo.setCursor(Qt.PointingHandCursor)
+        self.preset_combo.setMinimumWidth(200)
+
+        self.btn_save_preset = QToolButton()
+        self.btn_save_preset.setIcon(self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btn_save_preset.setToolTip("Save current settings as a new preset")
+        self.btn_save_preset.setCursor(Qt.PointingHandCursor)
+
+        self.btn_del_preset = QToolButton()
+        self.btn_del_preset.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
+        self.btn_del_preset.setToolTip("Delete selected preset (User presets only)")
+        self.btn_del_preset.setCursor(Qt.PointingHandCursor)
+
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(self.preset_combo, 1)
+        preset_row.addWidget(self.btn_save_preset)
+        preset_row.addWidget(self.btn_del_preset)
 
         self.preset_hint = QLabel("Select a preset to auto-configure settings.")
-        self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11px;")
+        self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11pt;")
 
-        adv_form.addRow(form_label("Difficulty"), self.preset_combo)
+        adv_form.addRow(form_label("Difficulty"), preset_row)
         adv_form.addRow(QLabel(""), self.preset_hint)
 
         self.custom_controls = QWidget()
         custom_form = QFormLayout(self.custom_controls)
         custom_form.setContentsMargins(0, 0, 0, 0)
-        custom_form.setVerticalSpacing(10)
+        custom_form.setVerticalSpacing(12)
 
         self.mode_group = QButtonGroup(self)
         self.mode_real = QRadioButton("Real (Audio Analysis)")
@@ -544,17 +620,17 @@ class MainWindow(QMainWindow):
         self.max_nps_spin.setRange(1.0, 10.0)
         self.max_nps_spin.setSingleStep(0.1)
         self.max_nps_spin.setSuffix(" NPS")
-        self.max_nps_spin.setMinimumHeight(30)
+        self.max_nps_spin.setMinimumHeight(26)
 
         self.min_gap_spin = SafeSpinBox()
         self.min_gap_spin.setRange(10, 1000)
         self.min_gap_spin.setSingleStep(10)
         self.min_gap_spin.setSuffix(" ms")
-        self.min_gap_spin.setMinimumHeight(30)
+        self.min_gap_spin.setMinimumHeight(26)
 
         self.seed_spin = SafeSpinBox()
         self.seed_spin.setRange(0, 999999)
-        self.seed_spin.setMinimumHeight(30)
+        self.seed_spin.setMinimumHeight(26)
         self.seed_spin.setToolTip("Seed for random generation.")
 
         self.chk_orange = QCheckBox("Allow Orange Lane")
@@ -636,6 +712,7 @@ class MainWindow(QMainWindow):
         self.btn_clear_out.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
         self.btn_clear_out.setToolTip("Clear output path")
         self.btn_clear_out.setCursor(Qt.PointingHandCursor)
+        self.btn_clear_out.setMinimumHeight(26)
 
         out_row1.addWidget(self.out_dir_edit, 1)
         out_row1.addWidget(self.btn_pick_output, 0)
@@ -664,6 +741,10 @@ class MainWindow(QMainWindow):
         # SCROLL AREA
         main_scroll = QScrollArea()
         main_scroll.setWidgetResizable(True)
+        # CRITICAL: Prevent horizontal scrollbar by forcing width match
+        main_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # CRITICAL: Always show vertical scrollbar to prevent layout jump ("scrunching")
+        main_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         main_scroll.setWidget(self.main_widget)
         main_scroll.setFrameShape(QFrame.NoFrame)
 
@@ -690,28 +771,28 @@ class MainWindow(QMainWindow):
         self.btn_help.clicked.connect(self.show_help)
 
         self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setObjectName("FooterBtn")
         self.btn_cancel.setCursor(Qt.PointingHandCursor)
-        self.btn_cancel.setMinimumHeight(18)
 
-        # New Progress Bar
+        # New Progress Bar (MOVED TO STATUS BAR)
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 0) # Indeterminate mode (bouncing)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedWidth(45)
+        self.progress_bar.setFixedWidth(200) # Wider for visibility
         self.progress_bar.setVisible(False)
-        self.progress_bar.setFixedHeight(18)
+        self.progress_bar.setFixedHeight(12) # Slimmer
+
+        # Add to Status Bar (Far Left)
+        self.statusBar().addWidget(self.progress_bar)
 
         self.btn_generate = QPushButton("GENERATE CHART")
         self.btn_generate.setObjectName("Primary")
         self.btn_generate.setCursor(Qt.PointingHandCursor)
-        self.btn_generate.setMinimumHeight(18)
 
         sep = QFrame()
         sep.setFrameShape(QFrame.VLine)
         sep.setStyleSheet("color: palette(mid);")
 
-        footer_layout.addWidget(self.progress_bar)
-        footer_layout.addWidget(sep)
         footer_layout.addWidget(self.chk_dark)
         footer_layout.addWidget(self.btn_show_logs)
         footer_layout.addWidget(self.btn_help)
@@ -753,6 +834,8 @@ class MainWindow(QMainWindow):
         self.title_edit.textEdited.connect(lambda _: setattr(self, "_title_user_edited", True))
         self.chk_dark.toggled.connect(self.on_dark_toggle)
         self.preset_combo.currentTextChanged.connect(self.apply_preset)
+        self.btn_save_preset.clicked.connect(self.on_save_preset)
+        self.btn_del_preset.clicked.connect(self.on_delete_preset)
 
         self.chk_adv.toggled.connect(self.on_toggle_advanced)
 
@@ -764,7 +847,7 @@ class MainWindow(QMainWindow):
             self.centralWidget().layout().activate()
         h = self.sidebar_widget.sizeHint().height()
         h = max(h, 600)
-        w = 310 + 550 + 40
+        w = 310 + 625 + 40
         self.resize(w, h)
 
     def show_help(self) -> None:
@@ -818,10 +901,75 @@ class MainWindow(QMainWindow):
             self.charter_edit.setText(saved_charter)
         saved_out = self.settings.value("out_dir", "", type=str)
         self.out_dir_edit.setText(saved_out)
-        last_preset = self.settings.value("preset", "Medium (Balanced)", type=str)
-        self.preset_combo.setCurrentText(last_preset)
         geom = self.settings.value("geometry")
         if geom: self.restoreGeometry(geom)
+
+    # --- Preset Logic ---
+    def refresh_presets(self) -> None:
+        current = self.preset_combo.currentText()
+        self.all_presets = load_all_presets()
+        self.preset_combo.blockSignals(True)
+        self.preset_combo.clear()
+        # Add defaults first, then sorted user presets, then "Custom"
+        defaults = sorted(list(DEFAULT_PRESETS.keys()))
+        others = sorted([k for k in self.all_presets.keys() if k not in DEFAULT_PRESETS])
+
+        self.preset_combo.addItems(defaults + others)
+        self.preset_combo.addItem("Custom…")
+
+        if current in self.all_presets:
+            self.preset_combo.setCurrentText(current)
+        else:
+            self.preset_combo.setCurrentText("Medium (Balanced)")
+        self.preset_combo.blockSignals(False)
+
+        # Update delete button state
+        is_default = self.preset_combo.currentText() in DEFAULT_PRESETS
+        self.btn_del_preset.setEnabled(not is_default and self.preset_combo.currentText() != "Custom…")
+
+    def on_save_preset(self) -> None:
+        name, ok = QInputDialog.getText(self, "Save Preset", "Enter preset name:")
+        if ok and name.strip():
+            name = name.strip()
+            # Capture current settings
+            data = {
+                "max_nps": self.max_nps_spin.value(),
+                "min_gap_ms": self.min_gap_spin.value(),
+                "sustain": self.sustain_slider.value(),
+                "chord": self.chord_slider.value()
+            }
+            save_user_preset(name, data)
+            self.refresh_presets()
+            self.preset_combo.setCurrentText(name)
+            self.statusBar().showMessage(f"Saved preset: {name}")
+
+    def on_delete_preset(self) -> None:
+        name = self.preset_combo.currentText()
+        if name in DEFAULT_PRESETS:
+            return
+
+        ret = QMessageBox.question(self, "Delete Preset", f"Are you sure you want to delete '{name}'?")
+        if ret == QMessageBox.Yes:
+            delete_user_preset(name)
+            self.refresh_presets()
+            self.statusBar().showMessage(f"Deleted preset: {name}")
+
+    def apply_preset(self, name: str) -> None:
+        preset = self.all_presets.get(name)
+        is_custom = preset is None
+        self.custom_controls.setVisible(is_custom)
+        if is_custom:
+            self.preset_hint.setText("Manual control enabled. Adjust density and gap below.")
+        else:
+            self.max_nps_spin.setValue(float(preset["max_nps"]))
+            self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
+            self.sustain_slider.setValue(int(preset["sustain"]))
+            self.chord_slider.setValue(int(preset["chord"]))
+            self.preset_hint.setText(f"Preset Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
+
+        # Enable/Disable Delete button logic
+        is_default = name in DEFAULT_PRESETS
+        self.btn_del_preset.setEnabled(not is_default and name != "Custom…")
 
     # ---------- Logic / Processing ----------
     def _update_queue_display(self) -> None:
@@ -896,20 +1044,6 @@ class MainWindow(QMainWindow):
     def on_toggle_advanced(self, checked: bool) -> None:
         self.adv_content.setVisible(checked)
 
-    def apply_preset(self, name: str) -> None:
-        preset = DIFFICULTY_PRESETS.get(name)
-        is_custom = preset is None
-        self.custom_controls.setVisible(is_custom)
-        if is_custom:
-            self.preset_hint.setText("Manual control enabled. Adjust density and gap below.")
-        else:
-            self.max_nps_spin.setValue(float(preset["max_nps"]))
-            self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
-            self.sustain_slider.setValue(int(preset["sustain"]))
-            self.chord_slider.setValue(int(preset["chord"]))
-
-            self.preset_hint.setText(f"Preset Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
-
     def _update_state(self) -> None:
         running = self.proc is not None and self.proc.state() != QProcess.NotRunning
         has_audio = self.audio_path is not None and self.audio_path.exists()
@@ -966,7 +1100,7 @@ class MainWindow(QMainWindow):
         else:
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
-            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11px;")
+            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
             self._update_state()
             self.audio_label.adjustSize()
             self.statusBar().showMessage("Audio cleared")
@@ -1069,6 +1203,8 @@ class MainWindow(QMainWindow):
         self.log_window.clear()
         self.append_log(f"Starting generation for: {cfg.title}...")
 
+        # Clear status bar text so progress bar stands out
+        self.statusBar().clearMessage()
         self.btn_generate.setText("Analyzing...")
         self.btn_generate.setEnabled(False)
         self.progress_bar.setVisible(True)
@@ -1124,7 +1260,7 @@ class MainWindow(QMainWindow):
                 self.clear_song_info()
                 self.audio_path = None
                 self.audio_label.setText("Drag Audio Files Here")
-                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11px;")
+                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
                 self._update_state()
                 self.statusBar().showMessage("Queue Finished")
         else:
