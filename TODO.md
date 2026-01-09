@@ -17,7 +17,7 @@
 **Focus:** Giving users granular control over the generation parameters.
 
 - [x] **User Presets:** Save and load custom configuration profiles (e.g., "My Thrash Metal Settings") to a local JSON file.
-- [ ] **Manual Overrides:** A simple table view to review/edit data before generation.
+- [x] **Manual Overrides:** A simple table view to review/edit data before generation.
   - _Features:_ Rename sections, adjust specific section difficulty, or tweak the start offset manually.
 - [ ] **Density Visualizer:** A small graph in the UI showing note density over time.
   - _Goal:_ Let users see where the difficulty spikes are before they play.
