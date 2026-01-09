@@ -1,44 +1,24 @@
 from __future__ import annotations
-import sys
+
 import json
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QProcess, QSize, QTimer, QSettings
-from PySide6.QtGui import QFont, QPixmap, QAction, QPalette, QColor, QDragEnterEvent, QDropEvent, QFontDatabase, QIcon
-from PySide6.QtWidgets import (
-    QApplication,
-    QCheckBox,
-    QButtonGroup,
-    QComboBox,
-    QRadioButton,
-    QDoubleSpinBox,
-    QFileDialog,
-    QFormLayout,
-    QFrame,
-    QGroupBox,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMainWindow,
-    QMessageBox,
-    QPushButton,
-    QScrollArea,
-    QSpinBox,
-    QSplitter,
-    QTextEdit,
-    QToolButton,
-    QVBoxLayout,
-    QWidget,
-    QSizePolicy,
-    QStyle,
-    QSlider,
-    QListWidget,
-    QListWidgetItem,
-    QAbstractItemView,
-    QProgressBar
-)
+from PySide6.QtCore import QProcess, QSettings, QSize, Qt, QTimer
+from PySide6.QtGui import (QAction, QColor, QDragEnterEvent, QDropEvent, QFont,
+                           QFontDatabase, QIcon, QPalette, QPixmap)
+from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup,
+                               QCheckBox, QComboBox, QDoubleSpinBox,
+                               QFileDialog, QFormLayout, QFrame, QGroupBox,
+                               QHBoxLayout, QLabel, QLineEdit, QListWidget,
+                               QListWidgetItem, QMainWindow, QMessageBox,
+                               QProgressBar, QPushButton, QRadioButton,
+                               QScrollArea, QSizePolicy, QSlider, QSpinBox,
+                               QSplitter, QStyle, QTextEdit, QToolButton,
+                               QVBoxLayout, QWidget)
+
 
 # ---------------- Paths & Config ----------------
 def is_frozen() -> bool:
@@ -75,6 +55,10 @@ class SafeSpinBox(QSpinBox):
         event.ignore()
 
 class SafeDoubleSpinBox(QDoubleSpinBox):
+    def wheelEvent(self, event):
+        event.ignore()
+
+class SafeSlider(QSlider):
     def wheelEvent(self, event):
         event.ignore()
 
@@ -183,6 +167,7 @@ class ThemeManager:
                 margin-top: 24px;
                 padding-top: 12px;
                 font-weight: bold;
+                font-size: 12px;
             }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
 
@@ -192,8 +177,9 @@ class ThemeManager:
                 border: 1px solid palette(mid);
                 background-color: palette(base);
                 color: palette(text);
+                font-size: 11px;
             }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus {
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus, QSlider:focus {
                 border: 1px solid palette(highlight);
             }
 
@@ -217,6 +203,7 @@ class ThemeManager:
                 border: 1px solid palette(mid);
                 background-color: palette(button);
                 color: palette(text);
+                font-size: 11px;
             }
             QPushButton:hover {
                 background-color: palette(midlight);
@@ -249,7 +236,7 @@ class ThemeManager:
                 border: 1px solid palette(mid);
             }
 
-            QCheckBox { spacing: 8px; }
+            QCheckBox { spacing: 8px; font-size: 11px; }
 
             QStatusBar { background: palette(window); border-top: 1px solid palette(mid); min-height: 50px; max-height: 50px; }
             QStatusBar::item { border: none; }
@@ -365,7 +352,7 @@ class MainWindow(QMainWindow):
                 icon_lbl.setPixmap(pix)
 
         title_lbl = QLabel("CloneHero 1-Click Charter")
-        title_lbl.setFont(get_font(26, True))
+        title_lbl.setFont(get_font(40, True))
         title_lbl.setStyleSheet("color: palette(text);")
 
         header_layout.addWidget(icon_lbl)
@@ -394,7 +381,7 @@ class MainWindow(QMainWindow):
         self.audio_label = QLabel("Drag Audio Files Here")
         self.audio_label.setAlignment(Qt.AlignCenter)
         self.audio_label.setWordWrap(True)
-        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
+        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11px;")
 
         # ADD Button
         self.btn_add_audio = QPushButton("Add Songs...")
@@ -443,7 +430,7 @@ class MainWindow(QMainWindow):
         self.cover_preview = QLabel("Drag Art Here")
         self.cover_preview.setAlignment(Qt.AlignCenter)
         self.cover_preview.setFixedSize(260, 260)
-        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text);")
+        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic; font-size: 11px;")
 
         row_art_btns = QHBoxLayout()
         self.btn_pick_cover = QPushButton("Image...")
@@ -502,7 +489,7 @@ class MainWindow(QMainWindow):
 
         row_clear = QHBoxLayout()
         row_clear.addStretch()
-        row_clear.addWidget(QLabel("Clear fields"))
+        row_clear.addWidget(QLabel("Clear Fields "))
         row_clear.addWidget(self.btn_clear_meta)
         form_meta.addRow("", row_clear)
 
@@ -574,12 +561,14 @@ class MainWindow(QMainWindow):
         self.chk_orange.setChecked(True)
         self.chk_orange.setCursor(Qt.PointingHandCursor)
 
-        self.chord_slider = QSlider(Qt.Horizontal)
+        self.chord_slider = SafeSlider()
+        self.chord_slider.setOrientation(Qt.Horizontal)
         self.chord_slider.setRange(0, 50)
         self.chord_slider.setValue(12)
         self.chord_slider.setCursor(Qt.PointingHandCursor)
 
-        self.sustain_slider = QSlider(Qt.Horizontal)
+        self.sustain_slider = SafeSlider()
+        self.sustain_slider.setOrientation(Qt.Horizontal)
         self.sustain_slider.setRange(0, 100)
         self.sustain_slider.setValue(50)
         self.sustain_slider.setCursor(Qt.PointingHandCursor)
@@ -977,7 +966,7 @@ class MainWindow(QMainWindow):
         else:
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
-            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
+            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11px;")
             self._update_state()
             self.audio_label.adjustSize()
             self.statusBar().showMessage("Audio cleared")
@@ -1135,7 +1124,7 @@ class MainWindow(QMainWindow):
                 self.clear_song_info()
                 self.audio_path = None
                 self.audio_label.setText("Drag Audio Files Here")
-                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
+                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11px;")
                 self._update_state()
                 self.statusBar().showMessage("Queue Finished")
         else:
