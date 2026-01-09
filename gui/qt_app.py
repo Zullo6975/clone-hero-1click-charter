@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup,
                                QScrollArea, QSizePolicy, QSlider, QSpinBox,
                                QSplitter, QStyle, QTableWidget,
                                QTableWidgetItem, QTextEdit, QToolButton,
-                               QVBoxLayout, QWidget)
+                               QVBoxLayout, QWidget, QAbstractSpinBox)
 
 
 # ---------------- Paths & Config ----------------
@@ -293,6 +293,7 @@ class ThemeManager:
                 border-top: 1px solid palette(mid);
                 min-height: 50px;
                 max-height: 50px;
+                padding-left: 20px; /* Padded to match right-side button margin */
             }
             QStatusBar::item { border: none; }
 
@@ -347,31 +348,30 @@ class SectionReviewDialog(QDialog):
     def __init__(self, sections: list[dict], parent=None):
         super().__init__(parent)
         self.setWindowTitle("Review Sections")
-        self.resize(450, 550)
+        self.resize(550, 650)
         self.sections = sections
 
         layout = QVBoxLayout(self)
+        layout.setSpacing(12)
 
-        lbl = QLabel("Review and edit detected sections before generation.")
+        lbl = QLabel("Review detected sections.\n"
+                     "• Times are in seconds.\n"
+                     "• Changing a start time automatically shifts all subsequent sections.")
         lbl.setStyleSheet("color: palette(text); font-style: italic;")
+        lbl.setWordWrap(True)
         layout.addWidget(lbl)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(2)
-        self.table.setHorizontalHeaderLabels(["Start Time (s)", "Name"])
+        self.table.setColumnCount(3) # Time, Name, Delete
+        self.table.setHorizontalHeaderLabels(["Start Time (s)", "Section Name", ""])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
+        self.table.setColumnWidth(2, 45)
+        self.table.setSelectionMode(QAbstractItemView.NoSelection) # Focus on widgets
 
-        self.table.setRowCount(len(sections))
-        for i, s in enumerate(sections):
-            t_val = float(s.get('start', 0.0))
-            t_item = QTableWidgetItem(f"{t_val:.2f}")
-            n_item = QTableWidgetItem(str(s.get('name', '')))
-
-            # Start time editable, but we trust user to be sane
-            self.table.setItem(i, 0, t_item)
-            self.table.setItem(i, 1, n_item)
-
+        self._updating = False
+        self.refresh_table()
         layout.addWidget(self.table)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -379,19 +379,77 @@ class SectionReviewDialog(QDialog):
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
 
+    def refresh_table(self):
+        self._updating = True
+        self.table.setRowCount(0)
+        self.table.setRowCount(len(self.sections))
+
+        for i, s in enumerate(self.sections):
+            # 1. TIME SPINNER
+            start_val = float(s.get('start', 0.0))
+            sb = SafeDoubleSpinBox()
+            sb.setRange(0.0, 9999.0)
+            sb.setSingleStep(0.5)
+            sb.setValue(start_val)
+            sb.setButtonSymbols(QAbstractSpinBox.NoButtons) # Cleaner look
+            sb.setAlignment(Qt.AlignCenter)
+            sb.valueChanged.connect(lambda val, idx=i: self.on_time_changed(idx, val))
+
+            # 2. NAME EDIT
+            le = QLineEdit(str(s.get('name', '')))
+            le.setPlaceholderText("Section Name")
+            le.setClearButtonEnabled(True) # The "Trash" inside the cell
+            le.textChanged.connect(lambda txt, idx=i: self.on_name_changed(idx, txt))
+
+            # 3. DELETE BUTTON
+            btn_del = QToolButton()
+            btn_del.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
+            btn_del.setToolTip("Remove this section")
+            btn_del.clicked.connect(lambda checked=False, idx=i: self.delete_row(idx))
+
+            # Layout for Delete Button to center it
+            w_del = QWidget()
+            l_del = QHBoxLayout(w_del)
+            l_del.setContentsMargins(0,0,0,0)
+            l_del.setAlignment(Qt.AlignCenter)
+            l_del.addWidget(btn_del)
+
+            self.table.setCellWidget(i, 0, sb)
+            self.table.setCellWidget(i, 1, le)
+            self.table.setCellWidget(i, 2, w_del)
+
+        self._updating = False
+
+    def on_time_changed(self, row: int, new_time: float):
+        if self._updating: return
+
+        old_time = self.sections[row]['start']
+        delta = new_time - old_time
+
+        self.sections[row]['start'] = new_time
+
+        # Ripple effect: Shift subsequent sections
+        self._updating = True
+        for i in range(row + 1, len(self.sections)):
+            current_sb = self.table.cellWidget(i, 0)
+            if current_sb:
+                prev_val = current_sb.value()
+                new_val = prev_val + delta
+                current_sb.setValue(new_val)
+                self.sections[i]['start'] = new_val
+        self._updating = False
+
+    def on_name_changed(self, row: int, new_name: str):
+        if 0 <= row < len(self.sections):
+            self.sections[row]['name'] = new_name
+
+    def delete_row(self, index):
+        if 0 <= index < len(self.sections):
+            self.sections.pop(index)
+            self.refresh_table()
+
     def get_sections(self) -> list[dict]:
-        res = []
-        for i in range(self.table.rowCount()):
-            t_str = self.table.item(i, 0).text()
-            n_str = self.table.item(i, 1).text()
-            try:
-                t = float(t_str)
-            except ValueError:
-                t = 0.0
-            res.append({"name": n_str, "start": t})
-        # Sort by start time to be safe
-        res.sort(key=lambda x: x['start'])
-        return res
+        return self.sections
 
 # ---------------- Main Window ----------------
 class MainWindow(QMainWindow):
