@@ -117,6 +117,7 @@ icons:
 	@./tools/make_icons.sh
 
 # Builds the macOS .app bundle
+# NOTE: Expects 'bin/ffmpeg' and 'bin/ffprobe' to exist!
 package: install icons
 	@echo "🚀 Packaging $(APP_NAME)..."
 	@rm -rf dist build
@@ -127,6 +128,8 @@ package: install icons
 		--onefile \
 		--icon "icons/AppIcon.icns" \
 		--add-data "icons/icon_og.png:icons" \
+		--add-binary "bin/ffmpeg:." \
+		--add-binary "bin/ffprobe:." \
 		--paths "." \
 		--hidden-import "charter.cli" \
 		--hidden-import "gui.qt_app" \
