@@ -313,13 +313,13 @@ class LogWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Logs")
-        self.resize(500, 350)
+        self.resize(700, 350)
         layout = QVBoxLayout(self)
 
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
-        # Ensure it starts with reasonable size if layout is constrained
-        self.text_edit.setMinimumSize(500, 350)
+        # Force text edit to expand
+        self.text_edit.setMinimumSize(700, 350)
 
         mono_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         mono_font.setPointSize(11)
@@ -351,36 +351,28 @@ class SectionReviewDialog(QDialog):
     def __init__(self, sections: list[dict], parent=None):
         super().__init__(parent)
         self.setWindowTitle("Review Sections")
-        self.resize(600, 700)
+        self.resize(500, 600)
         self.sections = sections
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
         lbl = QLabel("Review detected sections.\n"
-                     "• Times are in seconds.\n"
-                     "• Changing a start time automatically shifts all subsequent sections.")
+                     "• Times are locked to preserve rhythm.\n"
+                     "• You can rename sections (e.g., 'Verse 1', 'Solo').")
         lbl.setStyleSheet("color: palette(text); font-style: italic;")
         lbl.setWordWrap(True)
         layout.addWidget(lbl)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(3) # Time, Name, Actions
-        self.table.setHorizontalHeaderLabels(["Start Time (s)", "Section Name", "Actions"])
+        self.table.setColumnCount(2) # Time, Name
+        self.table.setHorizontalHeaderLabels(["Start Time (s)", "Section Name"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Fixed)
-        self.table.setColumnWidth(2, 110) # Enough for Up/Down/Del
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
 
-        self._updating = False
         self.refresh_table()
         layout.addWidget(self.table)
-
-        # ADD BUTTON
-        btn_add = QPushButton("Add Section")
-        btn_add.clicked.connect(self.add_section)
-        layout.addWidget(btn_add)
 
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(self.accept)
@@ -388,108 +380,28 @@ class SectionReviewDialog(QDialog):
         layout.addWidget(btns)
 
     def refresh_table(self):
-        self._updating = True
-        self.table.setRowCount(0)
         self.table.setRowCount(len(self.sections))
 
         for i, s in enumerate(self.sections):
-            # 1. TIME SPINNER
-            start_val = float(s.get('start', 0.0))
-            sb = SafeDoubleSpinBox()
-            sb.setRange(0.0, 99999.0)
-            sb.setSingleStep(0.5)
-            sb.setValue(start_val)
-            sb.setButtonSymbols(QAbstractSpinBox.NoButtons)
-            sb.setAlignment(Qt.AlignCenter)
-            sb.valueChanged.connect(lambda val, idx=i: self.on_time_changed(idx, val))
+            # 1. TIME (Read Only)
+            t_val = float(s.get('start', 0.0))
+            t_item = QTableWidgetItem(f"{t_val:.2f}")
+            # Flags: Enabled | Selectable (Not Editable)
+            t_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            t_item.setTextAlignment(Qt.AlignCenter)
 
             # 2. NAME EDIT
             le = QLineEdit(str(s.get('name', '')))
             le.setPlaceholderText("Section Name")
-            le.setClearButtonEnabled(True) # Adds the X
+            le.setClearButtonEnabled(True)
             le.textChanged.connect(lambda txt, idx=i: self.on_name_changed(idx, txt))
 
-            # 3. ACTIONS WIDGET
-            w_act = QWidget()
-            l_act = QHBoxLayout(w_act)
-            l_act.setContentsMargins(0,0,0,0)
-            l_act.setSpacing(4)
-            l_act.setAlignment(Qt.AlignCenter)
-
-            btn_up = QToolButton()
-            btn_up.setText("↑")
-            btn_up.setToolTip("Move Up")
-            btn_up.setEnabled(i > 0)
-            btn_up.clicked.connect(lambda checked=False, idx=i: self.move_row_up(idx))
-
-            btn_down = QToolButton()
-            btn_down.setText("↓")
-            btn_down.setToolTip("Move Down")
-            btn_down.setEnabled(i < len(self.sections) - 1)
-            btn_down.clicked.connect(lambda checked=False, idx=i: self.move_row_down(idx))
-
-            btn_del = QToolButton()
-            btn_del.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
-            btn_del.setToolTip("Remove this section")
-            btn_del.clicked.connect(lambda checked=False, idx=i: self.delete_row(idx))
-
-            l_act.addWidget(btn_up)
-            l_act.addWidget(btn_down)
-            l_act.addWidget(btn_del)
-
-            self.table.setCellWidget(i, 0, sb)
+            self.table.setItem(i, 0, t_item)
             self.table.setCellWidget(i, 1, le)
-            self.table.setCellWidget(i, 2, w_act)
-
-        self._updating = False
-
-    def on_time_changed(self, row: int, new_time: float):
-        if self._updating: return
-
-        old_time = self.sections[row]['start']
-        delta = new_time - old_time
-
-        self.sections[row]['start'] = new_time
-
-        # Ripple effect: Shift subsequent sections
-        self._updating = True
-        for i in range(row + 1, len(self.sections)):
-            current_sb = self.table.cellWidget(i, 0)
-            if current_sb:
-                prev_val = current_sb.value()
-                new_val = prev_val + delta
-                current_sb.setValue(new_val)
-                self.sections[i]['start'] = new_val
-        self._updating = False
 
     def on_name_changed(self, row: int, new_name: str):
         if 0 <= row < len(self.sections):
             self.sections[row]['name'] = new_name
-
-    def delete_row(self, index):
-        if 0 <= index < len(self.sections):
-            self.sections.pop(index)
-            self.refresh_table()
-
-    def add_section(self):
-        last_start = 0.0
-        if self.sections:
-            last_start = self.sections[-1]['start']
-
-        self.sections.append({"name": "New Section", "start": last_start + 10.0})
-        self.refresh_table()
-        # Scroll to bottom
-        self.table.scrollToBottom()
-
-    def move_row_up(self, index):
-        if index > 0:
-            self.sections[index], self.sections[index-1] = self.sections[index-1], self.sections[index]
-            self.refresh_table()
-
-    def move_row_down(self, index):
-        if index < len(self.sections) - 1:
-            self.sections[index], self.sections[index+1] = self.sections[index+1], self.sections[index]
-            self.refresh_table()
 
     def get_sections(self) -> list[dict]:
         return self.sections
@@ -537,8 +449,6 @@ class MainWindow(QMainWindow):
 
         self._update_state()
         QTimer.singleShot(100, self.snap_to_content)
-
-        # Initialize Status Label
         self.status_label.setText("Ready")
 
     def closeEvent(self, event) -> None:
@@ -948,7 +858,7 @@ class MainWindow(QMainWindow):
         # Container for Left side of status bar (Label + Progress)
         self.status_container = QWidget()
         self.status_layout = QHBoxLayout(self.status_container)
-        self.status_layout.setContentsMargins(20, 0, 0, 0) # 20px padding from left edge
+        self.status_layout.setContentsMargins(20, 0, 0, 0)
         self.status_layout.setSpacing(15)
 
         self.status_label = QLabel("Ready")
@@ -963,9 +873,8 @@ class MainWindow(QMainWindow):
 
         self.status_layout.addWidget(self.status_label)
         self.status_layout.addWidget(self.progress_bar)
-        self.status_layout.addStretch() # Push everything else right if needed (not needed here as we add it left)
+        self.status_layout.addStretch()
 
-        # Add container to status bar
         self.statusBar().addWidget(self.status_container, 1)
 
         self.btn_generate = QPushButton("GENERATE CHART")
