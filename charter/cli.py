@@ -9,7 +9,9 @@ from charter.ini import write_song_ini
 from charter.metadata import enrich_from_musicbrainz
 from charter.midi import write_dummy_notes_mid, write_real_notes_mid
 from charter.audio import normalize_and_save
-from charter.validator import validate_chart_file # We will move validator.py next
+from charter.validator import validate_chart_file
+# Import the stats engine to calculate complexity
+from charter.stats import compute_chart_stats
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="1clickcharter CLI")
@@ -78,7 +80,6 @@ def main():
     # --- ENFORCE REQUIREMENTS FOR GENERATION ---
     if not args.audio or not args.out:
         print("Error: --audio and --out are required for chart generation.")
-        # This mimics the standard argparse error output
         print("usage: 1ClickCharter [--validate ...] | --audio AUDIO --out OUT ...")
         return 1
     # -------------------------------------------
@@ -174,6 +175,24 @@ def main():
 
     final_delay = args.delay_ms + int(shift_seconds * 1000)
 
+    # --- CALCULATE COMPLEXITY ---
+    complexity_tier = -1
+    try:
+        if notes_mid.exists():
+            # Pass the just-generated MIDI to the stats engine
+            full_stats = compute_chart_stats(
+                notes_mid_path=notes_mid,
+                title=title,
+                artist=args.artist,
+                mode=args.mode,
+                # We don't strictly need precise audio duration for just complexity
+                song_duration_sec=None
+            )
+            complexity_tier = full_stats.complexity
+    except Exception as e:
+        print(f"Warning: Could not calculate complexity: {e}")
+    # ----------------------------
+
     write_song_ini(
         out_dir / "song.ini",
         title=title,
@@ -182,7 +201,8 @@ def main():
         genre=args.genre,
         year=args.year,
         charter=args.charter,
-        delay_ms=final_delay
+        delay_ms=final_delay,
+        diff_guitar=complexity_tier # Pass it here
     )
 
     print(f"✅ Generated: {title}")

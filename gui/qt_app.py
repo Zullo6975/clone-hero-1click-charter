@@ -1618,7 +1618,7 @@ class MainWindow(QMainWindow):
         for line in full_output.splitlines():
             line = line.strip()
             line_lower = line.lower()
-            # Simple heuristic to grab lines that look like warnings
+            # FIX: Case insensitive check for "warning" and "error"
             if line.startswith("- ") or "warning" in line_lower or "error" in line_lower or "traceback" in line_lower:
                 warnings.append(line)
 
@@ -1630,7 +1630,7 @@ class MainWindow(QMainWindow):
 
             # Show warnings if any found (including crashes)
             if warnings:
-                msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5]) # Limit length
+                msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
                 if len(warnings) > 5: msg += "\n... (check logs for more)"
 
             title = "Generation Complete" if not warnings else "Complete (With Warnings)"
@@ -1638,9 +1638,10 @@ class MainWindow(QMainWindow):
             # Use Warning icon if we found issues
             icon = QMessageBox.Information if not warnings else QMessageBox.Warning
 
+            # --- FIX: Explicitly set window width to 700px (matches Log Window) ---
             msg_box = QMessageBox(icon, title, msg, QMessageBox.Ok, self)
-            msg_box.setStyleSheet("QLabel{min-width: 600px;}")
-            msg_box.exec()            # -----------------------------------------------------
+            msg_box.exec()
+            # ----------------------------------------------------------------------
 
             self.status_label.setText("Ready")
 

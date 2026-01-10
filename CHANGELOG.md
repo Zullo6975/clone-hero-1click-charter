@@ -9,6 +9,7 @@
 - **Validator Upgrade:** The health check now verifies that sections exist on the correct track ("EVENTS") and detects formatting issues.
 - **UI Polish:** Success popups are now wider (600px) by default to prevent long output file paths from wrapping.
 - **Warning Detection:** The log parser is now case-insensitive, ensuring "Warning: ..." lines are correctly flagged in the completion popup.
+- **Dynamic Complexity:** Charts now display a calculated difficulty rating (0-6 dots) in the Clone Hero song list instead of `?`.
 
 ## [1.2.1] - 2026-01-09
 

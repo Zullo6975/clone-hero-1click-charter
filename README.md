@@ -73,6 +73,7 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 - [x] Auto-Metadata & Cover Art
 - [x] Chart Validation & Health Checks
 - [x] User Presets & Density Visualization
+- [x] Dynamic Difficulty Rating
 
 ### Future Goals (v2.0)
 
