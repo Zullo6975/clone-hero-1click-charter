@@ -1,4 +1,3 @@
-import sys
 import argparse
 from pathlib import Path
 import mido # type: ignore
@@ -8,6 +7,8 @@ def validate_chart_file(song_dir: Path, summary_only: bool = False):
     Scans the song folder for common Clone Hero issues.
     Prints report to stdout.
     """
+    # FORCE FLUSH to ensure GUI catches it immediately
+    print(f"Validator started for {song_dir.name}", flush=True)
     chart_path = song_dir / "notes.mid"
     ini_path = song_dir / "song.ini"
     audio_path = song_dir / "song.mp3" # or .ogg
