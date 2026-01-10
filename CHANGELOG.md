@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.1] - 2026-01-09
+
+### Community Standards
+
+Updating the repo to meet all GitHub community standards.
+
 ## [1.2.0] - 2026-01-09
 
 ### The "Power User" Update
