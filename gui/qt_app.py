@@ -8,7 +8,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QProcess, QSettings, QSize, Qt, QTimer
 from PySide6.QtGui import (QAction, QColor, QDragEnterEvent, QDropEvent, QFont,
-                           QFontDatabase, QIcon, QPalette, QPixmap)
+                           QFontDatabase, QIcon, QPalette, QPixmap, QPainter,
+                           QPainterPath, QPen, QLinearGradient)
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup,
                                QCheckBox, QComboBox, QDialog, QDialogButtonBox,
                                QDoubleSpinBox, QFileDialog, QFormLayout,
@@ -318,7 +319,6 @@ class LogWindow(QWidget):
 
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
-        # Force text edit to expand
         self.text_edit.setMinimumSize(700, 350)
 
         mono_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
@@ -346,21 +346,132 @@ class LogWindow(QWidget):
     def get_text(self) -> str:
         return self.text_edit.toPlainText()
 
+# ---------------- Density Visualizer ----------------
+class DensityGraphWidget(QWidget):
+    def __init__(self, density_data: list[dict], sections: list[dict], parent=None):
+        super().__init__(parent)
+        self._density = density_data
+        self._sections = sections
+        self.setMinimumHeight(140)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setStyleSheet("background-color: #2b2b2b; border: 1px solid #3d3d3d; border-radius: 4px;")
+
+    def set_sections(self, sections: list[dict]):
+        self._sections = sections
+        self.update() # Trigger repaint
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Fill Background
+        painter.fillRect(self.rect(), QColor(43, 43, 43))
+
+        w = self.width()
+        h = self.height()
+
+        if not self._density:
+            painter.setPen(QColor(150, 150, 150))
+            painter.drawText(self.rect(), Qt.AlignCenter, "No Density Data")
+            return
+
+        # Determine Scaling
+        max_t = self._density[-1]['t']
+        if max_t <= 0: max_t = 1.0
+
+        max_nps = 0.0
+        for d in self._density:
+            if d['nps'] > max_nps: max_nps = d['nps']
+        if max_nps < 5.0: max_nps = 5.0 # Minimum ceiling for visualization
+
+        # Margins
+        margin_b = 20
+        plot_h = h - margin_b
+
+        # 1. Draw Density Path
+        path = QPainterPath()
+        path.moveTo(0, plot_h) # Start bottom-left
+
+        for d in self._density:
+            x = (d['t'] / max_t) * w
+            # nps relative to max, inverted Y
+            ratio = d['nps'] / max_nps
+            y = plot_h - (ratio * plot_h)
+            path.lineTo(x, y)
+
+        path.lineTo(w, plot_h) # Finish bottom-right
+        path.closeSubpath()
+
+        # Gradient Fill
+        grad = QLinearGradient(0, 0, 0, plot_h)
+        grad.setColorAt(0.0, QColor(0, 180, 255, 120))
+        grad.setColorAt(1.0, QColor(0, 180, 255, 10))
+        painter.fillPath(path, grad)
+
+        # Line Stroke (Redraw line without closing loop)
+        painter.setPen(QPen(QColor(0, 200, 255), 2))
+        line_path = QPainterPath()
+        first = True
+        for d in self._density:
+            x = (d['t'] / max_t) * w
+            ratio = d['nps'] / max_nps
+            y = plot_h - (ratio * plot_h)
+            if first:
+                line_path.moveTo(x, y)
+                first = False
+            else:
+                line_path.lineTo(x, y)
+        painter.drawPath(line_path)
+
+        # 2. Draw Section Lines & Names
+        painter.setPen(QPen(QColor(255, 255, 255, 120), 1, Qt.DashLine))
+        font = painter.font()
+        font.setPointSize(9)
+        painter.setFont(font)
+
+        for i, s in enumerate(self._sections):
+            t = s.get('start', 0.0)
+            if t > max_t: continue
+
+            x = (t / max_t) * w
+            painter.drawLine(int(x), 0, int(x), h)
+
+            name = s.get('name', '')
+            # Stagger text height to prevent overlap
+            text_y = h - 6 if i % 2 == 0 else h - 18
+
+            # Text shadow for readability
+            painter.setPen(QColor(0,0,0, 180))
+            painter.drawText(int(x) + 5, text_y + 1, name)
+
+            painter.setPen(QColor(220, 220, 220))
+            painter.drawText(int(x) + 4, text_y, name)
+
+            # Reset pen for next line
+            painter.setPen(QPen(QColor(255, 255, 255, 120), 1, Qt.DashLine))
+
 # ---------------- Review Dialog ----------------
 class SectionReviewDialog(QDialog):
-    def __init__(self, sections: list[dict], parent=None):
+    def __init__(self, sections: list[dict], density_data: list[dict], parent=None):
         super().__init__(parent)
         self.setWindowTitle("Review Sections")
-        self.resize(500, 600)
+        self.resize(500, 600) # Increased width for graph
         self.sections = sections
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        lbl = QLabel("Review detected sections.\n"
-                     "• Times are locked to preserve rhythm.\n"
-                     "• You can rename sections (e.g., 'Verse 1', 'Solo').")
-        lbl.setStyleSheet("color: palette(text); font-style: italic;")
+        # 1. Density Graph
+        lbl_graph = QLabel("Note Density & Structure")
+        lbl_graph.setStyleSheet("font-weight: bold;")
+        layout.addWidget(lbl_graph)
+
+        self.graph = DensityGraphWidget(density_data, sections)
+        layout.addWidget(self.graph)
+
+        # 2. Table Header
+        lbl = QLabel("Section List (Rename Only)")
+        lbl.setStyleSheet("color: palette(text); font-weight: bold; margin-top: 10px;")
         lbl.setWordWrap(True)
         layout.addWidget(lbl)
 
@@ -386,7 +497,6 @@ class SectionReviewDialog(QDialog):
             # 1. TIME (Read Only)
             t_val = float(s.get('start', 0.0))
             t_item = QTableWidgetItem(f"{t_val:.2f}")
-            # Flags: Enabled | Selectable (Not Editable)
             t_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             t_item.setTextAlignment(Qt.AlignCenter)
 
@@ -402,6 +512,8 @@ class SectionReviewDialog(QDialog):
     def on_name_changed(self, row: int, new_name: str):
         if 0 <= row < len(self.sections):
             self.sections[row]['name'] = new_name
+            # Update the graph labels in real-time
+            self.graph.set_sections(self.sections)
 
     def get_sections(self) -> list[dict]:
         return self.sections
@@ -677,7 +789,7 @@ class MainWindow(QMainWindow):
 
         adv_form.addRow(form_label("Difficulty"), preset_row)
         adv_form.addRow(QLabel(""), self.preset_hint)
-        adv_form.addRow(form_label("Override Section Names"), self.chk_review) # Add review box here
+        adv_form.addRow(form_label("Override Section Names"), self.chk_review) # Renamed label
 
         self.custom_controls = QWidget()
         custom_form = QFormLayout(self.custom_controls)
@@ -785,7 +897,7 @@ class MainWindow(QMainWindow):
 
         out_row1 = QHBoxLayout()
         self.out_dir_edit = QLineEdit("")
-        self.out_dir_edit.setPlaceholderText("Select output folder... (Required)")
+        self.out_dir_edit.setPlaceholderText("Select output folder...")
 
         self.btn_pick_output = QPushButton("Browse...")
         self.btn_pick_output.setCursor(Qt.PointingHandCursor)
@@ -1370,7 +1482,9 @@ class MainWindow(QMainWindow):
                 try:
                     data = json.loads(json_path.read_text(encoding='utf-8'))
                     sections = data.get("sections", [])
-                    dlg = SectionReviewDialog(sections, self)
+                    density = data.get("density", [])
+
+                    dlg = SectionReviewDialog(sections, density, self)
                     if dlg.exec():
                         # User Confirmed
                         overrides = dlg.get_sections()
