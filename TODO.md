@@ -12,19 +12,17 @@
 
 ---
 
-## 🟡 v1.2: Power User Controls (Next)
+## 🟡 v1.2: Power User Controls (COMPLETE)
 
 **Focus:** Giving users granular control over the generation parameters.
 
-- [ ] **User Presets:** Save and load custom configuration profiles (e.g., "My Thrash Metal Settings") to a local JSON file.
-- [ ] **Manual Overrides:** A simple table view to review/edit data before generation.
-  - _Features:_ Rename sections, adjust specific section difficulty, or tweak the start offset manually.
-- [ ] **Density Visualizer:** A small graph in the UI showing note density over time.
-  - _Goal:_ Let users see where the difficulty spikes are before they play.
+- [x] **User Presets:** Save and load custom configuration profiles (e.g., "My Thrash Metal Settings") to a local JSON file.
+- [x] **Manual Overrides:** A simple table view to review/edit data before generation.
+- [x] **Density Visualizer:** A small graph in the UI showing note density over time.
 
 ---
 
-## 🟠 v2.0: Multi-Difficulty Architecture
+## 🟠 v2.0: Multi-Difficulty Architecture (NEXT)
 
 **Focus:** Moving from a single "Medium" chart to a full difficulty suite.
 
@@ -44,4 +42,6 @@
 - [ ] **Chart Export:** Option to export in `.chart` format (text-based) for editing in Moonscraper.
 - [ ] **Auto-Update:** In-app notification when a new GitHub Release is available.
 - [ ] **Batch Reporting:** A summary screen after a large batch job ("Processed 50 songs: 48 Success, 2 Failed").
-- [ ] **UI Refinement:** Always ongoing, nit-picking my GUI configurations
+- [ ] **Lyrics:** Provide lyrics with the song being charted.
+- [ ] **Full Band:** Possible addition of further instruments.
+- [ ] **UI Refinement:** Always ongoing, nit-picking my GUI configurations.

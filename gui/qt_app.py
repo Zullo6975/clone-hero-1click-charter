@@ -8,16 +8,19 @@ from pathlib import Path
 
 from PySide6.QtCore import QProcess, QSettings, QSize, Qt, QTimer
 from PySide6.QtGui import (QAction, QColor, QDragEnterEvent, QDropEvent, QFont,
-                           QFontDatabase, QIcon, QPalette, QPixmap)
+                           QFontDatabase, QIcon, QPalette, QPixmap, QPainter,
+                           QPainterPath, QPen, QLinearGradient)
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup,
-                               QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QFormLayout, QFrame, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit, QListWidget,
+                               QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                               QDoubleSpinBox, QFileDialog, QFormLayout,
+                               QFrame, QGroupBox, QHBoxLayout, QHeaderView,
+                               QInputDialog, QLabel, QLineEdit, QListWidget,
                                QListWidgetItem, QMainWindow, QMessageBox,
                                QProgressBar, QPushButton, QRadioButton,
                                QScrollArea, QSizePolicy, QSlider, QSpinBox,
-                               QSplitter, QStyle, QTextEdit, QToolButton,
-                               QVBoxLayout, QWidget)
+                               QSplitter, QStyle, QTableWidget,
+                               QTableWidgetItem, QTextEdit, QToolButton,
+                               QVBoxLayout, QWidget, QAbstractSpinBox)
 
 
 # ---------------- Paths & Config ----------------
@@ -32,14 +35,14 @@ def get_python_exec() -> str | Path:
     if is_frozen(): return sys.executable
     return repo_root() / ".venv" / "bin" / "python"
 
-def form_label(text: str, required: bool = False) -> QLabel:
+def form_label(text: str, required: bool = False, align=Qt.AlignRight | Qt.AlignVCenter) -> QLabel:
     txt = f"{text} <span style='color:#ff4444;'>*</span>" if required else text
     lbl = QLabel(txt)
-    lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+    lbl.setAlignment(align)
     lbl.setMinimumWidth(110)
     return lbl
 
-def get_font(size: int = 10, bold: bool = False) -> QFont:
+def get_font(size: int = 11, bold: bool = False) -> QFont:
     f = QApplication.font()
     f.setPointSize(size)
     f.setBold(bold)
@@ -62,13 +65,56 @@ class SafeSlider(QSlider):
     def wheelEvent(self, event):
         event.ignore()
 
-DIFFICULTY_PRESETS: dict[str, dict[str, float | int] | None] = {
-    "Medium (Casual)":   {"max_nps": 2.25, "min_gap_ms": 170, "sustain": 50, "chord": 5},
-    "Medium (Balanced)": {"max_nps": 2.80, "min_gap_ms": 140, "sustain": 15, "chord": 12},
-    "Medium (Intense)":  {"max_nps": 3.40, "min_gap_ms": 110, "sustain": 5,  "chord": 25},
-    "Medium (Chaotic)":  {"max_nps": 4.20, "min_gap_ms": 85,  "sustain": 0,  "chord": 40},
-    "Custom…":           None,
+# --- PRESETS MANAGEMENT ---
+DEFAULT_PRESETS: dict[str, dict[str, float | int]] = {
+    "Medium 1 (Casual)":   {"max_nps": 2.25, "min_gap_ms": 170, "sustain": 50, "chord": 5},
+    "Medium 2 (Balanced)": {"max_nps": 2.80, "min_gap_ms": 140, "sustain": 15, "chord": 12},
+    "Medium 3 (Intense)":  {"max_nps": 3.40, "min_gap_ms": 110, "sustain": 5,  "chord": 25},
+    "Medium 4 (Chaotic)":  {"max_nps": 4.20, "min_gap_ms": 85,  "sustain": 0,  "chord": 40},
 }
+
+def get_user_preset_path() -> Path:
+    """Returns path to user_presets.json in home dir."""
+    p = Path.home() / ".1clickcharter" / "presets.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+def load_all_presets() -> dict[str, dict[str, float | int]]:
+    """Merges defaults with user presets."""
+    merged = DEFAULT_PRESETS.copy()
+    user_path = get_user_preset_path()
+    if user_path.exists():
+        try:
+            user_data = json.loads(user_path.read_text(encoding="utf-8"))
+            merged.update(user_data)
+        except Exception:
+            pass # Ignore corrupted file
+    return merged
+
+def save_user_preset(name: str, data: dict[str, float | int]) -> None:
+    """Saves a single preset to the JSON file (merging with existing)."""
+    user_path = get_user_preset_path()
+    current = {}
+    if user_path.exists():
+        try:
+            current = json.loads(user_path.read_text(encoding="utf-8"))
+        except Exception:
+            current = {}
+
+    current[name] = data
+    user_path.write_text(json.dumps(current, indent=2), encoding="utf-8")
+
+def delete_user_preset(name: str) -> None:
+    user_path = get_user_preset_path()
+    if not user_path.exists(): return
+
+    try:
+        current = json.loads(user_path.read_text(encoding="utf-8"))
+        if name in current:
+            del current[name]
+            user_path.write_text(json.dumps(current, indent=2), encoding="utf-8")
+    except Exception:
+        pass
 
 @dataclass
 class RunConfig:
@@ -97,8 +143,10 @@ class ThemeManager:
     @staticmethod
     def apply_style(app: QApplication, dark_mode: bool):
         app.setStyle("Fusion")
-        font = app.font()
-        font.setPointSize(10)
+
+        # Enforce clean font state (11pt is the sweet spot)
+        font = QFont()
+        font.setPointSize(11)
         app.setFont(font)
         palette = QPalette()
 
@@ -126,7 +174,7 @@ class ThemeManager:
             palette.setColor(QPalette.PlaceholderText, QColor(120, 130, 140))
 
         else:
-            # Light Theme (Explicitly defined to override Dark OS defaults)
+            # Light Theme
             base = QColor(245, 245, 250)
             white = QColor(255, 255, 255)
             text = QColor(30, 30, 40)
@@ -143,14 +191,14 @@ class ThemeManager:
             palette.setColor(QPalette.Highlight, highlight)
             palette.setColor(QPalette.HighlightedText, white)
 
-            # Explicit Interaction Colors (Fixes OS Dark Mode bleed)
+            # Explicit Interaction Colors
             palette.setColor(QPalette.Light, QColor(255, 255, 255)) # Hover
             palette.setColor(QPalette.Midlight, QColor(230, 230, 240))
             palette.setColor(QPalette.Dark, QColor(200, 200, 210))
             palette.setColor(QPalette.Mid, QColor(210, 210, 220)) # Borders
             palette.setColor(QPalette.Shadow, QColor(150, 150, 160))
 
-            # Disabled States (Explicitly readable grey)
+            # Disabled States
             disabled_text = QColor(160, 160, 170)
             palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
             palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
@@ -167,17 +215,20 @@ class ThemeManager:
                 margin-top: 24px;
                 padding-top: 12px;
                 font-weight: bold;
-                font-size: 12px;
+                font-size: 12pt;
+                max-width: 550px;
             }
             QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
 
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget {
-                padding: 6px;
+                padding: 5px;
                 border-radius: 4px;
                 border: 1px solid palette(mid);
                 background-color: palette(base);
                 color: palette(text);
-                font-size: 11px;
+                min-height: 18px;
+                max-width: 425px;
+                font-size: 11pt;
             }
             QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus, QSlider:focus {
                 border: 1px solid palette(highlight);
@@ -197,13 +248,14 @@ class ThemeManager:
                 selection-color: palette(highlighted-text);
             }
 
+            /* STANDARD BUTTONS - SCALED DOWN */
             QPushButton {
-                padding: 8px 16px;
+                padding: 5px 10px;
                 border-radius: 5px;
                 border: 1px solid palette(mid);
                 background-color: palette(button);
                 color: palette(text);
-                font-size: 11px;
+                font-size: 11pt; /* Slightly smaller font */
             }
             QPushButton:hover {
                 background-color: palette(midlight);
@@ -215,16 +267,14 @@ class ThemeManager:
                 border: 1px solid palette(mid);
             }
 
-            /* PRIMARY BUTTON (Fixed Height) */
+            /* PRIMARY BUTTON (GENERATE) */
             QPushButton#Primary {
-                background-color: palette(highlight);
-                color: palette(highlighted-text);
-                font-weight: bold;
-                border: 1px solid palette(highlight);
-                min-height: 18px;
-                max-height: 18px;
-                min-width: 120px;
-                max-width: 120px;
+                padding: 6px 12px;
+                border-radius: 5px;
+                border: 1px solid palette(mid);
+                background-color: palette(button);
+                color: palette(text);
+                font-size: 11pt; /* Slightly smaller font */
             }
             QPushButton#Primary:hover {
                 border: 1px solid palette(text);
@@ -236,9 +286,15 @@ class ThemeManager:
                 border: 1px solid palette(mid);
             }
 
-            QCheckBox { spacing: 8px; font-size: 11px; }
+            QCheckBox { spacing: 8px; }
 
-            QStatusBar { background: palette(window); border-top: 1px solid palette(mid); min-height: 50px; max-height: 50px; }
+            /* STATUS BAR */
+            QStatusBar {
+                background: palette(window);
+                border-top: 1px solid palette(mid);
+                min-height: 50px;
+                max-height: 50px;
+            }
             QStatusBar::item { border: none; }
 
             QProgressBar {
@@ -258,10 +314,13 @@ class LogWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Logs")
-        self.resize(700, 500)
+        self.resize(700, 350)
         layout = QVBoxLayout(self)
+
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
+        self.text_edit.setMinimumSize(700, 350)
+
         mono_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         mono_font.setPointSize(11)
         self.text_edit.setFont(mono_font)
@@ -287,6 +346,178 @@ class LogWindow(QWidget):
     def get_text(self) -> str:
         return self.text_edit.toPlainText()
 
+# ---------------- Density Visualizer ----------------
+class DensityGraphWidget(QWidget):
+    def __init__(self, density_data: list[dict], sections: list[dict], parent=None):
+        super().__init__(parent)
+        self._density = density_data
+        self._sections = sections
+        self.setMinimumHeight(140)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.setStyleSheet("background-color: #2b2b2b; border: 1px solid #3d3d3d; border-radius: 4px;")
+
+    def set_sections(self, sections: list[dict]):
+        self._sections = sections
+        self.update() # Trigger repaint
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Fill Background
+        painter.fillRect(self.rect(), QColor(43, 43, 43))
+
+        w = self.width()
+        h = self.height()
+
+        if not self._density:
+            painter.setPen(QColor(150, 150, 150))
+            painter.drawText(self.rect(), Qt.AlignCenter, "No Density Data")
+            return
+
+        # Determine Scaling
+        max_t = self._density[-1]['t']
+        if max_t <= 0: max_t = 1.0
+
+        max_nps = 0.0
+        for d in self._density:
+            if d['nps'] > max_nps: max_nps = d['nps']
+        if max_nps < 5.0: max_nps = 5.0 # Minimum ceiling for visualization
+
+        # Margins
+        margin_b = 20
+        plot_h = h - margin_b
+
+        # 1. Draw Density Path
+        path = QPainterPath()
+        path.moveTo(0, plot_h) # Start bottom-left
+
+        for d in self._density:
+            x = (d['t'] / max_t) * w
+            # nps relative to max, inverted Y
+            ratio = d['nps'] / max_nps
+            y = plot_h - (ratio * plot_h)
+            path.lineTo(x, y)
+
+        path.lineTo(w, plot_h) # Finish bottom-right
+        path.closeSubpath()
+
+        # Gradient Fill
+        grad = QLinearGradient(0, 0, 0, plot_h)
+        grad.setColorAt(0.0, QColor(0, 180, 255, 120))
+        grad.setColorAt(1.0, QColor(0, 180, 255, 10))
+        painter.fillPath(path, grad)
+
+        # Line Stroke (Redraw line without closing loop)
+        painter.setPen(QPen(QColor(0, 200, 255), 2))
+        line_path = QPainterPath()
+        first = True
+        for d in self._density:
+            x = (d['t'] / max_t) * w
+            ratio = d['nps'] / max_nps
+            y = plot_h - (ratio * plot_h)
+            if first:
+                line_path.moveTo(x, y)
+                first = False
+            else:
+                line_path.lineTo(x, y)
+        painter.drawPath(line_path)
+
+        # 2. Draw Section Lines & Names
+        painter.setPen(QPen(QColor(255, 255, 255, 120), 1, Qt.DashLine))
+        font = painter.font()
+        font.setPointSize(9)
+        painter.setFont(font)
+
+        for i, s in enumerate(self._sections):
+            t = s.get('start', 0.0)
+            if t > max_t: continue
+
+            x = (t / max_t) * w
+            painter.drawLine(int(x), 0, int(x), h)
+
+            name = s.get('name', '')
+            # Stagger text height to prevent overlap
+            text_y = h - 6 if i % 2 == 0 else h - 18
+
+            # Text shadow for readability
+            painter.setPen(QColor(0,0,0, 180))
+            painter.drawText(int(x) + 5, text_y + 1, name)
+
+            painter.setPen(QColor(220, 220, 220))
+            painter.drawText(int(x) + 4, text_y, name)
+
+            # Reset pen for next line
+            painter.setPen(QPen(QColor(255, 255, 255, 120), 1, Qt.DashLine))
+
+# ---------------- Review Dialog ----------------
+class SectionReviewDialog(QDialog):
+    def __init__(self, sections: list[dict], density_data: list[dict], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Review Sections")
+        self.resize(500, 600) # Increased width for graph
+        self.sections = sections
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        # 1. Density Graph
+        lbl_graph = QLabel("Note Density & Structure")
+        lbl_graph.setStyleSheet("font-weight: bold;")
+        layout.addWidget(lbl_graph)
+
+        self.graph = DensityGraphWidget(density_data, sections)
+        layout.addWidget(self.graph)
+
+        # 2. Table Header
+        lbl = QLabel("Section List (Rename Only)")
+        lbl.setStyleSheet("color: palette(text); font-weight: bold; margin-top: 10px;")
+        lbl.setWordWrap(True)
+        layout.addWidget(lbl)
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(2) # Time, Name
+        self.table.setHorizontalHeaderLabels(["Start Time (s)", "Section Name"])
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.setSelectionMode(QAbstractItemView.NoSelection)
+
+        self.refresh_table()
+        layout.addWidget(self.table)
+
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(self.accept)
+        btns.rejected.connect(self.reject)
+        layout.addWidget(btns)
+
+    def refresh_table(self):
+        self.table.setRowCount(len(self.sections))
+
+        for i, s in enumerate(self.sections):
+            # 1. TIME (Read Only)
+            t_val = float(s.get('start', 0.0))
+            t_item = QTableWidgetItem(f"{t_val:.2f}")
+            t_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            t_item.setTextAlignment(Qt.AlignCenter)
+
+            # 2. NAME EDIT
+            le = QLineEdit(str(s.get('name', '')))
+            le.setPlaceholderText("Section Name")
+            le.setClearButtonEnabled(True)
+            le.textChanged.connect(lambda txt, idx=i: self.on_name_changed(idx, txt))
+
+            self.table.setItem(i, 0, t_item)
+            self.table.setCellWidget(i, 1, le)
+
+    def on_name_changed(self, row: int, new_name: str):
+        if 0 <= row < len(self.sections):
+            self.sections[row]['name'] = new_name
+            # Update the graph labels in real-time
+            self.graph.set_sections(self.sections)
+
+    def get_sections(self) -> list[dict]:
+        return self.sections
+
 # ---------------- Main Window ----------------
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -301,8 +532,11 @@ class MainWindow(QMainWindow):
         self.proc: QProcess | None = None
         self.validator_proc: QProcess | None = None
 
-        # QUEUE SYSTEM
+        # STATE
         self.song_queue: list[Path] = []
+        self._is_analyzing = False
+        self._pending_generation_cfg: RunConfig | None = None
+        self._pending_generation_out: Path | None = None
 
         self.log_window = LogWindow()
         self.dark_mode = self.settings.value("dark_mode", True, type=bool)
@@ -312,12 +546,22 @@ class MainWindow(QMainWindow):
         self._wire()
         self._restore_settings()
 
-        self.resize(980, 750)
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
+
+        # Load Presets
+        self.refresh_presets()
+        last_preset = self.settings.value("preset", "Medium 2 (Balanced)", type=str)
+        if last_preset in self.all_presets:
+            self.preset_combo.setCurrentText(last_preset)
+        else:
+            self.preset_combo.setCurrentText("Medium 2 (Balanced)")
+
         self.apply_preset(self.preset_combo.currentText())
+        self._update_queue_display()
+
         self._update_state()
         QTimer.singleShot(100, self.snap_to_content)
-        self.statusBar().showMessage("Ready")
+        self.status_label.setText("Ready")
 
     def closeEvent(self, event) -> None:
         self.log_window.close()
@@ -333,13 +577,13 @@ class MainWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(24, 24, 24, 24)
+        main_layout.setSpacing(24)
 
         # --- HEADER ---
         header_widget = QWidget()
         header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(0, 0, 0, 8)
+        header_layout.setContentsMargins(0, 0, 0, 10)
         header_layout.setSpacing(16)
         header_layout.setAlignment(Qt.AlignCenter)
 
@@ -348,7 +592,7 @@ class MainWindow(QMainWindow):
         if icon_path.exists():
             pix = QPixmap(str(icon_path))
             if not pix.isNull():
-                pix = pix.scaled(64, 64, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                pix = pix.scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 icon_lbl.setPixmap(pix)
 
         title_lbl = QLabel("CloneHero 1-Click Charter")
@@ -372,8 +616,8 @@ class MainWindow(QMainWindow):
         self.sidebar_widget.setMaximumWidth(340)
 
         sidebar_layout = QVBoxLayout(self.sidebar_widget)
-        sidebar_layout.setContentsMargins(0, 0, 12, 0)
-        sidebar_layout.setSpacing(18)
+        sidebar_layout.setContentsMargins(0, 0, 16, 0)
+        sidebar_layout.setSpacing(20)
 
         # Audio Input Group
         grp_audio = QGroupBox("Input Audio (REQUIRED)")
@@ -381,7 +625,7 @@ class MainWindow(QMainWindow):
         self.audio_label = QLabel("Drag Audio Files Here")
         self.audio_label.setAlignment(Qt.AlignCenter)
         self.audio_label.setWordWrap(True)
-        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11px;")
+        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
 
         # ADD Button
         self.btn_add_audio = QPushButton("Add Songs...")
@@ -407,12 +651,12 @@ class MainWindow(QMainWindow):
         self.grp_queue.setVisible(True)
 
         queue_layout = QVBoxLayout(self.grp_queue)
-        queue_layout.setContentsMargins(8, 8, 8, 8)
-        queue_layout.setSpacing(8)
+        queue_layout.setContentsMargins(10, 10, 10, 10)
+        queue_layout.setSpacing(10)
 
         self.queue_list = QListWidget()
         self.queue_list.setSelectionMode(QAbstractItemView.NoSelection)
-        self.queue_list.setMaximumHeight(65)
+        self.queue_list.setMaximumHeight(60)
         self.queue_list.setStyleSheet("border: 1px solid palette(mid); border-radius: 4px;")
 
         self.btn_clear_queue_all = QPushButton("Clear Queue")
@@ -429,8 +673,8 @@ class MainWindow(QMainWindow):
 
         self.cover_preview = QLabel("Drag Art Here")
         self.cover_preview.setAlignment(Qt.AlignCenter)
-        self.cover_preview.setFixedSize(260, 260)
-        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic; font-size: 11px;")
+        self.cover_preview.setFixedSize(280, 280)
+        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic; font-size: 11pt;")
 
         row_art_btns = QHBoxLayout()
         self.btn_pick_cover = QPushButton("Image...")
@@ -455,25 +699,30 @@ class MainWindow(QMainWindow):
         # ================= Main Panel =================
         self.main_widget = QWidget()
         self.main_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
-        self.main_widget.setMinimumWidth(500)
+        self.main_widget.setMinimumWidth(700)
 
         main_layout_inner = QVBoxLayout(self.main_widget)
-        main_layout_inner.setContentsMargins(12, 0, 0, 0)
-        main_layout_inner.setSpacing(22)
+        main_layout_inner.setContentsMargins(16, 0, 0, 0)
+        main_layout_inner.setSpacing(24)
 
         # Metadata
         grp_meta = QGroupBox("Song Metadata")
         form_meta = QFormLayout(grp_meta)
         form_meta.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
-        form_meta.setLabelAlignment(Qt.AlignRight)
-        form_meta.setVerticalSpacing(12)
+        form_meta.setLabelAlignment(Qt.AlignVCenter)
+        form_meta.setVerticalSpacing(14)
 
         self.title_edit = QLineEdit()
+        self.title_edit.setAlignment(Qt.AlignLeft)
         self.artist_edit = QLineEdit()
+        self.artist_edit.setAlignment(Qt.AlignLeft)
         self.album_edit = QLineEdit()
+        self.album_edit.setAlignment(Qt.AlignLeft)
         self.genre_edit = QLineEdit()
+        self.genre_edit.setAlignment(Qt.AlignLeft)
         self.genre_edit.setPlaceholderText("Default: Rock")
         self.charter_edit = QLineEdit()
+        self.charter_edit.setAlignment(Qt.AlignLeft)
         self.charter_edit.setPlaceholderText("Default: Zullo7569")
 
         self.btn_clear_meta = QToolButton()
@@ -481,11 +730,11 @@ class MainWindow(QMainWindow):
         self.btn_clear_meta.setToolTip("Clear all metadata fields")
         self.btn_clear_meta.setCursor(Qt.PointingHandCursor)
 
-        form_meta.addRow(form_label("Title", required=True), self.title_edit)
-        form_meta.addRow(form_label("Artist", required=True), self.artist_edit)
-        form_meta.addRow(form_label("Album"), self.album_edit)
-        form_meta.addRow(form_label("Genre"), self.genre_edit)
-        form_meta.addRow(form_label("Charter"), self.charter_edit)
+        form_meta.addRow(form_label("Title", required=True, align=Qt.AlignCenter), self.title_edit)
+        form_meta.addRow(form_label("Artist", required=True, align=Qt.AlignCenter), self.artist_edit)
+        form_meta.addRow(form_label("Album", align=Qt.AlignCenter), self.album_edit)
+        form_meta.addRow(form_label("Genre", align=Qt.AlignCenter), self.genre_edit)
+        form_meta.addRow(form_label("Charter", align=Qt.AlignCenter), self.charter_edit)
 
         row_clear = QHBoxLayout()
         row_clear.addStretch()
@@ -507,24 +756,45 @@ class MainWindow(QMainWindow):
         self.adv_content.setVisible(False)
         adv_form = QFormLayout(self.adv_content)
         adv_form.setLabelAlignment(Qt.AlignRight)
-        adv_form.setVerticalSpacing(10)
+        adv_form.setVerticalSpacing(12)
         adv_form.setContentsMargins(10, 0, 0, 0)
 
+        # PRESETS ROW
         self.preset_combo = SafeComboBox()
-        self.preset_combo.addItems(list(DIFFICULTY_PRESETS.keys()))
-        self.preset_combo.setCurrentText("Medium (Balanced)")
         self.preset_combo.setCursor(Qt.PointingHandCursor)
+        self.preset_combo.setMinimumWidth(200)
+
+        self.btn_save_preset = QToolButton()
+        self.btn_save_preset.setIcon(self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btn_save_preset.setToolTip("Save current settings as a new preset")
+        self.btn_save_preset.setCursor(Qt.PointingHandCursor)
+
+        self.btn_del_preset = QToolButton()
+        self.btn_del_preset.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
+        self.btn_del_preset.setToolTip("Delete selected preset (User presets only)")
+        self.btn_del_preset.setCursor(Qt.PointingHandCursor)
+
+        preset_row = QHBoxLayout()
+        preset_row.addWidget(self.preset_combo, 1)
+        preset_row.addWidget(self.btn_save_preset)
+        preset_row.addWidget(self.btn_del_preset)
 
         self.preset_hint = QLabel("Select a preset to auto-configure settings.")
-        self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11px;")
+        self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11pt;")
 
-        adv_form.addRow(form_label("Difficulty"), self.preset_combo)
+        # NEW: Review Checkbox
+        self.chk_review = QCheckBox("Review Sections before Generation")
+        self.chk_review.setToolTip("Show a list of detected sections to rename/edit before creating the chart.")
+        self.chk_review.setCursor(Qt.PointingHandCursor)
+
+        adv_form.addRow(form_label("Difficulty"), preset_row)
         adv_form.addRow(QLabel(""), self.preset_hint)
+        adv_form.addRow(form_label("Override Section Names"), self.chk_review) # Renamed label
 
         self.custom_controls = QWidget()
         custom_form = QFormLayout(self.custom_controls)
         custom_form.setContentsMargins(0, 0, 0, 0)
-        custom_form.setVerticalSpacing(10)
+        custom_form.setVerticalSpacing(12)
 
         self.mode_group = QButtonGroup(self)
         self.mode_real = QRadioButton("Real (Audio Analysis)")
@@ -544,17 +814,17 @@ class MainWindow(QMainWindow):
         self.max_nps_spin.setRange(1.0, 10.0)
         self.max_nps_spin.setSingleStep(0.1)
         self.max_nps_spin.setSuffix(" NPS")
-        self.max_nps_spin.setMinimumHeight(30)
+        self.max_nps_spin.setMinimumHeight(26)
 
         self.min_gap_spin = SafeSpinBox()
         self.min_gap_spin.setRange(10, 1000)
         self.min_gap_spin.setSingleStep(10)
         self.min_gap_spin.setSuffix(" ms")
-        self.min_gap_spin.setMinimumHeight(30)
+        self.min_gap_spin.setMinimumHeight(26)
 
         self.seed_spin = SafeSpinBox()
         self.seed_spin.setRange(0, 999999)
-        self.seed_spin.setMinimumHeight(30)
+        self.seed_spin.setMinimumHeight(26)
         self.seed_spin.setToolTip("Seed for random generation.")
 
         self.chk_orange = QCheckBox("Allow Orange Lane")
@@ -627,7 +897,7 @@ class MainWindow(QMainWindow):
 
         out_row1 = QHBoxLayout()
         self.out_dir_edit = QLineEdit("")
-        self.out_dir_edit.setPlaceholderText("Select output folder... (Required)")
+        self.out_dir_edit.setPlaceholderText("Select output folder...")
 
         self.btn_pick_output = QPushButton("Browse...")
         self.btn_pick_output.setCursor(Qt.PointingHandCursor)
@@ -636,6 +906,7 @@ class MainWindow(QMainWindow):
         self.btn_clear_out.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
         self.btn_clear_out.setToolTip("Clear output path")
         self.btn_clear_out.setCursor(Qt.PointingHandCursor)
+        self.btn_clear_out.setMinimumHeight(26)
 
         out_row1.addWidget(self.out_dir_edit, 1)
         out_row1.addWidget(self.btn_pick_output, 0)
@@ -664,6 +935,8 @@ class MainWindow(QMainWindow):
         # SCROLL AREA
         main_scroll = QScrollArea()
         main_scroll.setWidgetResizable(True)
+        main_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        main_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         main_scroll.setWidget(self.main_widget)
         main_scroll.setFrameShape(QFrame.NoFrame)
 
@@ -690,28 +963,40 @@ class MainWindow(QMainWindow):
         self.btn_help.clicked.connect(self.show_help)
 
         self.btn_cancel = QPushButton("Cancel")
+        self.btn_cancel.setObjectName("FooterBtn")
         self.btn_cancel.setCursor(Qt.PointingHandCursor)
-        self.btn_cancel.setMinimumHeight(18)
 
-        # New Progress Bar
+        # ---------------- STATUS BAR WIDGETS ----------------
+        # Container for Left side of status bar (Label + Progress)
+        self.status_container = QWidget()
+        self.status_layout = QHBoxLayout(self.status_container)
+        self.status_layout.setContentsMargins(20, 0, 0, 0)
+        self.status_layout.setSpacing(15)
+
+        self.status_label = QLabel("Ready")
+        self.status_label.setStyleSheet("color: palette(text); font-weight: bold;")
+
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0) # Indeterminate mode (bouncing)
+        self.progress_bar.setRange(0, 0)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setFixedWidth(45)
+        self.progress_bar.setFixedWidth(200)
         self.progress_bar.setVisible(False)
-        self.progress_bar.setFixedHeight(18)
+        self.progress_bar.setFixedHeight(12)
+
+        self.status_layout.addWidget(self.status_label)
+        self.status_layout.addWidget(self.progress_bar)
+        self.status_layout.addStretch()
+
+        self.statusBar().addWidget(self.status_container, 1)
 
         self.btn_generate = QPushButton("GENERATE CHART")
         self.btn_generate.setObjectName("Primary")
         self.btn_generate.setCursor(Qt.PointingHandCursor)
-        self.btn_generate.setMinimumHeight(18)
 
         sep = QFrame()
         sep.setFrameShape(QFrame.VLine)
         sep.setStyleSheet("color: palette(mid);")
 
-        footer_layout.addWidget(self.progress_bar)
-        footer_layout.addWidget(sep)
         footer_layout.addWidget(self.chk_dark)
         footer_layout.addWidget(self.btn_show_logs)
         footer_layout.addWidget(self.btn_help)
@@ -753,6 +1038,8 @@ class MainWindow(QMainWindow):
         self.title_edit.textEdited.connect(lambda _: setattr(self, "_title_user_edited", True))
         self.chk_dark.toggled.connect(self.on_dark_toggle)
         self.preset_combo.currentTextChanged.connect(self.apply_preset)
+        self.btn_save_preset.clicked.connect(self.on_save_preset)
+        self.btn_del_preset.clicked.connect(self.on_delete_preset)
 
         self.chk_adv.toggled.connect(self.on_toggle_advanced)
 
@@ -764,7 +1051,7 @@ class MainWindow(QMainWindow):
             self.centralWidget().layout().activate()
         h = self.sidebar_widget.sizeHint().height()
         h = max(h, 600)
-        w = 310 + 550 + 40
+        w = 310 + 625 + 40
         self.resize(w, h)
 
     def show_help(self) -> None:
@@ -818,10 +1105,71 @@ class MainWindow(QMainWindow):
             self.charter_edit.setText(saved_charter)
         saved_out = self.settings.value("out_dir", "", type=str)
         self.out_dir_edit.setText(saved_out)
-        last_preset = self.settings.value("preset", "Medium (Balanced)", type=str)
-        self.preset_combo.setCurrentText(last_preset)
         geom = self.settings.value("geometry")
         if geom: self.restoreGeometry(geom)
+
+    # --- Preset Logic ---
+    def refresh_presets(self) -> None:
+        current = self.preset_combo.currentText()
+        self.all_presets = load_all_presets()
+        self.preset_combo.blockSignals(True)
+        self.preset_combo.clear()
+        defaults = sorted(list(DEFAULT_PRESETS.keys()))
+        others = sorted([k for k in self.all_presets.keys() if k not in DEFAULT_PRESETS])
+
+        self.preset_combo.addItems(defaults + others)
+        self.preset_combo.addItem("Custom…")
+
+        if current in self.all_presets:
+            self.preset_combo.setCurrentText(current)
+        else:
+            self.preset_combo.setCurrentText("Medium 2 (Balanced)")
+        self.preset_combo.blockSignals(False)
+
+        is_default = self.preset_combo.currentText() in DEFAULT_PRESETS
+        self.btn_del_preset.setEnabled(not is_default and self.preset_combo.currentText() != "Custom…")
+
+    def on_save_preset(self) -> None:
+        name, ok = QInputDialog.getText(self, "Save Preset", "Enter preset name:")
+        if ok and name.strip():
+            name = name.strip()
+            data = {
+                "max_nps": self.max_nps_spin.value(),
+                "min_gap_ms": self.min_gap_spin.value(),
+                "sustain": self.sustain_slider.value(),
+                "chord": self.chord_slider.value()
+            }
+            save_user_preset(name, data)
+            self.refresh_presets()
+            self.preset_combo.setCurrentText(name)
+            self.statusBar().showMessage(f"Saved preset: {name}")
+
+    def on_delete_preset(self) -> None:
+        name = self.preset_combo.currentText()
+        if name in DEFAULT_PRESETS:
+            return
+
+        ret = QMessageBox.question(self, "Delete Preset", f"Are you sure you want to delete '{name}'?")
+        if ret == QMessageBox.Yes:
+            delete_user_preset(name)
+            self.refresh_presets()
+            self.statusBar().showMessage(f"Deleted preset: {name}")
+
+    def apply_preset(self, name: str) -> None:
+        preset = self.all_presets.get(name)
+        is_custom = preset is None
+        self.custom_controls.setVisible(is_custom)
+        if is_custom:
+            self.preset_hint.setText("Manual control enabled. Adjust density and gap below.")
+        else:
+            self.max_nps_spin.setValue(float(preset["max_nps"]))
+            self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
+            self.sustain_slider.setValue(int(preset["sustain"]))
+            self.chord_slider.setValue(int(preset["chord"]))
+            self.preset_hint.setText(f"Preset Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
+
+        is_default = name in DEFAULT_PRESETS
+        self.btn_del_preset.setEnabled(not is_default and name != "Custom…")
 
     # ---------- Logic / Processing ----------
     def _update_queue_display(self) -> None:
@@ -896,20 +1244,6 @@ class MainWindow(QMainWindow):
     def on_toggle_advanced(self, checked: bool) -> None:
         self.adv_content.setVisible(checked)
 
-    def apply_preset(self, name: str) -> None:
-        preset = DIFFICULTY_PRESETS.get(name)
-        is_custom = preset is None
-        self.custom_controls.setVisible(is_custom)
-        if is_custom:
-            self.preset_hint.setText("Manual control enabled. Adjust density and gap below.")
-        else:
-            self.max_nps_spin.setValue(float(preset["max_nps"]))
-            self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
-            self.sustain_slider.setValue(int(preset["sustain"]))
-            self.chord_slider.setValue(int(preset["chord"]))
-
-            self.preset_hint.setText(f"Preset Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
-
     def _update_state(self) -> None:
         running = self.proc is not None and self.proc.state() != QProcess.NotRunning
         has_audio = self.audio_path is not None and self.audio_path.exists()
@@ -952,7 +1286,7 @@ class MainWindow(QMainWindow):
         self.audio_label.setStyleSheet("color: palette(text); font-weight: bold;")
         if (not self._title_user_edited) and (not self.title_edit.text().strip()):
             self.title_edit.setText(self.audio_path.stem)
-        self.statusBar().showMessage(f"Loaded: {self.audio_path.name}")
+        self.status_label.setText(f"Loaded: {self.audio_path.name}")
         self._update_state()
         QTimer.singleShot(0, self.snap_to_content)
 
@@ -962,14 +1296,14 @@ class MainWindow(QMainWindow):
             next_song = self.song_queue.pop(0)
             self._update_queue_display()
             self.load_audio(next_song)
-            self.statusBar().showMessage(f"Queue: Loaded {next_song.name}")
+            self.status_label.setText(f"Queue: Loaded {next_song.name}")
         else:
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
-            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11px;")
+            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
             self._update_state()
             self.audio_label.adjustSize()
-            self.statusBar().showMessage("Audio cleared")
+            self.status_label.setText("Audio cleared")
             QTimer.singleShot(10, self.snap_to_content)
 
     def pick_cover(self) -> None:
@@ -1048,8 +1382,23 @@ class MainWindow(QMainWindow):
         out_song = (cfg.out_root / cfg.title).resolve()
         out_song.mkdir(parents=True, exist_ok=True)
         self.last_out_song = out_song
+
+        self._pending_generation_cfg = cfg
+        self._pending_generation_out = out_song
+
+        # Determine if we should analyze first
+        if self.chk_review.isChecked():
+            self._is_analyzing = True
+            label = "Analyzing..."
+            extra_args = ["--analyze-only"]
+        else:
+            self._is_analyzing = False
+            label = "Analyzing..." # Technically still accurate for phase 1
+            extra_args = []
+
         if is_frozen(): cmd = [str(py_exec), "--internal-cli"]
         else: cmd = [str(py_exec), "-m", "charter.cli"]
+
         cmd.extend([
             "--audio", str(cfg.audio), "--out", str(out_song),
             "--title", cfg.title, "--artist", cfg.artist,
@@ -1066,10 +1415,18 @@ class MainWindow(QMainWindow):
         if not cfg.allow_orange: cmd.append("--no-orange")
         if not self.chk_rhythm_glue.isChecked(): cmd.append("--no-rhythmic-glue")
         if cfg.fetch_metadata: cmd.append("--fetch-metadata")
-        self.log_window.clear()
-        self.append_log(f"Starting generation for: {cfg.title}...")
 
-        self.btn_generate.setText("Analyzing...")
+        cmd.extend(extra_args)
+
+        self.log_window.clear()
+        if self._is_analyzing:
+            self.append_log(f"Starting analysis for: {cfg.title}...")
+        else:
+            self.append_log(f"Starting generation for: {cfg.title}...")
+
+        # Clear status bar text so progress bar stands out
+        self.status_label.setText("")
+        self.btn_generate.setText(label)
         self.btn_generate.setEnabled(False)
         self.progress_bar.setVisible(True)
 
@@ -1098,49 +1455,138 @@ class MainWindow(QMainWindow):
         self.append_log(data)
 
     def _on_finished(self, code: int, status: QProcess.ExitStatus, out_song: Path) -> None:
-        self.btn_generate.setText("GENERATE CHART")
-        self.progress_bar.setVisible(False)
-
         ok = (status == QProcess.NormalExit) and (code == 0)
 
-        if ok:
-            if self.cover_path and self.cover_path.exists():
-                try:
-                    dest = out_song / "album.png"
-                    dest.write_bytes(self.cover_path.read_bytes())
-                    self.append_log(f"Cover copied to {dest}")
-                except Exception as e: self.append_log(f"Cover copy failed: {e}")
-            gen_cover = out_song / "album.png"
-            if gen_cover.exists(): self.update_cover_preview(gen_cover)
-            self.run_health_check(out_song)
-
-            if self.song_queue:
-                next_song = self.song_queue.pop(0)
-                self.clear_song_info()
-                self.load_audio(next_song)
-                self._update_queue_display()
-                self.statusBar().showMessage(f"Chart generated! Loaded next: {next_song.name}")
-            else:
-                self.clear_song_info()
-                self.audio_path = None
-                self.audio_label.setText("Drag Audio Files Here")
-                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11px;")
-                self._update_state()
-                self.statusBar().showMessage("Queue Finished")
-        else:
+        if not ok:
+            # FAILURE
+            self.btn_generate.setText("GENERATE CHART")
+            self.progress_bar.setVisible(False)
             reason = "Unknown error."
             logs = self.log_window.get_text()
             for line in reversed(logs.splitlines()):
                 if "Error" in line or "Exception" in line:
                     reason = line.strip()
                     break
-            QMessageBox.critical(self, "Generation Failed", f"Failed to generate chart.\n\nReason: {reason}\n\nCheck logs for full details.")
-            self.statusBar().showMessage("Generation Failed")
+            QMessageBox.critical(self, "Process Failed", f"Failed.\n\nReason: {reason}\n\nCheck logs for full details.")
+            self.status_label.setText("Failed")
+            self.proc = None
+            self._update_state()
+            return
+
+        # SUCCESS
+        if self._is_analyzing:
+            # PHASE 1 COMPLETE -> SHOW REVIEW DIALOG
+            self._is_analyzing = False # Reset flag
+            json_path = out_song / "sections.json"
+            if json_path.exists():
+                try:
+                    data = json.loads(json_path.read_text(encoding='utf-8'))
+                    sections = data.get("sections", [])
+                    density = data.get("density", [])
+
+                    dlg = SectionReviewDialog(sections, density, self)
+                    if dlg.exec():
+                        # User Confirmed
+                        overrides = dlg.get_sections()
+                        override_path = out_song / "overrides.json"
+                        override_path.write_text(json.dumps(overrides, indent=2))
+
+                        # TRIGGER PHASE 2 (Actual Generation)
+                        self.run_generation_phase2(override_path)
+                    else:
+                        # User Cancelled
+                        self.btn_generate.setText("GENERATE CHART")
+                        self.progress_bar.setVisible(False)
+                        self.status_label.setText("Cancelled")
+                        self.proc = None
+                        self._update_state()
+                except Exception as e:
+                    QMessageBox.critical(self, "Error", f"Failed to parse analysis data: {e}")
+                    self.btn_generate.setText("GENERATE CHART")
+                    self.progress_bar.setVisible(False)
+                    self.proc = None
+                    self._update_state()
+            else:
+                QMessageBox.critical(self, "Error", "Analysis finished but sections.json was not found.")
+                self.btn_generate.setText("GENERATE CHART")
+                self.progress_bar.setVisible(False)
+                self.proc = None
+                self._update_state()
+            return
+
+        # PHASE 2 COMPLETE (Or Normal Run Complete)
+        self.btn_generate.setText("GENERATE CHART")
+        self.progress_bar.setVisible(False)
+
+        if self.cover_path and self.cover_path.exists():
+            try:
+                dest = out_song / "album.png"
+                dest.write_bytes(self.cover_path.read_bytes())
+                self.append_log(f"Cover copied to {dest}")
+            except Exception as e: self.append_log(f"Cover copy failed: {e}")
+        gen_cover = out_song / "album.png"
+        if gen_cover.exists(): self.update_cover_preview(gen_cover)
+        self.run_health_check(out_song)
+
+        if self.song_queue:
+            next_song = self.song_queue.pop(0)
+            self.clear_song_info()
+            self.load_audio(next_song)
+            self._update_queue_display()
+            self.status_label.setText(f"Chart generated! Loaded next: {next_song.name}")
+        else:
+            self.clear_song_info()
+            self.audio_path = None
+            self.audio_label.setText("Drag Audio Files Here")
+            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+            self._update_state()
+            self.status_label.setText("Queue Finished")
+
         self.proc = None
         self._update_state()
 
+    def run_generation_phase2(self, override_path: Path) -> None:
+        # Re-run CLI but with --section-overrides and NO --analyze-only
+        cfg = self._pending_generation_cfg
+        out_song = self._pending_generation_out
+
+        if not cfg or not out_song: return
+
+        py_exec = get_python_exec()
+        if is_frozen(): cmd = [str(py_exec), "--internal-cli"]
+        else: cmd = [str(py_exec), "-m", "charter.cli"]
+
+        cmd.extend([
+            "--audio", str(cfg.audio), "--out", str(out_song),
+            "--title", cfg.title, "--artist", cfg.artist,
+            "--album", cfg.album, "--genre", cfg.genre,
+            "--charter", cfg.charter, "--mode", cfg.mode,
+            "--min-gap-ms", str(cfg.min_gap_ms), "--max-nps", f"{cfg.max_nps:.2f}",
+            "--seed", str(cfg.seed),
+            "--chord-prob", str(cfg.chord_prob),
+            "--sustain-len", str(cfg.sustain_len),
+            "--grid-snap", cfg.grid_snap,
+            "--sustain-threshold", str(cfg.sustain_threshold),
+            "--sustain-buffer", str(cfg.sustain_buffer),
+            "--section-overrides", str(override_path)
+        ])
+        if not cfg.allow_orange: cmd.append("--no-orange")
+        if not self.chk_rhythm_glue.isChecked(): cmd.append("--no-rhythmic-glue")
+        # Metadata fetch already happened or is optional, but let's keep it consistent
+        if cfg.fetch_metadata: cmd.append("--fetch-metadata")
+
+        self.append_log(f"Starting Final Generation (with overrides)...")
+
+        self.proc = QProcess(self)
+        self.proc.setProcessChannelMode(QProcess.SeparateChannels)
+        if not is_frozen(): self.proc.setWorkingDirectory(str(repo_root()))
+        self.proc.readyReadStandardOutput.connect(self._on_stdout)
+        self.proc.readyReadStandardError.connect(self._on_stderr)
+        self.proc.finished.connect(lambda c, s: self._on_finished(c, s, out_song))
+        self.proc.start(cmd[0], cmd[1:])
+
     def run_health_check(self, song_dir: Path) -> None:
-        self.statusBar().showMessage("Validating...")
+        self.status_label.setText("Validating...")
         QTimer.singleShot(0, self.snap_to_content)
         py_exec = get_python_exec()
         script = repo_root() / "tools" / "validator.py"
@@ -1163,7 +1609,7 @@ class MainWindow(QMainWindow):
             if warnings: msg += "\n\nWarnings:\n" + "\n".join(f"• {w}" for w in warnings)
             title = "Generation Complete" if not warnings else "Complete (With Warnings)"
             QMessageBox.information(self, title, msg) if not warnings else QMessageBox.warning(self, title, msg)
-            self.statusBar().showMessage("Ready")
+            self.status_label.setText("Ready")
 
         self.validator_proc = None
 

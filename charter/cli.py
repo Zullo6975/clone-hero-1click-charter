@@ -1,8 +1,8 @@
 from __future__ import annotations
 import argparse
-import shutil
+from dataclasses import asdict
+import json
 from pathlib import Path
-import librosa # type: ignore
 
 from charter.config import ChartConfig
 from charter.ini import write_song_ini
@@ -46,8 +46,11 @@ def parse_args() -> argparse.Namespace:
 
     # Rhythm (v1.2)
     p.add_argument("--no-rhythmic-glue", action="store_true")
-
     p.add_argument("--no-stats", action="store_true")
+
+    # Manual Overrides (v1.2)
+    p.add_argument("--analyze-only", action="store_true", help="Analyze audio and output sections, no chart generation.")
+    p.add_argument("--section-overrides", help="Path to JSON file with section definitions.")
 
     # Dummy params
     p.add_argument("--bpm", type=float, default=120.0)
@@ -79,13 +82,15 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     title = args.title or audio_path.stem
-    
+
     # --- AUDIO PROCESSING (Normalize) ---
     dest_audio = out_dir / "song.mp3"
-    print(f"Processing audio: {audio_path.name}...")
-    normalize_and_save(audio_path, dest_audio)
 
-    if args.fetch_metadata and args.artist:
+    if not args.analyze_only:
+        print(f"Processing audio: {audio_path.name}...")
+        normalize_and_save(audio_path, dest_audio)
+
+    if args.fetch_metadata and args.artist and not args.analyze_only:
         try:
             cache_path = Path.home() / ".cache" / "1clickcharter" / "metadata.json"
             enriched = enrich_from_musicbrainz(
@@ -99,20 +104,52 @@ def main():
         except Exception as e:
             print(f"Metadata fetch failed: {e}")
 
+    # Load Overrides
+    loaded_sections = None
+    if args.section_overrides:
+        try:
+            src = Path(args.section_overrides)
+            if src.exists():
+                data = json.loads(src.read_text(encoding='utf-8'))
+                loaded_sections = data.get("sections", data) if isinstance(data, dict) else data
+        except Exception as e:
+            print(f"Warning: Failed to load section overrides: {e}")
+
     # Generate Chart & Get Shift Amount
     notes_mid = out_dir / "notes.mid"
     stats_out = out_dir / "stats_internal.json"
 
     shift_seconds = 0.0
+    final_sections = []
+    density_data = []
+
     if args.mode == "dummy":
         shift_seconds = write_dummy_notes_mid(notes_mid, args.bpm, args.bars, args.density)
     else:
-        shift_seconds = write_real_notes_mid(
+        shift_seconds, final_sections, density_data = write_real_notes_mid(
             audio_path=audio_path,
             out_path=notes_mid,
             cfg=cfg,
-            stats_out_path=stats_out
+            stats_out_path=stats_out,
+            override_sections=loaded_sections,
+            dry_run=args.analyze_only
         )
+
+    if args.analyze_only:
+        out_json = out_dir / "sections.json"
+
+        serializable_sections = []
+        for s in final_sections:
+             if hasattr(s, "__dict__"): serializable_sections.append(asdict(s))
+             elif isinstance(s, dict): serializable_sections.append(s)
+             else: serializable_sections.append(s)
+
+        out_json.write_text(json.dumps({
+            "sections": serializable_sections,
+            "density": density_data
+        }, indent=2))
+        print(f"✅ Analysis Complete. Data written to: {out_json}")
+        return
 
     final_delay = args.delay_ms + int(shift_seconds * 1000)
 
