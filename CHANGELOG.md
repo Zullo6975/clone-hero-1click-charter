@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.2.0] - 2026-01-09
+
+### The "Power User" Update
+
+This update puts control in your hands. You can now save your favorite settings, visualize the song's difficulty structure before generating, and rename sections to match the song perfectly.
+
+### 🎛️ New Features
+
+- **User Presets:** Save your custom engine settings (NPS, Gap, Density) into named presets like "My Thrash Settings" for easy recall.
+- **Density Visualizer:** A new interactive graph in the Review window shows note intensity peaks over time, letting you "see" the difficulty spikes before you play.
+- **Section Overrides:** New "Override Section Names" checkbox allows you to review detected sections and rename them (e.g., "Guitar Solo", "Verse 1") before the chart is generated.
+
+### 🖥️ UI/UX Polish
+
+- **Status Bar:** Added padding to the status bar for a cleaner look.
+- **Log Window:** Fixed default sizing to ensure logs are readable immediately upon opening.
+- **Review Dialog:** Interactive table for renaming sections with locked timestamps to preserve rhythmic integrity.
+
 ## [1.1.0] - 2026-01-09
 
 ### The "Musicality" Update

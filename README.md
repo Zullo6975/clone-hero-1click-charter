@@ -16,11 +16,15 @@ Assisted by ChatGPT and Gemini.
 - **Auto-Metadata:** Fetches Album Art, Year, and Album Title from MusicBrainz automatically.
 - **Smart Delay:** Automatically shifts the chart to ensure you have a "runway" before the first note hits.
 - **Validation:** Built-in health check scans for errors (like impossible patterns or silence) before you even launch the game.
+- **Density Visualizer:** See a graph of the song's difficulty spikes before you generate.
+- **User Presets:** Save and load your own custom configuration profiles.
 
 ### 🎛 Advanced Customization
 
 While the defaults are tuned for a "GH3 Medium" feel, you can tweak the engine:
 
+- **User Presets:** Save your favorite settings (e.g., "Chill", "Chaotic") and load them instantly.
+- **Manual Overrides:** Rename sections (like "Guitar Solo") before the chart is built.
 - **No Orange Toggle:** Disable the 5th lane for a purer 4-lane experience.
 - **Chord Density:** Slide from "All Taps" to "Power Chord Heavy".
 - **Sustain Length:** Control how "sticky" the notes are.

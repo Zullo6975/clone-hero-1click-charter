@@ -24,6 +24,24 @@ To chart an entire album at once:
 4. Once finished, the app will **automatically load Song #2**.
 5. Repeat until the queue is empty!
 
+## Power User Tools
+
+### User Presets
+1. Open the **"Show Advanced Settings"** panel.
+2. Adjust the sliders and spinners to your liking.
+3. Click the **Save (Floppy Disk)** icon next to the dropdown.
+4. Name your preset (e.g., "Speed Metal").
+5. It will now appear in the dropdown list for future use!
+
+### Section Review & Visualizer
+1. Check the box **"Override Section Names"** in the configuration panel.
+2. Click **Generate**.
+3. A window will appear showing:
+   - A **Density Graph** of the song's intensity.
+   - A list of detected sections.
+4. You can click on any **Section Name** to rename it (e.g., change "Chorus" to "Guitar Solo").
+5. Click **OK** to finish generating the chart with your custom names.
+
 ## Tips
 
 * **Difficulty:** Use the "Advanced Settings" to choose a preset. "Medium (Balanced)" is recommended for most songs.
