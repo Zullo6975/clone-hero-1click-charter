@@ -2,9 +2,13 @@
 
 ## [1.2.2] - 2026-01-10
 
-### Addressing Bugs
+### 🩹 Critical Fixes & Polish
 
-Blank for now.
+- **Clone Hero Sections:** Fixed a major bug where sections were invisible in-game. The engine now correctly injects standard "Text Events" into a dedicated `EVENTS` track (Track 1), complying with strict Clone Hero MIDI standards.
+- **Star Power 2.0:** Overhauled the SP generation logic. It now targets high-density sections (solos/choruses) and includes a safety buffer to ensure activation phrases never extend past the song's end.
+- **Validator Upgrade:** The health check now verifies that sections exist on the correct track ("EVENTS") and detects formatting issues.
+- **UI Polish:** Success popups are now wider (600px) by default to prevent long output file paths from wrapping.
+- **Warning Detection:** The log parser is now case-insensitive, ensuring "Warning: ..." lines are correctly flagged in the completion popup.
 
 ## [1.2.1] - 2026-01-09
 
@@ -71,31 +75,3 @@ Highlighting the usage of AI.
 ### Initial Release
 
 The first official release of **CloneHero 1-Click Charter**, a tool designed to make creating fun, playable charts accessible to everyone.
-
-### ✨ Core Features
-
-- **One-Click Generation:** Drag and drop audio files to instantly generate a chart.
-- **Smart Analysis:** Uses `librosa` audio analysis to sync notes to the beat (groove-locked to 1/8 grid).
-- **Medium Difficulty Focus:** Default settings are tuned for a "GH3 Medium" feel—predictable, rhythmic, and fair.
-- **Batch Processing:** Queue system allows dragging multiple files or folders to chart entire albums sequentially.
-
-### 🖥️ User Interface
-
-- **Modern GUI:** Clean, vertical layout with integrated Dark Mode.
-- **Metadata Management:** Auto-fetches Title, Artist, Album, and Year using MusicBrainz.
-- **Album Art:** Drag and drop cover art support with automatic downloading from metadata sources.
-- **Advanced Controls:** Fine-tune the engine with sliders for Chord Density, Sustain Length, and "No Orange" mode.
-- **Action Bar:** Unified footer with easy access to Logs, Help, and Generation controls.
-
-### ⚙️ Engine Capabilities
-
-- **Smart Delay:** Automatically shifts the chart start time to provide a 3-second "runway" before the first note hits.
-- **Lane Logic:** Weighted probabilistic generation that favors ergonomic finger movements.
-- **Star Power:** Algorithmic placement of Star Power phrases.
-- **Determinism:** Seed-based generation ensures the same settings always produce the exact same chart.
-
-### 🛡️ Validation & Polish
-
-- **Health Check:** Integrated validator scans for errors (empty charts, bad durations, density spikes) immediately after generation.
-- **Safe Inputs:** Dropdowns and spinners are scroll-locked to prevent accidental value changes.
-- **Output Management:** Quick actions to open the destination folder or the generated song file immediately.

@@ -1604,10 +1604,13 @@ class MainWindow(QMainWindow):
         self.validator_proc.start(cmd[0], cmd[1:])
 
     def _on_health_finished(self, code: int, status: QProcess.ExitStatus, song_dir: Path) -> None:
+        # Read both channels
         stdout = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8", errors="replace")
         stderr = bytes(self.validator_proc.readAllStandardError()).decode("utf-8", errors="replace")
+
         full_output = stdout + stderr
 
+        # Debugging: if nothing came back, say so
         if not full_output.strip():
             full_output = "[No output from validator process]"
 
@@ -1615,7 +1618,7 @@ class MainWindow(QMainWindow):
         for line in full_output.splitlines():
             line = line.strip()
             line_lower = line.lower()
-            # FIX: Case insensitive check for "warning" and "error"
+            # Simple heuristic to grab lines that look like warnings
             if line.startswith("- ") or "warning" in line_lower or "error" in line_lower or "traceback" in line_lower:
                 warnings.append(line)
 
@@ -1625,13 +1628,19 @@ class MainWindow(QMainWindow):
         if not self.song_queue:
             msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
 
+            # Show warnings if any found (including crashes)
             if warnings:
-                msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
+                msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5]) # Limit length
                 if len(warnings) > 5: msg += "\n... (check logs for more)"
 
             title = "Generation Complete" if not warnings else "Complete (With Warnings)"
+
+            # Use Warning icon if we found issues
             icon = QMessageBox.Information if not warnings else QMessageBox.Warning
-            QMessageBox(icon, title, msg, QMessageBox.Ok, self).show()
+
+            msg_box = QMessageBox(icon, title, msg, QMessageBox.Ok, self)
+            msg_box.setStyleSheet("QLabel{min-width: 600px;}")
+            msg_box.exec()            # -----------------------------------------------------
 
             self.status_label.setText("Ready")
 

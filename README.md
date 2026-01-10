@@ -48,7 +48,7 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 ## 🎮 How to Use
 
 1. **Input Audio:** Drag & Drop audio files (`.mp3`, `.ogg`, `.wav`) into the top box.
-   - *Tip:* Drag multiple files to add them to the **Pending Queue**.
+   - _Tip:_ Drag multiple files to add them to the **Pending Queue**.
 2. **Metadata:** Verify the Song Title and Artist. The app will try to auto-fill these.
 3. **Cover Art:** Drag an image into the "Album Art" box (optional).
 4. **Output:** Select where you want the song folder to be saved (e.g., your Clone Hero `Songs` folder).
@@ -66,7 +66,15 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 - [x] Auto-Metadata & Cover Art
 - [x] Chart Validation
 
-### Future Goals
+### v1.2.2 (Current)
+
+- [x] Full GUI with Dark Mode
+- [x] Batch Queue System
+- [x] Auto-Metadata & Cover Art
+- [x] Chart Validation & Health Checks
+- [x] User Presets & Density Visualization
+
+### Future Goals (v2.0)
 
 - [ ] **Multi-Difficulty:** Generate Easy, Medium, Hard, and Expert charts simultaneously.
 - [ ] **Cascading Reduction:** Algorithmically reduce Expert charts to create lower difficulties.
