@@ -343,14 +343,12 @@ def validate_chart_file(song_dir: Path, summary_only: bool = False):
 
     # Print Results (GUI will capture these)
     if res.errors:
-        print("\nERRORS:")
         for e in res.errors:
-            print(f"\t{e}")
+            print(f"Error: {e}")
 
     if res.warnings:
-        print("\nWARNINGS:")
         for w in res.warnings:
-            print(f"\t{w}")
+            print(f"Warning: {w}")
 
     if res.ok and not res.warnings:
         print("\n✅ Chart passed basic health check.")

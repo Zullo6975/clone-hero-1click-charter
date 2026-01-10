@@ -989,7 +989,7 @@ class MainWindow(QMainWindow):
 
         self.statusBar().addWidget(self.status_container, 1)
 
-        self.btn_generate = QPushButton("GENERATE CHART")
+        self.btn_generate = QPushButton("  GENERATE  ")
         self.btn_generate.setObjectName("Primary")
         self.btn_generate.setCursor(Qt.PointingHandCursor)
 
@@ -1389,11 +1389,11 @@ class MainWindow(QMainWindow):
         # Determine if we should analyze first
         if self.chk_review.isChecked():
             self._is_analyzing = True
-            label = "Analyzing..."
+            label = "Analyzing...."
             extra_args = ["--analyze-only"]
         else:
             self._is_analyzing = False
-            label = "Generating..." # Technically still accurate for phase 1
+            label = "Generating...." # Technically still accurate for phase 1
             extra_args = []
 
         if is_frozen(): cmd = [str(py_exec), "--internal-cli"]
@@ -1459,7 +1459,7 @@ class MainWindow(QMainWindow):
 
         if not ok:
             # FAILURE
-            self.btn_generate.setText("GENERATE CHART")
+            self.btn_generate.setText("  GENERATE  ")
             self.progress_bar.setVisible(False)
             reason = "Unknown error."
             logs = self.log_window.get_text()
@@ -1495,27 +1495,27 @@ class MainWindow(QMainWindow):
                         self.run_generation_phase2(override_path)
                     else:
                         # User Cancelled
-                        self.btn_generate.setText("GENERATE CHART")
+                        self.btn_generate.setText("  GENERATE  ")
                         self.progress_bar.setVisible(False)
                         self.status_label.setText("Cancelled")
                         self.proc = None
                         self._update_state()
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Failed to parse analysis data: {e}")
-                    self.btn_generate.setText("GENERATE CHART")
+                    self.btn_generate.setText("  GENERATE  ")
                     self.progress_bar.setVisible(False)
                     self.proc = None
                     self._update_state()
             else:
                 QMessageBox.critical(self, "Error", "Analysis finished but sections.json was not found.")
-                self.btn_generate.setText("GENERATE CHART")
+                self.btn_generate.setText("  GENERATE  ")
                 self.progress_bar.setVisible(False)
                 self.proc = None
                 self._update_state()
             return
 
         # PHASE 2 COMPLETE (Or Normal Run Complete)
-        self.btn_generate.setText("GENERATE CHART")
+        self.btn_generate.setText("  GENERATE  ")
         self.progress_bar.setVisible(False)
 
         if self.cover_path and self.cover_path.exists():
