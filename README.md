@@ -66,7 +66,7 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 - [x] Auto-Metadata & Cover Art
 - [x] Chart Validation
 
-### v1.2.2 (Current)
+### v1.3 (Current)
 
 - [x] Full GUI with Dark Mode
 - [x] Batch Queue System

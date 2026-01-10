@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.2.2] - 2026-01-10
+## [1.3.0] - 2026-01-10
 
 ### 🩹 Critical Fixes & Polish
 
