@@ -970,7 +970,7 @@ class MainWindow(QMainWindow):
         # Container for Left side of status bar (Label + Progress)
         self.status_container = QWidget()
         self.status_layout = QHBoxLayout(self.status_container)
-        self.status_layout.setContentsMargins(20, 0, 0, 0)
+        self.status_layout.setContentsMargins(27, 0, 0, 0)
         self.status_layout.setSpacing(15)
 
         self.status_label = QLabel("Ready")
@@ -1393,7 +1393,7 @@ class MainWindow(QMainWindow):
             extra_args = ["--analyze-only"]
         else:
             self._is_analyzing = False
-            label = "Analyzing..." # Technically still accurate for phase 1
+            label = "Generating..." # Technically still accurate for phase 1
             extra_args = []
 
         if is_frozen(): cmd = [str(py_exec), "--internal-cli"]
@@ -1589,31 +1589,68 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Validating...")
         QTimer.singleShot(0, self.snap_to_content)
         py_exec = get_python_exec()
-        script = repo_root() / "tools" / "validator.py"
+
+        # --- FIX: Call via CLI flag, not script path ---
+        if is_frozen():
+            cmd = [str(py_exec), "--internal-cli"]
+        else:
+            cmd = [str(py_exec), "-m", "charter.cli"]
+
+        cmd.extend(["--validate", str(song_dir)])
+        # -----------------------------------------------
+
         self.validator_proc = QProcess(self)
         self.validator_proc.finished.connect(lambda c, s: self._on_health_finished(c, s, song_dir))
-        self.validator_proc.start(str(py_exec), [str(script), str(song_dir), "--summary"])
+        self.validator_proc.start(cmd[0], cmd[1:])
 
     def _on_health_finished(self, code: int, status: QProcess.ExitStatus, song_dir: Path) -> None:
-        output = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8")
+        # Read both channels
+        stdout = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+        stderr = bytes(self.validator_proc.readAllStandardError()).decode("utf-8", errors="replace")
+
+        full_output = stdout + stderr
+
+        # Debugging: if nothing came back, say so
+        if not full_output.strip():
+            full_output = "[No output from validator process]"
+
         warnings = []
-        for line in output.splitlines():
+        for line in full_output.splitlines():
             line = line.strip()
-            if line.startswith("- ") and "WARNINGS" in output:
-                warnings.append(line[2:])
+            # Simple heuristic to grab lines that look like warnings
+            if line.startswith("- ") or "WARNING" in line or "Error" in line or "Traceback" in line:
+                warnings.append(line)
+
         self.append_log("\n--- VALIDATION REPORT ---")
-        self.append_log(output)
+        self.append_log(full_output)
 
         if not self.song_queue:
             msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
-            if warnings: msg += "\n\nWarnings:\n" + "\n".join(f"• {w}" for w in warnings)
+
+            # Show warnings if any found (including crashes)
+            if warnings:
+                msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5]) # Limit length
+                if len(warnings) > 5: msg += "\n... (check logs for more)"
+
             title = "Generation Complete" if not warnings else "Complete (With Warnings)"
-            QMessageBox.information(self, title, msg) if not warnings else QMessageBox.warning(self, title, msg)
+
+            # Use Warning icon if we found issues
+            icon = QMessageBox.Information if not warnings else QMessageBox.Warning
+            QMessageBox(icon, title, msg, QMessageBox.Ok, self).show()
+
             self.status_label.setText("Ready")
 
         self.validator_proc = None
 
 def main() -> None:
+# --- FIX: Handle CLI mode for frozen app ---
+    if "--internal-cli" in sys.argv:
+        # Remove the flag so argparse doesn't choke on it
+        sys.argv.remove("--internal-cli")
+        from charter import cli
+        sys.exit(cli.main())
+    # -------------------------------------------
+
     app = QApplication(sys.argv)
     font = QApplication.font()
     font.setPointSize(10)

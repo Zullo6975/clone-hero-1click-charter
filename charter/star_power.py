@@ -1,47 +1,78 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from charter.config import SP_PITCH
+import random
 
-@dataclass(frozen=True)
+@dataclass
 class StarPowerPhrase:
     start: float
     end: float
 
-def generate_star_power_phrases(
-    *,
-    note_times: list[float],
-    duration_sec: float,
-    every_sec: float = 25.0,   # Slightly less frequent
-    phrase_len_sec: float = 6.0, # Shorter (was 9.0)
-    start_at: float = 15.0,
-) -> list[StarPowerPhrase]:
+def generate_star_power_phrases(note_times: list[float], duration_sec: float) -> list[StarPowerPhrase]:
     """
-    Generates Star Power phrases.
-    Updated v0.4: Shorter phrases (6s) that feel more like 'rewards'
-    than 'chores'.
+    Generates Star Power (SP) phrases based on note density.
+    - Finds dense regions (high NPS).
+    - Places SP phrases of 4-8 seconds.
+    - Ensures SP doesn't overlap or go past the last note.
     """
     if not note_times:
         return []
 
-    note_times = sorted(note_times)
-    phrases: list[StarPowerPhrase] = []
-    t = float(start_at)
+    # Safe boundaries based on actual notes
+    first_note = note_times[0]
+    last_note = note_times[-1]
 
-    idx = 0
-    while t < duration_sec - 10.0:
-        # Snap to nearest note
-        while idx < len(note_times) and note_times[idx] < t:
-            idx += 1
-        if idx >= len(note_times):
-            break
+    # 1. Calculate Density (1s windows)
+    window_size = 1.0
+    buckets = []
+    t = first_note
+    while t < last_note:
+        count = sum(1 for n in note_times if t <= n < t + window_size)
+        buckets.append((t, count))
+        t += window_size
 
-        start = note_times[idx]
-        # Shorter max length, minimum 2 seconds
-        end = min(start + phrase_len_sec, duration_sec - 1.0)
+    if not buckets:
+        return []
 
-        if end - start >= 2.0:
-            phrases.append(StarPowerPhrase(start=float(start), end=float(end)))
+    # 2. Select candidates (Above average density)
+    avg_density = sum(b[1] for b in buckets) / len(buckets) if buckets else 0
+    candidates = [b for b in buckets if b[1] >= avg_density]
 
-        t = end + every_sec
+    # Sort by time to process sequentially
+    candidates.sort(key=lambda x: x[0])
+
+    phrases = []
+    cooldown = 0.0
+
+    # Target approx 1 phrase every 20-30 seconds
+    target_gap = 25.0
+
+    for cand_t, _ in candidates:
+        if cand_t < cooldown:
+            continue
+
+        # Determine length (randomly 4s to 8s)
+        length = random.uniform(4.0, 8.0)
+
+        start_t = cand_t
+        end_t = start_t + length
+
+        # Clamp to last note! (Critical Fix)
+        if end_t > last_note:
+            end_t = last_note
+            # If clamping makes it tiny, skip it
+            if end_t - start_t < 2.0:
+                continue
+
+        phrases.append(StarPowerPhrase(start_t, end_t))
+        cooldown = end_t + target_gap
+
+    # If we didn't generate enough (short/sparse songs), fallback to periodic
+    if len(phrases) < 2 and duration_sec > 60:
+        phrases = []
+        cursor = first_note + 15.0
+        while cursor < last_note - 10.0:
+            end = min(cursor + 6.0, last_note)
+            phrases.append(StarPowerPhrase(cursor, end))
+            cursor += 35.0
 
     return phrases

@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.2] - 2026-01-10
+
+### Addressing Bugs
+
+Blank for now.
+
 ## [1.2.1] - 2026-01-09
 
 ### Community Standards

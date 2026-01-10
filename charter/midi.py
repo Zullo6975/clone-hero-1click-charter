@@ -8,6 +8,7 @@ import math
 import pretty_midi # type: ignore
 import librosa # type: ignore
 import numpy as np # type: ignore
+import mido # type: ignore
 
 from charter.config import ChartConfig, LANE_PITCHES, TRACK_NAME, SP_PITCH
 from charter.audio import detect_onsets, estimate_pitches
@@ -142,6 +143,73 @@ def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
         points.append({"t": round(t, 2), "nps": count})
         t += step
     return points
+
+def _fix_midi_sections(midi_path: Path):
+    """
+    Post-process the MIDI file to move [section ...] events to Track 0.
+    Clone Hero REQUIRES section names to be Text events on the global tempo track.
+    """
+    try:
+        mid = mido.MidiFile(str(midi_path))
+
+        # Track 0 is usually the conductor track (tempo, time sig, global events)
+        conductor_track = mid.tracks[0]
+
+        # We will collect all section events found in ANY track
+        sections_to_move = []
+
+        for track in mid.tracks:
+            # Rebuild track without the section events
+            new_track_data = []
+            current_time = 0
+
+            for msg in track:
+                current_time += msg.time # Track absolute time
+
+                # Identify section markers (Lyrics or Text starting with [section)
+                if msg.type in ('lyrics', 'text') and isinstance(msg.text, str) and msg.text.startswith('[section '):
+                    # Store absolute time and text to move later
+                    sections_to_move.append((current_time, msg.text))
+                else:
+                    new_track_data.append(msg)
+
+            # Replace track content (stripping sections from original location)
+            track[:] = new_track_data
+
+        # Now add them to the conductor track
+        if sections_to_move:
+            # 1. Convert conductor track to absolute time
+            abs_conductor = []
+            curr = 0
+            for msg in conductor_track:
+                curr += msg.time
+                abs_conductor.append((curr, msg))
+
+            # 2. Add new section events
+            for t, text in sections_to_move:
+                # Create a proper Text event (meta type 0x01)
+                new_msg = mido.MetaMessage('text', text=text)
+                abs_conductor.append((t, new_msg))
+
+            # 3. Sort by absolute time
+            abs_conductor.sort(key=lambda x: x[0])
+
+            # 4. Convert back to delta time
+            new_conductor = []
+            last_time = 0
+            for t, msg in abs_conductor:
+                delta = t - last_time
+                # Mido messages are mutable, but safer to copy if modifying time
+                msg = msg.copy(time=int(delta))
+                new_conductor.append(msg)
+                last_time = t
+
+            mid.tracks[0][:] = new_conductor
+
+        mid.save(str(midi_path))
+
+    except Exception as e:
+        print(f"Warning: Failed to fix section events: {e}")
 
 def write_real_notes_mid(
     *,
@@ -297,10 +365,8 @@ def write_real_notes_mid(
     if override_sections:
         final_sections = override_sections
         if not dry_run:
-            evt = pretty_midi.Instrument(0, name="EVENTS")
             for s in final_sections:
                 pm.lyrics.append(pretty_midi.Lyric(f"[section {s['name']}]", float(s['start'])))
-            pm.instruments.append(evt)
 
     elif cfg.add_sections:
         raw_sections = generate_sections(str(audio_path), duration - shift_seconds)
@@ -320,10 +386,8 @@ def write_real_notes_mid(
         )
 
         if not dry_run:
-            evt = pretty_midi.Instrument(0, name="EVENTS")
             for s in final_sections:
                 pm.lyrics.append(pretty_midi.Lyric(f"[section {s['name']}]", float(s['start'])))
-            pm.instruments.append(evt)
 
     if not dry_run and cfg.add_star_power:
         phrases = generate_star_power_phrases(note_times=times, duration_sec=duration)
@@ -333,6 +397,9 @@ def write_real_notes_mid(
     if not dry_run:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pm.write(str(out_path))
+
+        # --- FIX: Move section events to Track 0 for Clone Hero ---
+        _fix_midi_sections(out_path)
 
     # --- Compute Density ---
     density_data = _compute_rolling_density(times, duration)
