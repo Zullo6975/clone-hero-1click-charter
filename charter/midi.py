@@ -145,7 +145,8 @@ def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
 def _inject_sections_mido(midi_path: Path, sections: list, pm: pretty_midi.PrettyMIDI):
     """
     Directly injects section Text events into Track 0 of the MIDI file.
-    Uses pretty_midi to calculate ticks, but mido to write the events.
+    Format: [section Name] (Text Event)
+    Also ensures Track 0 is named "EVENTS".
     """
     try:
         mid = mido.MidiFile(str(midi_path))
@@ -154,11 +155,20 @@ def _inject_sections_mido(midi_path: Path, sections: list, pm: pretty_midi.Prett
         # 1. Convert Track 0 to absolute time
         abs_events = []
         curr_ticks = 0
+        has_track_name = False
+
         for msg in track0:
             curr_ticks += msg.time
             abs_events.append((curr_ticks, msg))
+            if msg.type == 'track_name':
+                has_track_name = True
 
-        # 2. Add Section Events
+        # 2. Add Track Name "EVENTS" if missing (helps CH parser)
+        if not has_track_name:
+            name_msg = mido.MetaMessage('track_name', name='EVENTS', time=0)
+            abs_events.append((0, name_msg))
+
+        # 3. Add Section Events
         for s in sections:
             name = s['name'] if isinstance(s, dict) else s.name
             start_sec = float(s['start'] if isinstance(s, dict) else s.start)
@@ -166,14 +176,15 @@ def _inject_sections_mido(midi_path: Path, sections: list, pm: pretty_midi.Prett
             # Convert seconds -> ticks using the PrettyMIDI object that wrote the file
             start_ticks = pm.time_to_tick(start_sec)
 
-            # Create Text event
+            # Create Text event WITH brackets: [section Name]
+            # This combination (Text Event + Brackets) is the Moonscraper standard
             text_msg = mido.MetaMessage('text', text=f"[section {name}]", time=0)
             abs_events.append((int(start_ticks), text_msg))
 
-        # 3. Sort by absolute time
+        # 4. Sort by absolute time
         abs_events.sort(key=lambda x: x[0])
 
-        # 4. Rebuild Track 0 with delta times
+        # 5. Rebuild Track 0 with delta times
         new_track = []
         last_ticks = 0
         for t, msg in abs_events:

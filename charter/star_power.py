@@ -39,7 +39,7 @@ def generate_star_power_phrases(note_times: list[float], duration_sec: float) ->
 
     # 2. Select candidates (Above average density)
     avg_density = sum(b[1] for b in buckets) / len(buckets) if buckets else 0
-    # Lower threshold slightly to allow more phrases in sparse songs
+
     threshold = avg_density * 0.8
     candidates = [b for b in buckets if b[1] >= threshold]
 
@@ -48,7 +48,6 @@ def generate_star_power_phrases(note_times: list[float], duration_sec: float) ->
     phrases = []
     cooldown = 0.0
 
-    # Reduced gap to allow more phrases (was 25.0)
     target_gap = 15.0
 
     for cand_t, _ in candidates:
