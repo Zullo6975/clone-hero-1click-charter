@@ -45,7 +45,6 @@ jobs:
           pyinstaller --noconfirm --clean \
             --name "1ClickCharter" \
             --windowed \
-            --onefile \
             --icon "icons/AppIcon.icns" \
             --add-data "icons/icon_og.png:icons" \
             --add-binary "bin/ffmpeg:." \
@@ -136,7 +135,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Download Artifacts
         uses: actions/download-artifact@v4
         with:

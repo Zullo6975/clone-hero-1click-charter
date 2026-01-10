@@ -125,7 +125,6 @@ package: install icons
 	@$(VENV)/bin/pyinstaller --noconfirm --clean \
 		--name "$(APP_NAME)" \
 		--windowed \
-		--onefile \
 		--icon "icons/AppIcon.icns" \
 		--add-data "icons/icon_og.png:icons" \
 		--add-binary "bin/ffmpeg:." \
