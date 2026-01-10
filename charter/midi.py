@@ -144,56 +144,49 @@ def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
 
 def _inject_sections_mido(midi_path: Path, sections: list, pm: pretty_midi.PrettyMIDI):
     """
-    Directly injects section Text events into Track 0 of the MIDI file.
+    Directly injects section Text events into a dedicated 'EVENTS' track.
     Format: [section Name] (Text Event)
-    Also ensures Track 0 is named "EVENTS".
+    This structure (Tempo -> EVENTS -> Instruments) is standard for CH.
     """
     try:
         mid = mido.MidiFile(str(midi_path))
-        track0 = mid.tracks[0]
 
-        # 1. Convert Track 0 to absolute time
+        # Create a fresh track for Events
+        events_track = mido.MidiTrack()
+
+        # Name it "EVENTS" (Crucial for Clone Hero)
+        events_track.append(mido.MetaMessage('track_name', name='EVENTS', time=0))
+
+        # 1. Prepare absolute time list
         abs_events = []
-        curr_ticks = 0
-        has_track_name = False
 
-        for msg in track0:
-            curr_ticks += msg.time
-            abs_events.append((curr_ticks, msg))
-            if msg.type == 'track_name':
-                has_track_name = True
-
-        # 2. Add Track Name "EVENTS" if missing (helps CH parser)
-        if not has_track_name:
-            name_msg = mido.MetaMessage('track_name', name='EVENTS', time=0)
-            abs_events.append((0, name_msg))
-
-        # 3. Add Section Events
+        # 2. Add Section Events
         for s in sections:
             name = s['name'] if isinstance(s, dict) else s.name
             start_sec = float(s['start'] if isinstance(s, dict) else s.start)
 
-            # Convert seconds -> ticks using the PrettyMIDI object that wrote the file
+            # Convert seconds -> ticks
             start_ticks = pm.time_to_tick(start_sec)
 
             # Create Text event WITH brackets: [section Name]
-            # This combination (Text Event + Brackets) is the Moonscraper standard
             text_msg = mido.MetaMessage('text', text=f"[section {name}]", time=0)
             abs_events.append((int(start_ticks), text_msg))
 
-        # 4. Sort by absolute time
+        # 3. Sort by absolute time
         abs_events.sort(key=lambda x: x[0])
 
-        # 5. Rebuild Track 0 with delta times
-        new_track = []
+        # 4. Convert to delta times and append to the new track
         last_ticks = 0
         for t, msg in abs_events:
             delta = t - last_ticks
             msg = msg.copy(time=int(delta))
-            new_track.append(msg)
+            events_track.append(msg)
             last_ticks = t
 
-        mid.tracks[0][:] = new_track
+        # 5. Insert the EVENTS track after the Tempo track (Index 1)
+        # Track 0 is usually Conductor/Tempo. Track 1 is now EVENTS.
+        mid.tracks.insert(1, events_track)
+
         mid.save(str(midi_path))
 
     except Exception as e:
@@ -378,7 +371,7 @@ def write_real_notes_mid(
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pm.write(str(out_path))
 
-        # --- FIX: Inject proper Text Events for sections ---
+        # --- FIX: Inject separate EVENTS track ---
         if final_sections:
             _inject_sections_mido(out_path, final_sections, pm)
 

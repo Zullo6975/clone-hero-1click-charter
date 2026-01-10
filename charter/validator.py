@@ -98,15 +98,22 @@ def _group_sp_phrases(sp_starts: list[float], sp_ends: list[float], gap_join_sec
 def _parse_sections(midi_path: Path, pm: pretty_midi.PrettyMIDI) -> tuple[list[tuple[str, float]], str]:
     """
     Scans the raw MIDI file for Text or Lyric events starting with 'section '.
-    Returns (list_of_sections, track_location_info)
+    Returns (list_of_sections, track_name_info)
     """
     out: list[tuple[str, float]] = []
-    found_in_track = None
+    found_in_track_name = None
 
     try:
         mid = mido.MidiFile(str(midi_path))
 
         for i, track in enumerate(mid.tracks):
+            track_name = f"Track {i}"
+            # Check for track name event first
+            for msg in track:
+                if msg.type == 'track_name':
+                    track_name = msg.name
+                    break
+
             abs_time = 0
             for msg in track:
                 abs_time += msg.time
@@ -114,7 +121,6 @@ def _parse_sections(midi_path: Path, pm: pretty_midi.PrettyMIDI) -> tuple[list[t
                 if msg.type in ('text', 'lyrics') and isinstance(msg.text, str):
                     text = msg.text.strip()
 
-                    # Accept 'section Name' OR '[section Name]'
                     is_sec = False
                     clean_name = ""
 
@@ -126,7 +132,7 @@ def _parse_sections(midi_path: Path, pm: pretty_midi.PrettyMIDI) -> tuple[list[t
                         is_sec = True
 
                     if is_sec:
-                        if found_in_track is None: found_in_track = i
+                        if found_in_track_name is None: found_in_track_name = track_name
                         seconds = pm.tick_to_time(abs_time)
                         out.append((clean_name, seconds))
 
@@ -135,7 +141,7 @@ def _parse_sections(midi_path: Path, pm: pretty_midi.PrettyMIDI) -> tuple[list[t
         return [], "Error"
 
     out.sort(key=lambda x: x[1])
-    track_info = f"Track {found_in_track}" if found_in_track is not None else "None"
+    track_info = found_in_track_name if found_in_track_name is not None else "None"
     return out, track_info
 
 
@@ -236,8 +242,8 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
     sections, track_loc = _parse_sections(notes_mid, pm)
     if not sections:
         warnings.append("No section markers found.")
-    elif track_loc != "Track 0":
-        warnings.append(f"Sections found in {track_loc}, but Clone Hero expects Track 0.")
+    elif track_loc != "EVENTS":
+        warnings.append(f"Sections found in '{track_loc}', but expected 'EVENTS' track.")
 
     spikes = _count_density_spikes(lane_note_starts, window_sec=1.0, nps_warn=9.0)
     if spikes > 0:
