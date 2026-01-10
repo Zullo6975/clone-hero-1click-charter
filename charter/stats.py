@@ -51,6 +51,7 @@ class ChartStats:
     # difficulty-ish
     max_nps_1s: float
     avg_nps: float
+    complexity: int  # New field: 0-10 score
 
     # lanes
     lane_counts: dict[str, int]  # {"G":..., "R":..., ...}
@@ -145,6 +146,34 @@ def _lane_counts(notes: list[pretty_midi.Note]) -> dict[str, int]:
     return out
 
 
+def _calculate_complexity(avg_nps: float, max_nps: float, total_chords: int, total_notes: int) -> int:
+    """
+    Calculates a 0-6 complexity score based on chart metrics.
+    Modeled roughly after Rock Band tiering logic.
+    """
+    if total_notes == 0:
+        return 0
+
+    # 1. Base Score from NPS (Weight: 60%)
+    # 2.0 NPS = Tier 1, 8.0 NPS = Tier 6
+    nps_score = min(6, (avg_nps / 1.5))
+
+    # 2. Peak Score from Max NPS (Weight: 20%)
+    # Spikes indicate difficulty even if avg is low
+    peak_score = min(6, (max_nps / 3.0))
+
+    # 3. Chord Density Score (Weight: 20%)
+    chord_ratio = total_chords / total_notes if total_notes else 0
+    chord_score = min(6, chord_ratio * 10)
+
+    # Weighted Average
+    # Average NPS is king, but peaks and chords bump you up
+    raw_score = (nps_score * 0.6) + (peak_score * 0.2) + (chord_score * 0.2)
+
+    # Round to nearest integer 0-6
+    return int(round(raw_score))
+
+
 def compute_chart_stats(
     *,
     notes_mid_path: Path,
@@ -184,6 +213,9 @@ def compute_chart_stats(
 
     chart_duration = max(0.0, chart_end - (min(starts) if starts else 0.0))
     avg_nps = (total_notes / chart_duration) if chart_duration > 0 else 0.0
+
+    # Calculate Complexity
+    complexity = _calculate_complexity(avg_nps, max_nps_1s, total_chords, total_notes)
 
     # windows (fixed buckets, GH-ish "section stats")
     w = max(5.0, float(window_sec))
@@ -233,6 +265,7 @@ def compute_chart_stats(
         sustain_ratio=_safe_float(sustain_ratio),
         max_nps_1s=_safe_float(max_nps_1s),
         avg_nps=_safe_float(avg_nps),
+        complexity=complexity,
         lane_counts=_lane_counts(notes),
         window_sec=_safe_float(w),
         windows=windows,
@@ -252,6 +285,7 @@ def format_stats_summary(stats: ChartStats) -> str:
         f"Stats\n"
         f"- Notes: {stats.total_notes} (chords: {stats.total_chords}, sustains: {stats.total_sustains}, sustain%: {stats.sustain_ratio:.2f})\n"
         f"- Max NPS (1s): {stats.max_nps_1s:.2f} | Avg NPS: {stats.avg_nps:.2f}\n"
+        f"- Complexity: {stats.complexity}/6\n"
         f"- Lanes: {lane_str}\n"
         f"- Chart end: {stats.chart_duration_sec:.2f}s\n"
         f"- Sections: {len(stats.windows)} @ {stats.window_sec:.0f}s\n"
