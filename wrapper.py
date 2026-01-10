@@ -1,30 +1,43 @@
 import sys
 import os
-import multiprocessing
+from pathlib import Path
 
-from gui.qt_app import main as gui_main
-from charter import cli as cli_module 
-
-def setup_path():
+# --- FIX: Setup Pydub & FFmpeg environment BEFORE imports ---
+def setup_ffmpeg_env():
     """
-    If running as a frozen PyInstaller bundle, add the internal extraction
-    directory to the PATH so pydub can find the bundled ffmpeg/ffprobe.
+    Ensures pydub can find the bundled ffmpeg/ffprobe binaries.
     """
     if getattr(sys, 'frozen', False):
-        bundle_dir = sys._MEIPASS
-        # Append the bundle directory to the system PATH
-        os.environ["PATH"] += os.pathsep + bundle_dir
+        # We are running in a bundle
+        base_path = Path(sys._MEIPASS)
 
-def run():
-    multiprocessing.freeze_support()
-    setup_path()
+        # 1. Add bundle dir to PATH (so pydub's subprocess calls find it)
+        os.environ["PATH"] += os.pathsep + str(base_path)
 
-    # TRAFFIC COP: Did the subprocess call us with the secret flag?
-    if "--internal-cli" in sys.argv:
-        sys.argv.remove("--internal-cli")
-        cli_module.main()
-    else:
-        gui_main()
+        # 2. Explicitly tell pydub where they are
+        # (We import inside here to avoid global side effects before setup)
+        try:
+            from pydub import AudioSegment
+
+            ffmpeg_name = "ffmpeg.exe" if sys.platform == "win32" else "ffmpeg"
+            ffprobe_name = "ffprobe.exe" if sys.platform == "win32" else "ffprobe"
+
+            ffmpeg_path = base_path / ffmpeg_name
+            ffprobe_path = base_path / ffprobe_name
+
+            if ffmpeg_path.exists():
+                AudioSegment.converter = str(ffmpeg_path)
+
+            # Pydub doesn't have a direct 'ffprobe' setter in all versions,
+            # but adding to PATH above usually fixes it.
+
+        except ImportError:
+            pass # Pydub might not be installed yet (unlikely in frozen app)
+
+setup_ffmpeg_env()
+# ------------------------------------------------------------
+
+from gui import qt_app
 
 if __name__ == "__main__":
-    run()
+    qt_app.main()

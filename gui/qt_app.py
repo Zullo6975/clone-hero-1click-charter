@@ -970,7 +970,7 @@ class MainWindow(QMainWindow):
         # Container for Left side of status bar (Label + Progress)
         self.status_container = QWidget()
         self.status_layout = QHBoxLayout(self.status_container)
-        self.status_layout.setContentsMargins(20, 0, 0, 0)
+        self.status_layout.setContentsMargins(27, 0, 0, 0)
         self.status_layout.setSpacing(15)
 
         self.status_label = QLabel("Ready")
@@ -989,7 +989,7 @@ class MainWindow(QMainWindow):
 
         self.statusBar().addWidget(self.status_container, 1)
 
-        self.btn_generate = QPushButton("GENERATE CHART")
+        self.btn_generate = QPushButton("  GENERATE  ")
         self.btn_generate.setObjectName("Primary")
         self.btn_generate.setCursor(Qt.PointingHandCursor)
 
@@ -1389,11 +1389,11 @@ class MainWindow(QMainWindow):
         # Determine if we should analyze first
         if self.chk_review.isChecked():
             self._is_analyzing = True
-            label = "Analyzing..."
+            label = "Generating...."
             extra_args = ["--analyze-only"]
         else:
             self._is_analyzing = False
-            label = "Analyzing..." # Technically still accurate for phase 1
+            label = "Generating...." # Technically still accurate for phase 1
             extra_args = []
 
         if is_frozen(): cmd = [str(py_exec), "--internal-cli"]
@@ -1459,7 +1459,7 @@ class MainWindow(QMainWindow):
 
         if not ok:
             # FAILURE
-            self.btn_generate.setText("GENERATE CHART")
+            self.btn_generate.setText("  GENERATE  ")
             self.progress_bar.setVisible(False)
             reason = "Unknown error."
             logs = self.log_window.get_text()
@@ -1495,27 +1495,27 @@ class MainWindow(QMainWindow):
                         self.run_generation_phase2(override_path)
                     else:
                         # User Cancelled
-                        self.btn_generate.setText("GENERATE CHART")
+                        self.btn_generate.setText("  GENERATE  ")
                         self.progress_bar.setVisible(False)
                         self.status_label.setText("Cancelled")
                         self.proc = None
                         self._update_state()
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Failed to parse analysis data: {e}")
-                    self.btn_generate.setText("GENERATE CHART")
+                    self.btn_generate.setText("  GENERATE  ")
                     self.progress_bar.setVisible(False)
                     self.proc = None
                     self._update_state()
             else:
                 QMessageBox.critical(self, "Error", "Analysis finished but sections.json was not found.")
-                self.btn_generate.setText("GENERATE CHART")
+                self.btn_generate.setText("  GENERATE  ")
                 self.progress_bar.setVisible(False)
                 self.proc = None
                 self._update_state()
             return
 
         # PHASE 2 COMPLETE (Or Normal Run Complete)
-        self.btn_generate.setText("GENERATE CHART")
+        self.btn_generate.setText("  GENERATE  ")
         self.progress_bar.setVisible(False)
 
         if self.cover_path and self.cover_path.exists():
@@ -1589,31 +1589,73 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Validating...")
         QTimer.singleShot(0, self.snap_to_content)
         py_exec = get_python_exec()
-        script = repo_root() / "tools" / "validator.py"
+
+        # --- FIX: Call via CLI flag, not script path ---
+        if is_frozen():
+            cmd = [str(py_exec), "--internal-cli"]
+        else:
+            cmd = [str(py_exec), "-m", "charter.cli"]
+
+        cmd.extend(["--validate", str(song_dir)])
+        # -----------------------------------------------
+
         self.validator_proc = QProcess(self)
         self.validator_proc.finished.connect(lambda c, s: self._on_health_finished(c, s, song_dir))
-        self.validator_proc.start(str(py_exec), [str(script), str(song_dir), "--summary"])
+        self.validator_proc.start(cmd[0], cmd[1:])
 
     def _on_health_finished(self, code: int, status: QProcess.ExitStatus, song_dir: Path) -> None:
-        output = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8")
+        # Read both channels
+        stdout = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+        stderr = bytes(self.validator_proc.readAllStandardError()).decode("utf-8", errors="replace")
+
+        full_output = stdout + stderr
+
+        # Debugging: if nothing came back, say so
+        if not full_output.strip():
+            full_output = "[No output from validator process]"
+
         warnings = []
-        for line in output.splitlines():
+        for line in full_output.splitlines():
             line = line.strip()
-            if line.startswith("- ") and "WARNINGS" in output:
-                warnings.append(line[2:])
+            line_lower = line.lower()
+            # FIX: Case insensitive check for "warning" and "error"
+            if line.startswith("- ") or "warning" in line_lower or "error" in line_lower or "traceback" in line_lower:
+                warnings.append(line)
+
         self.append_log("\n--- VALIDATION REPORT ---")
-        self.append_log(output)
+        self.append_log(full_output)
 
         if not self.song_queue:
             msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
-            if warnings: msg += "\n\nWarnings:\n" + "\n".join(f"• {w}" for w in warnings)
+
+            # Show warnings if any found (including crashes)
+            if warnings:
+                msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
+                if len(warnings) > 5: msg += "\n... (check logs for more)"
+
             title = "Generation Complete" if not warnings else "Complete (With Warnings)"
-            QMessageBox.information(self, title, msg) if not warnings else QMessageBox.warning(self, title, msg)
+
+            # Use Warning icon if we found issues
+            icon = QMessageBox.Information if not warnings else QMessageBox.Warning
+
+            # --- FIX: Explicitly set window width to 700px (matches Log Window) ---
+            msg_box = QMessageBox(icon, title, msg, QMessageBox.Ok, self)
+            msg_box.exec()
+            # ----------------------------------------------------------------------
+
             self.status_label.setText("Ready")
 
         self.validator_proc = None
 
 def main() -> None:
+# --- FIX: Handle CLI mode for frozen app ---
+    if "--internal-cli" in sys.argv:
+        # Remove the flag so argparse doesn't choke on it
+        sys.argv.remove("--internal-cli")
+        from charter import cli
+        sys.exit(cli.main())
+    # -------------------------------------------
+
     app = QApplication(sys.argv)
     font = QApplication.font()
     font.setPointSize(10)

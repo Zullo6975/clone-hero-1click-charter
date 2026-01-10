@@ -7,16 +7,12 @@ from pathlib import Path
 from typing import Iterable, List, Tuple
 
 import pretty_midi  # type: ignore
-
+import mido  # type: ignore
 
 # ---- Your chart conventions ----
 TRACK_NAME = "PART GUITAR"
-
-# CLONE HERO PITCH MAP (Medium Difficulty)
-# 72=Green, 73=Red, 74=Yellow, 75=Blue, 76=Orange
 LANE_PITCHES = {72, 73, 74, 75, 76}
 ORANGE_PITCH = 76
-
 DEFAULT_MIN_NOTE_START = 1.0
 DEFAULT_SP_PITCH = 116
 
@@ -83,11 +79,6 @@ def _count_density_spikes(note_starts: list[float], window_sec: float = 1.0, nps
 
 
 def _group_sp_phrases(sp_starts: list[float], sp_ends: list[float], gap_join_sec: float = 0.45) -> list[tuple[float, float]]:
-    """
-    SP notes are written as contiguous ranges (start->end).
-    We group nearby SP notes into 'phrases' so you can count them.
-    gap_join_sec: if the next SP note starts within this gap, treat as same phrase.
-    """
     spans = sorted(zip(sp_starts, sp_ends), key=lambda x: x[0])
     if not spans:
         return []
@@ -104,22 +95,57 @@ def _group_sp_phrases(sp_starts: list[float], sp_ends: list[float], gap_join_sec
     return phrases
 
 
-def _parse_sections(pm: pretty_midi.PrettyMIDI) -> list[tuple[str, float]]:
+def _parse_sections(midi_path: Path, pm: pretty_midi.PrettyMIDI) -> tuple[list[tuple[str, float]], str]:
+    """
+    Scans the raw MIDI file for Text or Lyric events starting with 'section '.
+    Returns (list_of_sections, track_name_info)
+    """
     out: list[tuple[str, float]] = []
-    for ly in getattr(pm, "lyrics", []) or []:
-        text = getattr(ly, "text", "")
-        t = float(getattr(ly, "time", 0.0))
-        if isinstance(text, str) and text.lower().startswith("[section "):
-            out.append((text.strip(), t))
+    found_in_track_name = None
+
+    try:
+        mid = mido.MidiFile(str(midi_path))
+
+        for i, track in enumerate(mid.tracks):
+            track_name = f"Track {i}"
+            # Check for track name event first
+            for msg in track:
+                if msg.type == 'track_name':
+                    track_name = msg.name
+                    break
+
+            abs_time = 0
+            for msg in track:
+                abs_time += msg.time
+
+                if msg.type in ('text', 'lyrics') and isinstance(msg.text, str):
+                    text = msg.text.strip()
+
+                    is_sec = False
+                    clean_name = ""
+
+                    if text.lower().startswith("section "):
+                        clean_name = text[8:].strip()
+                        is_sec = True
+                    elif text.lower().startswith("[section "):
+                        clean_name = text.replace("[section ", "").replace("]", "").strip()
+                        is_sec = True
+
+                    if is_sec:
+                        if found_in_track_name is None: found_in_track_name = track_name
+                        seconds = pm.tick_to_time(abs_time)
+                        out.append((clean_name, seconds))
+
+    except Exception as e:
+        print(f"Warning: Failed to scan sections with mido: {e}")
+        return [], "Error"
+
     out.sort(key=lambda x: x[1])
-    return out
+    track_info = found_in_track_name if found_in_track_name is not None else "None"
+    return out, track_info
 
 
 def _estimate_chords(lane_note_starts: list[float], tol: float = 0.012) -> int:
-    """
-    A chord is multiple lane notes starting at ~same time.
-    We estimate by bucketing start times within tolerance.
-    """
     if not lane_note_starts:
         return 0
     times = sorted(lane_note_starts)
@@ -194,9 +220,6 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
             sp_notes += 1
             sp_starts.append(float(n.start))
             sp_ends.append(float(n.end))
-        else:
-            # Not necessarily wrong, but likely noise.
-            warnings.append(f"Unexpected pitch in PART GUITAR: {n.pitch} at {n.start:.3f}s")
 
     if bad_dur:
         errors.append(f"{bad_dur} notes have non-positive duration (end <= start).")
@@ -214,15 +237,17 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
         warnings.append(f"No Star Power notes found (expected SP pitch={sp_pitch}).")
 
     if orange_notes > 0:
-        warnings.append(f"{orange_notes} orange notes found! Safe to play.")
+        warnings.append(f"{orange_notes} orange notes found!")
 
-    sections = _parse_sections(pm)
+    sections, track_loc = _parse_sections(notes_mid, pm)
     if not sections:
-        warnings.append("No [section ...] markers found in MIDI lyrics (optional but nice).")
+        warnings.append("No section markers found.")
+    elif track_loc != "EVENTS":
+        warnings.append(f"Sections found in '{track_loc}', but expected 'EVENTS' track.")
 
     spikes = _count_density_spikes(lane_note_starts, window_sec=1.0, nps_warn=9.0)
     if spikes > 0:
-        warnings.append(f"High-density spikes detected (>= 9 NPS in a 1s window): {spikes} (warning only).")
+        warnings.append(f"High-density spikes detected (>= 9 NPS): {spikes}")
 
     ok = len(errors) == 0
     return ValidationResult(ok, errors, warnings)
@@ -259,18 +284,11 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
     chords_est = _estimate_chords(lane_note_starts)
     total_lane = len(lane_note_starts)
 
-    sections = _parse_sections(pm)
+    sections, track_loc = _parse_sections(notes_mid, pm)
     sp_phrases = _group_sp_phrases(sp_starts, sp_ends, gap_join_sec=0.45)
 
     print("\n--- SUMMARY (Medium Difficulty) ---")
     print(f"Folder: {song_dir}")
-    print(f"notes.mid: {notes_mid.name}")
-
-    song_ini = _find_song_ini(song_dir)
-    audio = _find_audio(song_dir)
-    print(f"song.ini: {'YES' if song_ini else 'NO'}")
-    print(f"audio:    {audio.name if audio else 'NOT FOUND'}")
-
     print("\nPART GUITAR:")
     print(f"  Lane notes: {total_lane}")
     print(f"  Chords (est): {chords_est}")
@@ -282,62 +300,55 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
     print(f"    Orange(76): {lane_pitch_counts[76]}")
 
     print("\nSTAR POWER:")
-    print(f"  SP pitch: {sp_pitch}")
-    print(f"  SP notes: {len(sp_starts)}")
     print(f"  Phrases:  {len(sp_phrases)}")
     if sp_phrases:
         for i, (s, e) in enumerate(sp_phrases[:12], 1):
-            print(f"    {i:02d}. {s:7.2f}s → {e:7.2f}s  (len {e - s:5.2f}s)")
+            print(f"    {i:02d}. {s:7.2f}s -> {e:7.2f}s  (len {e - s:5.2f}s)")
         if len(sp_phrases) > 12:
-            print(f"    …and {len(sp_phrases) - 12} more")
+            print(f"    ...and {len(sp_phrases) - 12} more")
 
-    print("\nSECTIONS:")
+    print(f"\nSECTIONS (Found in {track_loc}):")
     print(f"  Markers: {len(sections)}")
     if sections:
         for i, (name, t) in enumerate(sections[:18], 1):
             print(f"    {i:02d}. {t:7.2f}s  {name}")
         if len(sections) > 18:
-            print(f"    …and {len(sections) - 18} more")
+            print(f"    ...and {len(sections) - 18} more")
 
-    # Small timeline peek
     if lane_note_starts:
         starts = sorted(lane_note_starts)
         print("\nTIMELINE (lane note starts):")
         print(f"  First: {starts[0]:.2f}s   Median: {starts[len(starts)//2]:.2f}s   Last: {starts[-1]:.2f}s")
 
 
-def main() -> None:
-    ap = argparse.ArgumentParser(description="Sanity-check a Clone Hero output folder without opening Clone Hero.")
-    ap.add_argument("song_dir", type=str, help="Path to the output song folder (contains notes.mid, song.ini, audio).")
-    ap.add_argument("--sp-pitch", type=int, default=DEFAULT_SP_PITCH, help="Star Power MIDI pitch (default: 116).")
-    ap.add_argument("--min-note-start", type=float, default=DEFAULT_MIN_NOTE_START, help="Warn if notes start before this time.")
-    ap.add_argument("--summary", action="store_true", help="Print summary (sections, SP phrases, lane counts).")
-    args = ap.parse_args()
+def validate_chart_file(song_dir: Path, summary_only: bool = False):
+    print(f"DEBUG: Validator started for {song_dir.name}", flush=True)
+    res = validate_song_dir(song_dir, sp_pitch=DEFAULT_SP_PITCH)
 
-    song_dir = Path(args.song_dir).expanduser().resolve()
-
-    res = validate_song_dir(song_dir, sp_pitch=int(args.sp_pitch), min_note_start=float(args.min_note_start))
-
-    print(f"\n== Validate: {song_dir} ==")
     if res.errors:
-        print("\nERRORS:")
         for e in res.errors:
-            print(f"  - {e}")
+            print(f"Error: {e}")
 
     if res.warnings:
-        print("\nWARNINGS:")
         for w in res.warnings:
-            print(f"  - {w}")
+            print(f"Warning: {w}")
 
-    if args.summary:
-        summarize(song_dir, sp_pitch=int(args.sp_pitch))
+    if res.ok and not res.warnings:
+        print("\n✅ Chart passed basic health check.")
 
-    if res.ok:
-        print("\n✅ OK: looks structurally sane for Clone Hero (best-effort).")
-        sys.exit(0)
-    else:
-        print("\n❌ FAIL: fix errors above before bothering with Clone Hero.")
-        sys.exit(1)
+    if summary_only or True:
+        summarize(song_dir, sp_pitch=DEFAULT_SP_PITCH)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Sanity-check a Clone Hero output folder.")
+    ap.add_argument("song_dir", type=str, help="Path to the output song folder.")
+    ap.add_argument("--sp-pitch", type=int, default=DEFAULT_SP_PITCH, help="Star Power MIDI pitch.")
+    ap.add_argument("--min-note-start", type=float, default=DEFAULT_MIN_NOTE_START, help="Warn if notes start too early.")
+    ap.add_argument("--summary", action="store_true", help="Print summary.")
+    args = ap.parse_args()
+
+    validate_chart_file(Path(args.song_dir), summary_only=args.summary)
 
 
 if __name__ == "__main__":

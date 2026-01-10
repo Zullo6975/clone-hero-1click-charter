@@ -1,68 +1,59 @@
 from __future__ import annotations
 from dataclasses import dataclass
-import librosa # type: ignore
-import numpy as np # type: ignore
+import random
 
-@dataclass(frozen=True)
+@dataclass
 class Section:
     name: str
     start: float
 
-# UPDATED: Removed "Solo" so it is only used when detected dynamically
-SECTION_LABELS = ["Verse", "Chorus", "Verse", "Chorus", "Bridge", "Breakdown", "Chorus", "Outro"]
-
-def generate_sections(
-    audio_path: str,
-    duration_sec: float,
-) -> list[Section]:
+def generate_sections(audio_path: str, duration: float) -> list[Section]:
     """
-    Finds musical boundaries using audio analysis.
-    INCLUDES SAFETY VALVE: Force-splits any section > 45s to ensure pacing.
+    Generates a list of sections based on song duration.
     """
-    try:
-        # 1. Fast structural segmentation
-        y, sr = librosa.load(audio_path, sr=22050, mono=True, duration=duration_sec)
-        chroma = librosa.feature.chroma_cqt(y=y, sr=sr)
-        # Ask for slightly more segments (k=12) to catch smaller changes
-        bounds = librosa.segment.agglomerative(chroma, k=12)
-        times = librosa.frames_to_time(bounds, sr=sr)
-        times = sorted(list(times))
-    except Exception:
-        # Fallback if analysis crashes
-        times = [0.0]
+    # Standard structure templates based on duration
+    # Short (< 2 min): Intro -> Verse -> Chorus -> Outro
+    # Medium (2-4 min): Intro -> Verse 1 -> Chorus 1 -> Verse 2 -> Chorus 2 -> Bridge -> Outro
+    # Long (> 4 min): Expanded structure
 
-    # 2. Merge "Analysis" times with "Safety" times
-    filled_times = [0.0]
-    analysis_times = [t for t in times if t > 0.1]
-    analysis_times.append(duration_sec)
+    sections = []
+    cursor = 0.0
 
-    curr = 0.0
-    for t in analysis_times:
-        # While the gap to the next analysis point is too big...
-        while t - curr > 45.0:
-            # Inject a split at +40s
-            curr += 40.0
-            if curr < duration_sec - 10.0:
-                filled_times.append(curr)
-
-        # Add the actual analysis point if it's not too close to the last one
-        if t < duration_sec - 5.0 and (t - filled_times[-1] > 10.0):
-            filled_times.append(t)
-            curr = t
-
-    # 3. Labeling
-    sections: list[Section] = []
-
-    if not filled_times or filled_times[0] != 0.0:
-        filled_times.insert(0, 0.0)
-
+    # Always start with Intro
     sections.append(Section("Intro", 0.0))
+    cursor += random.uniform(8.0, 15.0) # Short intro
 
-    label_idx = 0
-    for t in filled_times[1:]:
-        name = SECTION_LABELS[label_idx % len(SECTION_LABELS)]
-        sections.append(Section(name, float(t)))
-        label_idx += 1
+    # Loop to fill duration
+    verse_count = 1
+    chorus_count = 1
+
+    while cursor < duration - 20.0: # Leave room for Outro
+        # Add Verse
+        sections.append(Section(f"Verse {verse_count}", cursor))
+        cursor += random.uniform(30.0, 45.0)
+        verse_count += 1
+
+        if cursor >= duration - 20.0: break
+
+        # Add Chorus
+        sections.append(Section(f"Chorus {chorus_count}", cursor))
+        cursor += random.uniform(25.0, 40.0)
+        chorus_count += 1
+
+        if cursor >= duration - 20.0: break
+
+        # Occasionally add a Bridge or Solo after 2nd Chorus
+        if chorus_count == 3 and cursor < duration - 45.0:
+            if random.random() > 0.5:
+                sections.append(Section("Bridge", cursor))
+            else:
+                sections.append(Section("Solo", cursor))
+            cursor += random.uniform(20.0, 30.0)
+
+    # Final Section: Outro
+    # Ensure it doesn't start *after* the song ends
+    if cursor < duration:
+        sections.append(Section("Outro", cursor))
 
     return sections
 

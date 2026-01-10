@@ -8,6 +8,7 @@ import math
 import pretty_midi # type: ignore
 import librosa # type: ignore
 import numpy as np # type: ignore
+import mido # type: ignore
 
 from charter.config import ChartConfig, LANE_PITCHES, TRACK_NAME, SP_PITCH
 from charter.audio import detect_onsets, estimate_pitches
@@ -129,7 +130,6 @@ def _rename_sections_based_on_density(sections: list, note_times: list[float], t
     return new_sections
 
 def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
-    """Calculates Notes Per Second (NPS) in 1-second windows, stepped every 0.5s."""
     points = []
     step = 0.5
     window = 1.0
@@ -137,11 +137,60 @@ def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
     times_sorted = sorted(times)
 
     while t <= duration:
-        # Count notes in [t, t + window]
         count = sum(1 for x in times_sorted if t <= x < t + window)
         points.append({"t": round(t, 2), "nps": count})
         t += step
     return points
+
+def _inject_sections_mido(midi_path: Path, sections: list, pm: pretty_midi.PrettyMIDI):
+    """
+    Directly injects section Text events into a dedicated 'EVENTS' track.
+    Format: [section Name] (Text Event)
+    This structure (Tempo -> EVENTS -> Instruments) is standard for CH.
+    """
+    try:
+        mid = mido.MidiFile(str(midi_path))
+
+        # Create a fresh track for Events
+        events_track = mido.MidiTrack()
+
+        # Name it "EVENTS" (Crucial for Clone Hero)
+        events_track.append(mido.MetaMessage('track_name', name='EVENTS', time=0))
+
+        # 1. Prepare absolute time list
+        abs_events = []
+
+        # 2. Add Section Events
+        for s in sections:
+            name = s['name'] if isinstance(s, dict) else s.name
+            start_sec = float(s['start'] if isinstance(s, dict) else s.start)
+
+            # Convert seconds -> ticks
+            start_ticks = pm.time_to_tick(start_sec)
+
+            # Create Text event WITH brackets: [section Name]
+            text_msg = mido.MetaMessage('text', text=f"[section {name}]", time=0)
+            abs_events.append((int(start_ticks), text_msg))
+
+        # 3. Sort by absolute time
+        abs_events.sort(key=lambda x: x[0])
+
+        # 4. Convert to delta times and append to the new track
+        last_ticks = 0
+        for t, msg in abs_events:
+            delta = t - last_ticks
+            msg = msg.copy(time=int(delta))
+            events_track.append(msg)
+            last_ticks = t
+
+        # 5. Insert the EVENTS track after the Tempo track (Index 1)
+        # Track 0 is usually Conductor/Tempo. Track 1 is now EVENTS.
+        mid.tracks.insert(1, events_track)
+
+        mid.save(str(midi_path))
+
+    except Exception as e:
+        print(f"Warning: Failed to inject sections: {e}")
 
 def write_real_notes_mid(
     *,
@@ -215,7 +264,7 @@ def write_real_notes_mid(
             m_idx, m_offset = _quantize_to_measure(t, shifted_beat_times)
             measure_notes.setdefault(m_idx, []).append((m_offset, i))
 
-    # 3. Note Generation (Skip if dry_run)
+    # 3. Note Generation
     pm = pretty_midi.PrettyMIDI(initial_tempo=float(tempo))
     guitar = pretty_midi.Instrument(program=0, name=TRACK_NAME)
 
@@ -291,17 +340,11 @@ def write_real_notes_mid(
 
         pm.instruments.append(guitar)
 
-    # 4. Events & Smart Sections
+    # 4. Smart Sections Logic
     final_sections = []
 
     if override_sections:
         final_sections = override_sections
-        if not dry_run:
-            evt = pretty_midi.Instrument(0, name="EVENTS")
-            for s in final_sections:
-                pm.lyrics.append(pretty_midi.Lyric(f"[section {s['name']}]", float(s['start'])))
-            pm.instruments.append(evt)
-
     elif cfg.add_sections:
         raw_sections = generate_sections(str(audio_path), duration - shift_seconds)
 
@@ -319,12 +362,6 @@ def write_real_notes_mid(
             duration
         )
 
-        if not dry_run:
-            evt = pretty_midi.Instrument(0, name="EVENTS")
-            for s in final_sections:
-                pm.lyrics.append(pretty_midi.Lyric(f"[section {s['name']}]", float(s['start'])))
-            pm.instruments.append(evt)
-
     if not dry_run and cfg.add_star_power:
         phrases = generate_star_power_phrases(note_times=times, duration_sec=duration)
         for p in phrases:
@@ -333,6 +370,10 @@ def write_real_notes_mid(
     if not dry_run:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pm.write(str(out_path))
+
+        # --- FIX: Inject separate EVENTS track ---
+        if final_sections:
+            _inject_sections_mido(out_path, final_sections, pm)
 
     # --- Compute Density ---
     density_data = _compute_rolling_density(times, duration)

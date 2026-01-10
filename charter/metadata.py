@@ -36,7 +36,6 @@ def _save_cache(cache_path: Path, data: dict[str, Any]) -> None:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     except OSError as e:
-        # Fallback: if the default path is read-only, try writing to the user's home directory
         user_fallback = Path.home() / ".1clickcharter_cache"
         user_fallback.parent.mkdir(parents=True, exist_ok=True)
         user_fallback.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -61,21 +60,43 @@ def enrich_from_musicbrainz(
 
     cache = _load_cache(cache_path)
     key = _cache_key(artist, title)
+
+    # --- FIX: Only use cache if it has the image_url field ---
     if key in cache:
         hit = cache[key]
-        return EnrichedMetadata(album=hit.get("album", ""), year=hit.get("year", ""))
+        # Only accept the cache if it has the 'image_url' key (new format)
+        if "image_url" in hit:
+            img_url = hit.get("image_url")
+            cover_bytes = None
 
-    # Search recordings
+            if img_url:
+                try:
+                    img = requests.get(img_url, headers={"User-Agent": user_agent}, timeout=5)
+                    if img.status_code == 200:
+                        cover_bytes = img.content
+                except Exception:
+                    pass
+
+            return EnrichedMetadata(
+                album=hit.get("album", ""),
+                year=hit.get("year", ""),
+                cover_bytes=cover_bytes
+            )
+    # ---------------------------------------------------------
+
     q = f'recording:"{title}" AND artist:"{artist}"'
     _sleep_polite()
-    r = requests.get(
-        "https://musicbrainz.org/ws/2/recording/",
-        params={"query": q, "fmt": "json", "limit": "5"},
-        headers={"User-Agent": user_agent, "Accept": "application/json"},
-        timeout=20,
-    )
-    r.raise_for_status()
-    data = r.json()
+    try:
+        r = requests.get(
+            "https://musicbrainz.org/ws/2/recording/",
+            params={"query": q, "fmt": "json", "limit": "5"},
+            headers={"User-Agent": user_agent, "Accept": "application/json"},
+            timeout=20,
+        )
+        r.raise_for_status()
+        data = r.json()
+    except Exception:
+        return EnrichedMetadata()
 
     recs = data.get("recordings") or []
     if not recs:
@@ -97,6 +118,8 @@ def enrich_from_musicbrainz(
     rel_id = (best or {}).get("id")
 
     cover_bytes = None
+    image_url_found = None
+
     if rel_id:
         try:
             _sleep_polite()
@@ -111,6 +134,8 @@ def enrich_from_musicbrainz(
                 front = next((img for img in images if img.get("front")), None) or (images[0] if images else None)
                 if front and front.get("image"):
                     img_url = front["image"]
+                    image_url_found = img_url # Save URL to cache
+
                     _sleep_polite()
                     img = requests.get(img_url, headers={"User-Agent": user_agent}, timeout=30)
                     if img.status_code == 200 and img.content:
@@ -118,7 +143,14 @@ def enrich_from_musicbrainz(
         except Exception:
             cover_bytes = None
 
-    cache[key] = {"album": album, "year": year, "artist": artist, "title": title}
+    # Update cache with the new format (including image_url)
+    cache[key] = {
+        "album": album,
+        "year": year,
+        "artist": artist,
+        "title": title,
+        "image_url": image_url_found
+    }
     _save_cache(cache_path, cache)
 
     return EnrichedMetadata(album=album, year=year, cover_bytes=cover_bytes)
