@@ -1,7 +1,7 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QWidget, QGroupBox, QVBoxLayout, QHBoxLayout, QFormLayout,
                                QLineEdit, QToolButton, QLabel, QCheckBox,
-                               QButtonGroup, QRadioButton, QFrame, QPushButton, QInputDialog, QMessageBox, QStyle)
+                               QButtonGroup, QRadioButton, QFrame, QPushButton, QInputDialog, QMessageBox, QStyle, QAbstractSpinBox)
 from PySide6.QtCore import Qt
 
 # Import custom widgets and helpers
@@ -87,7 +87,7 @@ class SettingsWidget(QGroupBox):
         self.preset_combo = SafeComboBox()
         self.preset_combo.setCursor(Qt.PointingHandCursor)
         self.preset_combo.setMinimumWidth(200)
-        # CHANGED: Use currentIndexChanged to handle clean keys from itemData
+        # currentIndexChanged to handle clean keys from itemData
         self.preset_combo.currentIndexChanged.connect(self._on_combo_changed)
 
         self.btn_save_preset = QToolButton()
@@ -125,7 +125,7 @@ class SettingsWidget(QGroupBox):
         self.init_expert_tab()
         self.init_scaling_tab()
 
-        # ADDED: Help Button in Corner
+        # Help Button in Corner
         self.btn_help = QToolButton()
         self.btn_help.setIcon(self.style().standardIcon(QStyle.SP_MessageBoxInformation))
         self.btn_help.setToolTip("Explanation of Settings")
@@ -220,40 +220,42 @@ class SettingsWidget(QGroupBox):
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight)
 
-        # CHANGED: Added NPS SpinBoxes for Hard/Med/Easy
+        # Helper to force arrows and set props
+        def config_spin(w_ms, w_nps):
+            w_ms.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
+            w_nps.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
+            w_nps.setToolTip("Approximate max notes per second")
+            self._wire_sync(w_ms, w_nps)
 
         # Hard Controls
         self.spin_hard_gap = SafeSpinBox()
-        self.spin_hard_gap.setRange(50, 500)
+        self.spin_hard_gap.setRange(40, 500) # 25 NPS to 2 NPS
         self.spin_hard_gap.setSuffix(" ms")
         self.spin_hard_nps = SafeDoubleSpinBox()
-        self.spin_hard_nps.setRange(0.1, 20.0)
+        self.spin_hard_nps.setRange(2.0, 25.0)
         self.spin_hard_nps.setSingleStep(0.1)
         self.spin_hard_nps.setSuffix(" NPS")
-        self.spin_hard_nps.setToolTip("Approximate max notes per second")
+        config_spin(self.spin_hard_gap, self.spin_hard_nps)
 
         # Medium Controls
         self.spin_med_gap = SafeSpinBox()
-        self.spin_med_gap.setRange(100, 800)
+        self.spin_med_gap.setRange(100, 1000) # 10 NPS to 1 NPS
         self.spin_med_gap.setSuffix(" ms")
         self.spin_med_nps = SafeDoubleSpinBox()
-        self.spin_med_nps.setRange(0.1, 15.0)
+        self.spin_med_nps.setRange(1.0, 10.0)
         self.spin_med_nps.setSingleStep(0.1)
         self.spin_med_nps.setSuffix(" NPS")
+        config_spin(self.spin_med_gap, self.spin_med_nps)
 
         # Easy Controls
         self.spin_easy_gap = SafeSpinBox()
-        self.spin_easy_gap.setRange(200, 1500)
+        self.spin_easy_gap.setRange(125, 2000) # 8 NPS to 0.5 NPS
         self.spin_easy_gap.setSuffix(" ms")
         self.spin_easy_nps = SafeDoubleSpinBox()
-        self.spin_easy_nps.setRange(0.1, 10.0)
+        self.spin_easy_nps.setRange(0.5, 8.0)
         self.spin_easy_nps.setSingleStep(0.1)
         self.spin_easy_nps.setSuffix(" NPS")
-
-        # Wire up the sync logic
-        self._wire_sync(self.spin_hard_gap, self.spin_hard_nps)
-        self._wire_sync(self.spin_med_gap, self.spin_med_nps)
-        self._wire_sync(self.spin_easy_gap, self.spin_easy_nps)
+        config_spin(self.spin_easy_gap, self.spin_easy_nps)
 
         # Default Values (will be overwritten by presets)
         self.spin_hard_gap.setValue(120)
@@ -277,10 +279,23 @@ class SettingsWidget(QGroupBox):
         self.tabs.addTab(tab, "Difficulty Scaling")
 
     def _wire_sync(self, spin_ms: SafeSpinBox, spin_nps: SafeDoubleSpinBox):
-        # Sync Gap -> NPS
-        spin_ms.valueChanged.connect(lambda val: spin_nps.setValue(1000.0 / val if val > 0 else 0))
-        # Sync NPS -> Gap
-        spin_nps.valueChanged.connect(lambda val: spin_ms.setValue(int(1000.0 / val) if val > 0 else 1000))
+        # Prevent feedback loops by blocking signals during programmatic updates
+        def on_ms_change(val):
+            if val <= 0: return
+            new_nps = 1000.0 / val
+            spin_nps.blockSignals(True)
+            spin_nps.setValue(new_nps)
+            spin_nps.blockSignals(False)
+
+        def on_nps_change(val):
+            if val <= 0: return
+            new_ms = int(1000.0 / val)
+            spin_ms.blockSignals(True)
+            spin_ms.setValue(new_ms)
+            spin_ms.blockSignals(False)
+
+        spin_ms.valueChanged.connect(on_ms_change)
+        spin_nps.valueChanged.connect(on_nps_change)
 
     def toggle_advanced(self, checked: bool):
         self.content_widget.setVisible(checked)
@@ -308,8 +323,6 @@ class SettingsWidget(QGroupBox):
         # preserve current key if possible
         current_idx = self.preset_combo.currentIndex()
         current_key = self.preset_combo.itemData(current_idx) if current_idx >= 0 else None
-        if not current_key and self.preset_combo.count() > 0:
-            current_key = self.preset_combo.currentText() # Fallback for initial load
 
         self.all_presets = load_all_presets()
         self.preset_combo.blockSignals(True)

@@ -158,7 +158,7 @@ class MainWindow(QMainWindow):
         line = QFrame()
         line.setObjectName("HeaderLine") # Named object for theming
         line.setFixedHeight(1)
-        line.setFixedWidth(750)
+        line.setFixedWidth(900)
         layout.addWidget(line, alignment=Qt.AlignHCenter)
 
     def _build_sidebar_content(self, layout):

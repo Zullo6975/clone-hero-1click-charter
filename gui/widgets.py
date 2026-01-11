@@ -24,18 +24,19 @@ class SafeSlider(QSlider):
 class SafeTabWidget(QTabWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        # Install an event filter on the internal TabBar to catch mouse wheel events
-        # occurring directly over the tabs themselves.
+        # Install event filter to catch wheel events on the tab bar (headers)
         self.tabBar().installEventFilter(self)
 
     def eventFilter(self, obj, event):
-        # If the event is a Wheel event on the TabBar, block it (return True)
         if obj == self.tabBar() and event.type() == QEvent.Wheel:
+            # Ignore the event so it bubbles up to the parent (ScrollArea)
+            event.ignore()
+            # Return True to indicate we have filtered this event (preventing QTabBar from switching tabs)
             return True
         return super().eventFilter(obj, event)
 
     def wheelEvent(self, event):
-        # Block wheel events on the general widget area
+        # Ignore wheel events on the content area too
         event.ignore()
 
 # ---------------- Log Window ----------------
