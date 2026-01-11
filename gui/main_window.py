@@ -45,6 +45,10 @@ class MainWindow(QMainWindow):
 
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
 
+        self.settings_panel.refresh_presets()
+        self.settings_panel.preset_combo.setCurrentText("2) Standard")
+        self.settings_panel.apply_preset(self.settings_panel.preset_combo.currentText())
+
         self._update_queue_display()
         self._update_state()
         QTimer.singleShot(100, self.snap_to_content)
@@ -233,8 +237,10 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel("Ready")
         self.status_label.setStyleSheet("font-weight: bold;")
         self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)
         self.progress_bar.setVisible(False)
         self.progress_bar.setFixedWidth(200)
+        self.progress_bar.setFixedHeight(14)
         s_lay.addWidget(self.status_label)
         s_lay.addWidget(self.progress_bar)
         s_lay.addStretch()
@@ -323,6 +329,8 @@ class MainWindow(QMainWindow):
         self.btn_generate.setText("Generating....")
         self.btn_generate.setEnabled(False)
         self.progress_bar.setVisible(True)
+        # Ensure it is bouncing (indeterminate)
+        self.progress_bar.setRange(0, 0)
         self.status_label.setText("Working...")
 
         analyze = self.settings_panel.chk_review.isChecked()

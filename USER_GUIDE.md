@@ -4,7 +4,7 @@
 
 1. **Extract the Zip:** Unzip the downloaded file.
 2. **Run the App:** Double-click `1ClickCharter` (macOS) or `1ClickCharter.exe` (Windows).
-    * *Note (macOS):* If you see "App is damaged" or "Unidentified Developer", right-click the app and select **Open**, then click **Open** again in the dialog.
+   - _Note (macOS):_ If you see "App is damaged" or "Unidentified Developer", right-click the app and select **Open**, then click **Open** again in the dialog.
 
 ## How to Chart a Song
 
@@ -27,23 +27,34 @@ To chart an entire album at once:
 ## Power User Tools
 
 ### User Presets
-1. Open the **"Show Advanced Settings"** panel.
+
+1. Open the **"Show Tuning Controls"** panel.
 2. Adjust the sliders and spinners to your liking.
 3. Click the **Save (Floppy Disk)** icon next to the dropdown.
 4. Name your preset (e.g., "Speed Metal").
 5. It will now appear in the dropdown list for future use!
 
+### Difficulty Scaling
+
+Want to make "Hard" harder or "Easy" easier?
+
+1. Go to the **"Difficulty Scaling"** tab in the Settings panel.
+2. Use the **Target NPS** (Notes Per Second) boxes to set a "Speed Limit" for each difficulty.
+   - _Example:_ Set "Hard Scaling" to 8.0 NPS for a faster chart, or 4.0 NPS for a simpler one.
+3. The "Gap (ms)" will update automatically to match your setting.
+
 ### Section Review & Visualizer
-1. Check the box **"Override Section Names"** in the configuration panel.
+
+1. Check the box **"Review Sections before Generation"** in the configuration panel.
 2. Click **Generate**.
 3. A window will appear showing:
-   - A **Density Graph** of the song's intensity.
-   - A list of detected sections.
+   - **Density Graphs:** Click the tabs (Expert, Hard, Medium, Easy) to see the intensity curve for each difficulty.
+   - **Section List:** A list of detected sections.
 4. You can click on any **Section Name** to rename it (e.g., change "Chorus" to "Guitar Solo").
 5. Click **OK** to finish generating the chart with your custom names.
 
 ## Tips
 
-* **Difficulty:** Use the "Advanced Settings" to choose a preset. "Medium (Balanced)" is recommended for most songs.
-* **Logs:** If generation fails, click "Show Logs" at the bottom right to see what happened.
-* **Updates:** Check the GitHub Releases page for new versions.
+- **Difficulty:** Use the "Advanced Settings" to choose a preset. "Medium (Balanced)" is recommended for most songs.
+- **Logs:** If generation fails, click "Show Logs" at the bottom right to see what happened.
+- **Updates:** Check the GitHub Releases page for new versions.
