@@ -59,7 +59,7 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 4. **Output:** Select where you want the song folder to be saved (e.g., your Clone Hero `Songs` folder).
 5. **Review (Optional):** If you enabled "Review Sections", you'll see the visualizer before generation.
 
-![Section Review & Visualizer](/static/review_window.png)
+![Section Review & Visualizer](/static/section_review.png)
 
 6. **Generate:** Click the **GENERATE CHART** button.
 7. **Next Song:** If you queued multiple files, the app automatically loads the next one for you to review.
