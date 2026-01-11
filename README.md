@@ -84,6 +84,15 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 
 ---
 
+## 💙 Support & Contact
+
+If this tool saved you time, consider buying me a coffee (or a beer) to keep the development going!
+
+- **Venmo:** [@oneclickcharter](https://venmo.com/u/oneclickcharter)
+- **Support Email:** [oneclickcharter-support@outlook.com](mailto:oneclickcharter-support@outlook.com)
+
+---
+
 ## 🤝 Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for style guides and design philosophy.

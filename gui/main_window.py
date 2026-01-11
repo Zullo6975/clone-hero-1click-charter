@@ -190,7 +190,6 @@ class MainWindow(QMainWindow):
         self.grp_queue = QGroupBox("Pending Queue")
         v_q = QVBoxLayout(self.grp_queue)
         self.queue_list = QListWidget()
-        self.queue_list.setMaximumHeight(60)
         self.btn_clear_queue = QPushButton("Clear Queue")
         v_q.addWidget(self.queue_list)
         v_q.addWidget(self.btn_clear_queue)
@@ -468,10 +467,20 @@ class MainWindow(QMainWindow):
             wid = QWidget()
             h = QHBoxLayout(wid)
             h.setContentsMargins(4,0,4,0)
-            h.addWidget(QLabel(p.name), 1)
+
+            # Smaller text for the label
+            lbl = QLabel(p.name)
+            lbl.setStyleSheet("background: transparent; font-size: 11pt;")
+            h.addWidget(lbl, 1)
+
+            # Compact trash button
             btn = QToolButton()
             btn.setIcon(self.style().standardIcon(QStyle.SP_TrashIcon))
-            btn.clicked.connect(lambda _, idx=i: self._remove_queue_item(idx))
+            btn.setFixedSize(20, 20) # Force small square size
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet("border: none; background: transparent;") # Remove visual clutter
+
+            btn.clicked.connect(lambda checked=False, idx=i: self._remove_queue_item(idx))
             h.addWidget(btn, 0)
             item.setSizeHint(wid.sizeHint())
             self.queue_list.setItemWidget(item, wid)
