@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup,
                                QScrollArea, QSizePolicy, QSlider, QSpinBox,
                                QSplitter, QStyle, QTableWidget,
                                QTableWidgetItem, QTextEdit, QToolButton,
-                               QVBoxLayout, QWidget, QTabWidget) # Added QTabWidget
+                               QVBoxLayout, QWidget, QTabWidget)
 
 # Import constants
 from charter.config import SUPPORT_EMAIL, VENMO_URL, REPO_URL
@@ -69,11 +69,12 @@ class SafeSlider(QSlider):
         event.ignore()
 
 # --- PRESETS MANAGEMENT ---
+# UPDATED: Tuned for EXPERT Baseline (Harder, Faster, Stronger)
 DEFAULT_PRESETS: dict[str, dict[str, float | int]] = {
-    "Expert 1 (Casual)":   {"max_nps": 9.0,  "min_gap_ms": 80, "sustain": 40, "chord": 15},
-    "Expert 2 (Standard)":   {"max_nps": 12.0, "min_gap_ms": 60, "sustain": 25, "chord": 22},
-    "Expert 3 (Shred)":      {"max_nps": 16.0, "min_gap_ms": 40, "sustain": 10, "chord": 30},
-    "Expert 4 (Lose Fingerprints)":{"max_nps": 22.0, "min_gap_ms": 30, "sustain": 5,  "chord": 40},
+    "1) Casual":           {"max_nps": 9.0,  "min_gap_ms": 75, "sustain": 40, "chord": 15},
+    "2) Standard":         {"max_nps": 13.0, "min_gap_ms": 55, "sustain": 25, "chord": 22},
+    "3) Shred":            {"max_nps": 17.0, "min_gap_ms": 35, "sustain": 10, "chord": 30},
+    "4) Lose Fingerprints":{"max_nps": 22.0, "min_gap_ms": 25, "sustain": 5,  "chord": 40},
 }
 
 def get_user_preset_path() -> Path:
@@ -131,13 +132,21 @@ class RunConfig:
     max_nps: float
     min_gap_ms: int
     seed: int
+    # CLEANUP: These are now hardcoded in the build logic
     allow_orange: bool
+    rhythmic_glue: bool
+    grid_snap: str
+
     chord_prob: float
     sustain_len: float
-    grid_snap: str
     sustain_threshold: float
     sustain_buffer: float
-    rhythmic_glue: bool
+
+    # New Scaling Params
+    hard_gap_ms: int
+    med_gap_ms: int
+    easy_gap_ms: int
+
     charter: str = "Zullo7569"
     fetch_metadata: bool = True
 
@@ -309,6 +318,14 @@ class ThemeManager:
             }
             QProgressBar::chunk {
                 background-color: palette(highlight);
+            }
+
+            /* POPUPS: Explicit 500px width */
+            QMessageBox {
+                min-width: 500px;
+            }
+            QMessageBox QLabel {
+                min-width: 500px;
             }
         """)
 
@@ -653,11 +670,11 @@ class MainWindow(QMainWindow):
 
         # Load Presets
         self.refresh_presets()
-        last_preset = self.settings.value("preset", "Expert 2 (Standard)", type=str)
+        last_preset = self.settings.value("preset", "Standard", type=str)
 
-        # FIX: Ensure we default to Expert if the old "Medium" setting is stuck in cache
+        # Fallback if old "Medium" preset is cached
         if last_preset not in self.all_presets:
-            last_preset = "Expert 2 (Standard)"
+            last_preset = "2) Standard"
 
         self.preset_combo.setCurrentText(last_preset)
         self.apply_preset(self.preset_combo.currentText())
@@ -853,10 +870,10 @@ class MainWindow(QMainWindow):
         main_layout_inner.addWidget(grp_meta)
 
         # Configuration
-        self.adv_container = QGroupBox("Configuration")
+        self.adv_container = QGroupBox("Chart Settings")
         adv_layout = QVBoxLayout(self.adv_container)
 
-        self.chk_adv = QCheckBox("Show Advanced Settings")
+        self.chk_adv = QCheckBox("Show Tuning Controls")
         self.chk_adv.setStyleSheet("font-weight: bold; margin-bottom: 6px;")
         self.chk_adv.setCursor(Qt.PointingHandCursor)
 
@@ -887,7 +904,7 @@ class MainWindow(QMainWindow):
         preset_row.addWidget(self.btn_save_preset)
         preset_row.addWidget(self.btn_del_preset)
 
-        self.preset_hint = QLabel("Select a preset to auto-configure settings.")
+        self.preset_hint = QLabel("Select baseline intensity.")
         self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11pt;")
 
         # NEW: Review Checkbox
@@ -895,9 +912,46 @@ class MainWindow(QMainWindow):
         self.chk_review.setToolTip("Show a list of detected sections to rename/edit before creating the chart.")
         self.chk_review.setCursor(Qt.PointingHandCursor)
 
-        adv_form.addRow(form_label("Difficulty"), preset_row)
+        adv_form.addRow(form_label("Expert Style"), preset_row)
         adv_form.addRow(QLabel(""), self.preset_hint)
-        adv_form.addRow(form_label("Override Section Names"), self.chk_review) # Renamed label
+        adv_form.addRow(form_label("Override Section Names"), self.chk_review)
+
+        # --- DIFFICULTY SCALING ---
+        div2 = QFrame()
+        div2.setFrameShape(QFrame.HLine)
+        div2.setStyleSheet("color: palette(mid);")
+        adv_form.addRow(div2)
+
+        lbl_scaling = QLabel("Difficulty Scaling (Gap Between Notes)")
+        lbl_scaling.setStyleSheet("font-weight: bold; text-decoration: underline; margin-top: 10px;")
+        adv_form.addRow(lbl_scaling)
+
+        self.spin_hard_gap = SafeSpinBox()
+        self.spin_hard_gap.setRange(50, 500)
+        self.spin_hard_gap.setValue(120)
+        self.spin_hard_gap.setSuffix(" ms")
+        self.spin_hard_gap.setToolTip("Minimum gap for HARD difficulty")
+
+        self.spin_med_gap = SafeSpinBox()
+        self.spin_med_gap.setRange(100, 800)
+        self.spin_med_gap.setValue(220)
+        self.spin_med_gap.setSuffix(" ms")
+        self.spin_med_gap.setToolTip("Minimum gap for MEDIUM difficulty")
+
+        self.spin_easy_gap = SafeSpinBox()
+        self.spin_easy_gap.setRange(200, 1500)
+        self.spin_easy_gap.setValue(450)
+        self.spin_easy_gap.setSuffix(" ms")
+        self.spin_easy_gap.setToolTip("Minimum gap for EASY difficulty")
+
+        adv_form.addRow(form_label("Hard Spacing"), self.spin_hard_gap)
+        adv_form.addRow(form_label("Medium Spacing"), self.spin_med_gap)
+        adv_form.addRow(form_label("Easy Spacing"), self.spin_easy_gap)
+
+        div = QFrame()
+        div.setFrameShape(QFrame.HLine)
+        div.setStyleSheet("color: palette(mid);")
+        adv_form.addRow(div)
 
         self.custom_controls = QWidget()
         custom_form = QFormLayout(self.custom_controls)
@@ -919,7 +973,7 @@ class MainWindow(QMainWindow):
         row_mode.addStretch()
 
         self.max_nps_spin = SafeDoubleSpinBox()
-        self.max_nps_spin.setRange(1.0, 10.0)
+        self.max_nps_spin.setRange(1.0, 30.0)
         self.max_nps_spin.setSingleStep(0.1)
         self.max_nps_spin.setSuffix(" NPS")
         self.max_nps_spin.setMinimumHeight(26)
@@ -935,9 +989,7 @@ class MainWindow(QMainWindow):
         self.seed_spin.setMinimumHeight(26)
         self.seed_spin.setToolTip("Seed for random generation.")
 
-        self.chk_orange = QCheckBox("Allow Orange Lane")
-        self.chk_orange.setChecked(True)
-        self.chk_orange.setCursor(Qt.PointingHandCursor)
+        # --- CLEANUP: Removed Orange/Glue/Grid check boxes ---
 
         self.chord_slider = SafeSlider()
         self.chord_slider.setOrientation(Qt.Horizontal)
@@ -950,11 +1002,6 @@ class MainWindow(QMainWindow):
         self.sustain_slider.setRange(0, 100)
         self.sustain_slider.setValue(50)
         self.sustain_slider.setCursor(Qt.PointingHandCursor)
-
-        self.grid_combo = SafeComboBox()
-        self.grid_combo.addItems(["1/4", "1/8", "1/16"])
-        self.grid_combo.setCurrentText("1/8")
-        self.grid_combo.setCursor(Qt.PointingHandCursor)
 
         # New Sustain Tuning
         self.sustain_gap_spin = SafeDoubleSpinBox()
@@ -969,24 +1016,18 @@ class MainWindow(QMainWindow):
         self.sustain_buffer_spin.setValue(0.15)
         self.sustain_buffer_spin.setSuffix(" s")
 
-        # NEW CHECKBOX
-        self.chk_rhythm_glue = QCheckBox("Rhythmic Glue (Repeat Patterns)")
-        self.chk_rhythm_glue.setChecked(True)
-        self.chk_rhythm_glue.setToolTip("If a rhythm repeats, force the same strum/chord pattern.")
-
         custom_form.addRow(form_label("Generation Mode"), row_mode)
         custom_form.addRow(form_label("Max Notes/Sec"), self.max_nps_spin)
         custom_form.addRow(form_label("Min Note Spacing"), self.min_gap_spin)
         custom_form.addRow(form_label("Pattern Variation"), self.seed_spin)
 
-        div = QFrame()
-        div.setFrameShape(QFrame.HLine)
-        div.setStyleSheet("color: palette(mid);")
-        custom_form.addRow(div)
+        div3 = QFrame()
+        div3.setFrameShape(QFrame.HLine)
+        div3.setStyleSheet("color: palette(mid);")
+        custom_form.addRow(div3)
 
-        custom_form.addRow(form_label("Grid Snap"), self.grid_combo)
-        custom_form.addRow(form_label("5th Lane"), self.chk_orange)
-        custom_form.addRow(form_label("Consistency"), self.chk_rhythm_glue)
+        # Removed the grid snap / 5th lane / rhythm glue layout rows
+
         custom_form.addRow(form_label("Chord Density"), self.chord_slider)
         custom_form.addRow(form_label("Sustain Prob."), self.sustain_slider)
 
@@ -1233,10 +1274,11 @@ class MainWindow(QMainWindow):
         self.preset_combo.addItems(defaults + others)
         self.preset_combo.addItem("Custom…")
 
+        # Fallback Logic
         if current in self.all_presets:
             self.preset_combo.setCurrentText(current)
         else:
-            self.preset_combo.setCurrentText("Medium 2 (Balanced)")
+            self.preset_combo.setCurrentText("2) Standard")
         self.preset_combo.blockSignals(False)
 
         is_default = self.preset_combo.currentText() in DEFAULT_PRESETS
@@ -1273,13 +1315,13 @@ class MainWindow(QMainWindow):
         is_custom = preset is None
         self.custom_controls.setVisible(is_custom)
         if is_custom:
-            self.preset_hint.setText("Manual control enabled. Adjust density and gap below.")
+            self.preset_hint.setText("Manual control enabled.")
         else:
             self.max_nps_spin.setValue(float(preset["max_nps"]))
             self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
             self.sustain_slider.setValue(int(preset["sustain"]))
             self.chord_slider.setValue(int(preset["chord"]))
-            self.preset_hint.setText(f"Preset Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
+            self.preset_hint.setText(f"Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
 
         is_default = name in DEFAULT_PRESETS
         self.btn_del_preset.setEnabled(not is_default and name != "Custom…")
@@ -1467,6 +1509,7 @@ class MainWindow(QMainWindow):
         mode_val = "real" if self.mode_real.isChecked() else "dummy"
         genre_val = self.genre_edit.text().strip() or "Rock"
         charter_val = self.charter_edit.text().strip() or "Zullo7569"
+
         return RunConfig(
             audio=audio, out_root=out_root, title=title,
             artist=self.artist_edit.text().strip(), album=self.album_edit.text().strip(),
@@ -1475,13 +1518,23 @@ class MainWindow(QMainWindow):
             min_gap_ms=int(self.min_gap_spin.value()),
             seed=int(self.seed_spin.value()),
             charter=charter_val,
-            allow_orange=self.chk_orange.isChecked(),
+
+            # HARDCODED PRO DEFAULTS (UI Widgets Removed)
+            allow_orange=True,
+            rhythmic_glue=True,
+            grid_snap="1/16",
+
             chord_prob=self.chord_slider.value() / 100.0,
             sustain_len=self.sustain_slider.value() / 100.0,
-            grid_snap=self.grid_combo.currentText(),
             sustain_threshold=float(self.sustain_gap_spin.value()),
             sustain_buffer=float(self.sustain_buffer_spin.value()),
-            rhythmic_glue=self.chk_rhythm_glue.isChecked()
+
+            # Scaling
+            hard_gap_ms=int(self.spin_hard_gap.value()),
+            med_gap_ms=int(self.spin_med_gap.value()),
+            easy_gap_ms=int(self.spin_easy_gap.value()),
+
+            fetch_metadata=True
         )
 
     def run_generate(self) -> None:
@@ -1506,7 +1559,7 @@ class MainWindow(QMainWindow):
             extra_args = ["--analyze-only"]
         else:
             self._is_analyzing = False
-            label = "Generating...." # Technically still accurate for phase 1
+            label = "Generating...."
             extra_args = []
 
         if is_frozen(): cmd = [str(py_exec), "--internal-cli"]
@@ -1521,12 +1574,18 @@ class MainWindow(QMainWindow):
             "--seed", str(cfg.seed),
             "--chord-prob", str(cfg.chord_prob),
             "--sustain-len", str(cfg.sustain_len),
-            "--grid-snap", cfg.grid_snap,
+            # NO grid-snap arg
             "--sustain-threshold", str(cfg.sustain_threshold),
-            "--sustain-buffer", str(cfg.sustain_buffer)
+            "--sustain-buffer", str(cfg.sustain_buffer),
+
+            # New Scaling Args
+            "--hard-gap-ms", str(cfg.hard_gap_ms),
+            "--med-gap-ms", str(cfg.med_gap_ms),
+            "--easy-gap-ms", str(cfg.easy_gap_ms)
         ])
-        if not cfg.allow_orange: cmd.append("--no-orange")
-        if not self.chk_rhythm_glue.isChecked(): cmd.append("--no-rhythmic-glue")
+
+        # CLEANUP: No flags for orange/glue needed (defaults are true)
+
         if cfg.fetch_metadata: cmd.append("--fetch-metadata")
 
         cmd.extend(extra_args)
@@ -1537,7 +1596,6 @@ class MainWindow(QMainWindow):
         else:
             self.append_log(f"Starting generation for: {cfg.title}...")
 
-        # Clear status bar text so progress bar stands out
         self.status_label.setText("")
         self.btn_generate.setText(label)
         self.btn_generate.setEnabled(False)
@@ -1571,7 +1629,6 @@ class MainWindow(QMainWindow):
         ok = (status == QProcess.NormalExit) and (code == 0)
 
         if not ok:
-            # FAILURE
             self.btn_generate.setText("  GENERATE  ")
             self.progress_bar.setVisible(False)
             reason = "Unknown error."
@@ -1586,10 +1643,8 @@ class MainWindow(QMainWindow):
             self._update_state()
             return
 
-        # SUCCESS
         if self._is_analyzing:
-            # PHASE 1 COMPLETE -> SHOW REVIEW DIALOG
-            self._is_analyzing = False # Reset flag
+            self._is_analyzing = False
             json_path = out_song / "sections.json"
             if json_path.exists():
                 try:
@@ -1599,15 +1654,11 @@ class MainWindow(QMainWindow):
 
                     dlg = SectionReviewDialog(sections, density, self)
                     if dlg.exec():
-                        # User Confirmed
                         overrides = dlg.get_sections()
                         override_path = out_song / "overrides.json"
                         override_path.write_text(json.dumps(overrides, indent=2))
-
-                        # TRIGGER PHASE 2 (Actual Generation)
                         self.run_generation_phase2(override_path)
                     else:
-                        # User Cancelled
                         self.btn_generate.setText("  GENERATE  ")
                         self.progress_bar.setVisible(False)
                         self.status_label.setText("Cancelled")
@@ -1627,7 +1678,6 @@ class MainWindow(QMainWindow):
                 self._update_state()
             return
 
-        # PHASE 2 COMPLETE (Or Normal Run Complete)
         self.btn_generate.setText("  GENERATE  ")
         self.progress_bar.setVisible(False)
 
@@ -1659,7 +1709,6 @@ class MainWindow(QMainWindow):
         self._update_state()
 
     def run_generation_phase2(self, override_path: Path) -> None:
-        # Re-run CLI but with --section-overrides and NO --analyze-only
         cfg = self._pending_generation_cfg
         out_song = self._pending_generation_out
 
@@ -1678,14 +1727,19 @@ class MainWindow(QMainWindow):
             "--seed", str(cfg.seed),
             "--chord-prob", str(cfg.chord_prob),
             "--sustain-len", str(cfg.sustain_len),
-            "--grid-snap", cfg.grid_snap,
+            # NO grid-snap arg
             "--sustain-threshold", str(cfg.sustain_threshold),
             "--sustain-buffer", str(cfg.sustain_buffer),
-            "--section-overrides", str(override_path)
+            "--section-overrides", str(override_path),
+
+            # New Scaling Args
+            "--hard-gap-ms", str(cfg.hard_gap_ms),
+            "--med-gap-ms", str(cfg.med_gap_ms),
+            "--easy-gap-ms", str(cfg.easy_gap_ms)
         ])
-        if not cfg.allow_orange: cmd.append("--no-orange")
-        if not self.chk_rhythm_glue.isChecked(): cmd.append("--no-rhythmic-glue")
-        # Metadata fetch already happened or is optional, but let's keep it consistent
+
+        # Cleanup: No flags for orange/glue
+
         if cfg.fetch_metadata: cmd.append("--fetch-metadata")
 
         self.append_log(f"Starting Final Generation (with overrides)...")
@@ -1703,27 +1757,23 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self.snap_to_content)
         py_exec = get_python_exec()
 
-        # --- FIX: Call via CLI flag, not script path ---
         if is_frozen():
             cmd = [str(py_exec), "--internal-cli"]
         else:
             cmd = [str(py_exec), "-m", "charter.cli"]
 
         cmd.extend(["--validate", str(song_dir)])
-        # -----------------------------------------------
 
         self.validator_proc = QProcess(self)
         self.validator_proc.finished.connect(lambda c, s: self._on_health_finished(c, s, song_dir))
         self.validator_proc.start(cmd[0], cmd[1:])
 
     def _on_health_finished(self, code: int, status: QProcess.ExitStatus, song_dir: Path) -> None:
-        # Read both channels
         stdout = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8", errors="replace")
         stderr = bytes(self.validator_proc.readAllStandardError()).decode("utf-8", errors="replace")
 
         full_output = stdout + stderr
 
-        # Debugging: if nothing came back, say so
         if not full_output.strip():
             full_output = "[No output from validator process]"
 
@@ -1731,7 +1781,6 @@ class MainWindow(QMainWindow):
         for line in full_output.splitlines():
             line = line.strip()
             line_lower = line.lower()
-            # FIX: Case insensitive check for "warning" and "error"
             if line.startswith("- ") or "warning" in line_lower or "error" in line_lower or "traceback" in line_lower:
                 warnings.append(line)
 
@@ -1741,33 +1790,26 @@ class MainWindow(QMainWindow):
         if not self.song_queue:
             msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
 
-            # Show warnings if any found (including crashes)
             if warnings:
                 msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
                 if len(warnings) > 5: msg += "\n... (check logs for more)"
 
             title = "Generation Complete" if not warnings else "Complete (With Warnings)"
-
-            # Use Warning icon if we found issues
             icon = QMessageBox.Information if not warnings else QMessageBox.Warning
 
-            # --- FIX: Explicitly set window width to 700px (matches Log Window) ---
             msg_box = QMessageBox(icon, title, msg, QMessageBox.Ok, self)
+            msg_box.setMinimumWidth(500)
             msg_box.exec()
-            # ----------------------------------------------------------------------
 
             self.status_label.setText("Ready")
 
         self.validator_proc = None
 
 def main() -> None:
-# --- FIX: Handle CLI mode for frozen app ---
     if "--internal-cli" in sys.argv:
-        # Remove the flag so argparse doesn't choke on it
         sys.argv.remove("--internal-cli")
         from charter import cli
         sys.exit(cli.main())
-    # -------------------------------------------
 
     app = QApplication(sys.argv)
     font = QApplication.font()

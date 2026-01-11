@@ -14,6 +14,7 @@ from charter.config import ChartConfig, LANE_PITCHES, TRACK_NAME, SP_PITCH
 from charter.audio import detect_onsets, estimate_pitches
 from charter.sections import generate_sections, compute_section_stats, Section
 from charter.star_power import generate_star_power_phrases
+from charter.reduction import reduce_to_hard, reduce_to_medium, reduce_to_easy
 
 # -------------------------------------------------------------------------
 # 1. ANALYSIS HELPERS
@@ -310,7 +311,7 @@ def write_real_notes_mid(
     Main Orchestrator.
     1. Analyzes Audio
     2. Generates 'Expert' Notes
-    3. (Future: Generates Hard/Med/Easy)
+    3. Cascades Reduction (Exp -> Hard -> Med -> Easy)
     4. Writes Unified MIDI
     """
 
@@ -368,8 +369,7 @@ def write_real_notes_mid(
     duration += shift_seconds
     shifted_beat_times = [b + shift_seconds for b in beat_times]
 
-    # --- STEP 2: GENERATE NOTES ---
-    # This now returns a list of Note objects, decoupled from file writing
+    # --- STEP 2: GENERATE EXPERT NOTES ---
     expert_notes = []
     chord_starts = []
 
@@ -377,6 +377,18 @@ def write_real_notes_mid(
         expert_notes, chord_starts = generate_expert_notes(
             times, pitches, shifted_beat_times, cfg
         )
+
+    hard_notes = []
+    medium_notes = []
+    easy_notes = []
+
+    if not dry_run and expert_notes:
+        # Pass the dynamic config values here
+        hard_notes = reduce_to_hard(expert_notes, min_gap_ms=cfg.hard_min_gap_ms)
+        medium_notes = reduce_to_medium(hard_notes, min_gap_ms=cfg.medium_min_gap_ms)
+        easy_notes = reduce_to_easy(medium_notes, min_gap_ms=cfg.easy_min_gap_ms)
+
+        print(f"DEBUG: Expert({len(expert_notes)}) -> Hard({len(hard_notes)}) -> Med({len(medium_notes)}) -> Easy({len(easy_notes)})")
 
     # --- STEP 3: SECTIONS ---
     final_sections = []
@@ -399,13 +411,17 @@ def write_real_notes_mid(
             duration
         )
 
-    # --- STEP 4: WRITE MIDI ---
+    # --- STEP 4: WRITE MIDI (UNIFIED) ---
     if not dry_run:
         pm = pretty_midi.PrettyMIDI(initial_tempo=float(tempo))
         guitar = pretty_midi.Instrument(program=0, name=TRACK_NAME)
 
-        # Add Expert Notes
+        # MERGE ALL DIFFICULTIES INTO ONE TRACK
+        # Clone Hero parses them based on pitch range
         guitar.notes.extend(expert_notes)
+        guitar.notes.extend(hard_notes)
+        guitar.notes.extend(medium_notes)
+        guitar.notes.extend(easy_notes)
 
         # Add Star Power
         if cfg.add_star_power:

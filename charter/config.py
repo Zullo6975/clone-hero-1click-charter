@@ -13,10 +13,9 @@ DIFFICULTY_PITCHES = {
     "Easy":   {0: 60, 1: 61, 2: 62, 3: 63, 4: 64}
 }
 
-# Default to Expert for the base generation
 LANE_PITCHES = DIFFICULTY_PITCHES["Expert"]
 
-# --- SUPPORT INFO (v2.0) ---
+# --- SUPPORT INFO ---
 SUPPORT_EMAIL = "oneclickcharter-support@outlook.com"
 VENMO_HANDLE = "oneclickcharter"
 VENMO_URL = "https://venmo.com/u/oneclickcharter"
@@ -25,19 +24,27 @@ REPO_URL = "https://github.com/zullo6975/clone-hero-1click-charter"
 @dataclass
 class ChartConfig:
     # --- Basic ---
-    mode: str = "real"  # "real" or "dummy"
+    mode: str = "real"
 
-    # --- Difficulty / Feel (TUNED FOR EXPERT) ---
-    max_nps: float = 12.0       # Was 3.8 (Medium) -> 12.0 (Expert Shredding)
-    min_gap_ms: int = 60        # Was 140ms -> 60ms (Allows fast runs/trills)
+    # --- EXPERT BASELINE ---
+    max_nps: float = 12.0
+    min_gap_ms: int = 60
     seed: int = 42
 
+    # --- REDUCTION TUNING ---
+    hard_min_gap_ms: int = 120
+    medium_min_gap_ms: int = 220
+    easy_min_gap_ms: int = 450
+
     # --- Gameplay Customization ---
-    allow_orange: bool = True       # Essential for Expert
-    chord_prob: float = 0.22        # Was 0.12 -> 0.22 (More chords)
-    sustain_len: float = 0.4        # Was 0.5 -> 0.4 (Slightly less hold, more tap)
-    movement_bias: float = 0.6      # Was 0.5 -> 0.6 (More movement up/down neck)
-    grid_snap: str = "1/16"         # Was 1/8 -> 1/16 (Finer resolution)
+    # CLEANUP: Locked these values to "Always On / High Quality"
+    allow_orange: bool = True       # Always allow 5th lane logic to run
+    rhythmic_glue: bool = True      # Always enforce patterns
+    grid_snap: str = "1/16"         # Always use high-res grid
+
+    chord_prob: float = 0.22
+    sustain_len: float = 0.4
+    movement_bias: float = 0.6
     force_taps: bool = False
 
     # --- Sustain Fine-Tuning ---
@@ -45,6 +52,5 @@ class ChartConfig:
     sustain_buffer: float = 0.25
 
     # --- Structural ---
-    rhythmic_glue: bool = True
     add_sections: bool = True
     add_star_power: bool = True

@@ -26,12 +26,12 @@
 
 **Focus:** Moving from a single "Medium" chart to a full difficulty suite.
 
-- [ ] **The "Expert" Engine:** Create a new generation profile for Expert (1/16 grid, complex chords, 3-note chords allowed).
-- [ ] **Reduction Algorithm:** Create a logic system to "dumb down" an Expert chart.
+- [x] **The "Expert" Engine:** Create a new generation profile for Expert (1/16 grid, complex chords, 3-note chords allowed).
+- [x] **Reduction Algorithm:** Create a logic system to "dumb down" an Expert chart.
   - _Expert -> Hard:_ Remove 20% of notes, simplify complex chords.
   - _Hard -> Medium:_ Remove Orange, enforce 1/8 grid strictness.
   - _Medium -> Easy:_ On-beat only, mostly single notes.
-- [ ] **Unified MIDI Writer:** Update `midi.py` to write `PART GUITAR`, `EASY`, `MEDIUM`, `HARD`, and `EXPERT` tracks into a single `.mid` file.
+- [x] **Unified MIDI Writer:** Update `midi.py` to write `PART GUITAR`, `EASY`, `MEDIUM`, `HARD`, and `EXPERT` tracks into a single `.mid` file.
 
 ---
 
