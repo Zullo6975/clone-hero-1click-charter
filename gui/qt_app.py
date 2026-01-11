@@ -69,7 +69,6 @@ class SafeSlider(QSlider):
         event.ignore()
 
 # --- PRESETS MANAGEMENT ---
-# UPDATED: Tuned for EXPERT Baseline (Harder, Faster, Stronger)
 DEFAULT_PRESETS: dict[str, dict[str, float | int]] = {
     "1) Casual": {
         "max_nps": 9.0, "min_gap_ms": 75, "sustain": 40, "chord": 15,
@@ -90,13 +89,11 @@ DEFAULT_PRESETS: dict[str, dict[str, float | int]] = {
 }
 
 def get_user_preset_path() -> Path:
-    """Returns path to user_presets.json in home dir."""
     p = Path.home() / ".1clickcharter" / "presets.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     return p
 
 def load_all_presets() -> dict[str, dict[str, float | int]]:
-    """Merges defaults with user presets."""
     merged = DEFAULT_PRESETS.copy()
     user_path = get_user_preset_path()
     if user_path.exists():
@@ -108,7 +105,6 @@ def load_all_presets() -> dict[str, dict[str, float | int]]:
     return merged
 
 def save_user_preset(name: str, data: dict[str, float | int]) -> None:
-    """Saves a single preset to the JSON file (merging with existing)."""
     user_path = get_user_preset_path()
     current = {}
     if user_path.exists():
@@ -168,7 +164,6 @@ class ThemeManager:
     def apply_style(app: QApplication, dark_mode: bool):
         app.setStyle("Fusion")
 
-        # Enforce clean font state (11pt is the sweet spot)
         font = QFont()
         font.setPointSize(11)
         app.setFont(font)
@@ -191,8 +186,7 @@ class ThemeManager:
             palette.setColor(QPalette.Highlight, highlight)
             palette.setColor(QPalette.HighlightedText, Qt.white)
 
-            # Interactions
-            palette.setColor(QPalette.Light, QColor(60, 65, 70)) # Hover
+            palette.setColor(QPalette.Light, QColor(60, 65, 70))
             palette.setColor(QPalette.Disabled, QPalette.Text, QColor(100, 100, 100))
             palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(100, 100, 100))
             palette.setColor(QPalette.PlaceholderText, QColor(120, 130, 140))
@@ -215,14 +209,12 @@ class ThemeManager:
             palette.setColor(QPalette.Highlight, highlight)
             palette.setColor(QPalette.HighlightedText, white)
 
-            # Explicit Interaction Colors
-            palette.setColor(QPalette.Light, QColor(255, 255, 255)) # Hover
+            palette.setColor(QPalette.Light, QColor(255, 255, 255))
             palette.setColor(QPalette.Midlight, QColor(230, 230, 240))
             palette.setColor(QPalette.Dark, QColor(200, 200, 210))
-            palette.setColor(QPalette.Mid, QColor(210, 210, 220)) # Borders
+            palette.setColor(QPalette.Mid, QColor(210, 210, 220))
             palette.setColor(QPalette.Shadow, QColor(150, 150, 160))
 
-            # Disabled States
             disabled_text = QColor(160, 160, 170)
             palette.setColor(QPalette.Disabled, QPalette.Text, disabled_text)
             palette.setColor(QPalette.Disabled, QPalette.ButtonText, disabled_text)
@@ -338,6 +330,27 @@ class ThemeManager:
             }
             QMessageBox QLabel {
                 min-width: 500px;
+            }
+
+            /* TABS */
+            QTabWidget::pane {
+                border: 1px solid palette(mid);
+                border-radius: 4px;
+                top: -1px;
+            }
+            QTabBar::tab {
+                background: palette(button);
+                border: 1px solid palette(mid);
+                border-bottom-color: palette(mid);
+                border-top-left-radius: 4px;
+                border-top-right-radius: 4px;
+                padding: 6px 12px;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background: palette(base);
+                border-bottom-color: palette(base);
+                font-weight: bold;
             }
         """)
 
@@ -733,7 +746,7 @@ class MainWindow(QMainWindow):
                 icon_lbl.setPixmap(pix)
 
         title_lbl = QLabel("CloneHero 1-Click Charter")
-        title_lbl.setFont(get_font(40, True))
+        title_lbl.setFont(get_font(32, True))
         title_lbl.setStyleSheet("color: palette(text);")
 
         header_layout.addWidget(icon_lbl)
@@ -741,6 +754,12 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(header_widget)
 
         # --- BODY ---
+        line = QFrame()
+        line.setFixedHeight(1)
+        line.setFixedWidth(750)
+        line.setStyleSheet("background-color: rgba(0, 0, 0, 0.12);")
+        main_layout.addWidget(line, alignment=Qt.AlignmentFlag.AlignHCenter)
+
         splitter = QSplitter(Qt.Horizontal)
         splitter.setHandleWidth(1)
         splitter.setChildrenCollapsible(False)
@@ -891,12 +910,20 @@ class MainWindow(QMainWindow):
 
         self.adv_content = QWidget()
         self.adv_content.setVisible(False)
-        adv_form = QFormLayout(self.adv_content)
-        adv_form.setLabelAlignment(Qt.AlignRight)
-        adv_form.setVerticalSpacing(12)
-        adv_form.setContentsMargins(10, 0, 0, 0)
+        # Use VBox for the main container to allow mixing widgets (Presets) and Tabs
+        adv_inner_layout = QVBoxLayout(self.adv_content)
+        adv_inner_layout.setContentsMargins(0, 0, 0, 0)
+        adv_inner_layout.setSpacing(12)
 
-        # PRESETS ROW
+        # 1. PRESETS ROW (Global)
+        preset_row_widget = QWidget()
+        preset_layout = QHBoxLayout(preset_row_widget)
+        preset_layout.setContentsMargins(0, 0, 0, 0)
+
+        lbl_preset = QLabel("Expert Style:")
+        lbl_preset.setMinimumWidth(100)
+        lbl_preset.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
         self.preset_combo = SafeComboBox()
         self.preset_combo.setCursor(Qt.PointingHandCursor)
         self.preset_combo.setMinimumWidth(200)
@@ -911,64 +938,33 @@ class MainWindow(QMainWindow):
         self.btn_del_preset.setToolTip("Delete selected preset (User presets only)")
         self.btn_del_preset.setCursor(Qt.PointingHandCursor)
 
-        preset_row = QHBoxLayout()
-        preset_row.addWidget(self.preset_combo, 1)
-        preset_row.addWidget(self.btn_save_preset)
-        preset_row.addWidget(self.btn_del_preset)
+        preset_layout.addWidget(lbl_preset)
+        preset_layout.addWidget(self.preset_combo, 1)
+        preset_layout.addWidget(self.btn_save_preset)
+        preset_layout.addWidget(self.btn_del_preset)
+
+        adv_inner_layout.addWidget(preset_row_widget)
 
         self.preset_hint = QLabel("Select baseline intensity.")
-        self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11pt;")
+        self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11pt; margin-left: 110px;")
+        adv_inner_layout.addWidget(self.preset_hint)
 
-        # NEW: Review Checkbox
         self.chk_review = QCheckBox("Review Sections before Generation")
         self.chk_review.setToolTip("Show a list of detected sections to rename/edit before creating the chart.")
         self.chk_review.setCursor(Qt.PointingHandCursor)
+        # Right align the review checkbox slightly
+        row_review = QHBoxLayout()
+        row_review.addSpacing(110)
+        row_review.addWidget(self.chk_review)
+        adv_inner_layout.addLayout(row_review)
 
-        adv_form.addRow(form_label("Expert Style"), preset_row)
-        adv_form.addRow(QLabel(""), self.preset_hint)
-        adv_form.addRow(form_label("Override Section Names"), self.chk_review)
+        # 2. TABS
+        self.tabs_config = QTabWidget()
 
-        # --- DIFFICULTY SCALING ---
-        div2 = QFrame()
-        div2.setFrameShape(QFrame.HLine)
-        div2.setStyleSheet("color: palette(mid);")
-        adv_form.addRow(div2)
-
-        lbl_scaling = QLabel("Difficulty Scaling (Gap Between Notes)")
-        lbl_scaling.setStyleSheet("font-weight: bold; text-decoration: underline; margin-top: 10px;")
-        adv_form.addRow(lbl_scaling)
-
-        self.spin_hard_gap = SafeSpinBox()
-        self.spin_hard_gap.setRange(50, 500)
-        self.spin_hard_gap.setValue(120)
-        self.spin_hard_gap.setSuffix(" ms")
-        self.spin_hard_gap.setToolTip("Minimum gap for HARD difficulty")
-
-        self.spin_med_gap = SafeSpinBox()
-        self.spin_med_gap.setRange(100, 800)
-        self.spin_med_gap.setValue(220)
-        self.spin_med_gap.setSuffix(" ms")
-        self.spin_med_gap.setToolTip("Minimum gap for MEDIUM difficulty")
-
-        self.spin_easy_gap = SafeSpinBox()
-        self.spin_easy_gap.setRange(200, 1500)
-        self.spin_easy_gap.setValue(450)
-        self.spin_easy_gap.setSuffix(" ms")
-        self.spin_easy_gap.setToolTip("Minimum gap for EASY difficulty")
-
-        adv_form.addRow(form_label("Hard Spacing"), self.spin_hard_gap)
-        adv_form.addRow(form_label("Medium Spacing"), self.spin_med_gap)
-        adv_form.addRow(form_label("Easy Spacing"), self.spin_easy_gap)
-
-        div = QFrame()
-        div.setFrameShape(QFrame.HLine)
-        div.setStyleSheet("color: palette(mid);")
-        adv_form.addRow(div)
-
-        self.custom_controls = QWidget()
-        custom_form = QFormLayout(self.custom_controls)
-        custom_form.setContentsMargins(0, 0, 0, 0)
-        custom_form.setVerticalSpacing(12)
+        # --- TAB 1: EXPERT BASELINE ---
+        tab_expert = QWidget()
+        form_expert = QFormLayout(tab_expert)
+        form_expert.setLabelAlignment(Qt.AlignRight)
 
         self.mode_group = QButtonGroup(self)
         self.mode_real = QRadioButton("Real (Audio Analysis)")
@@ -1001,8 +997,6 @@ class MainWindow(QMainWindow):
         self.seed_spin.setMinimumHeight(26)
         self.seed_spin.setToolTip("Seed for random generation.")
 
-        # --- CLEANUP: Removed Orange/Glue/Grid check boxes ---
-
         self.chord_slider = SafeSlider()
         self.chord_slider.setOrientation(Qt.Horizontal)
         self.chord_slider.setRange(0, 50)
@@ -1015,13 +1009,11 @@ class MainWindow(QMainWindow):
         self.sustain_slider.setValue(50)
         self.sustain_slider.setCursor(Qt.PointingHandCursor)
 
-        # New Sustain Tuning
         self.sustain_gap_spin = SafeDoubleSpinBox()
         self.sustain_gap_spin.setRange(0.1, 2.0)
         self.sustain_gap_spin.setSingleStep(0.1)
-        self.sustain_gap_spin.setValue(0.2) # Changed from 0.8 -> 0.2
+        self.sustain_gap_spin.setValue(0.2)
         self.sustain_gap_spin.setSuffix(" s")
-        self.sustain_gap_spin.setToolTip("Gaps larger than this will become sustains.")
 
         self.sustain_buffer_spin = SafeDoubleSpinBox()
         self.sustain_buffer_spin.setRange(0.05, 0.5)
@@ -1029,26 +1021,89 @@ class MainWindow(QMainWindow):
         self.sustain_buffer_spin.setValue(0.15)
         self.sustain_buffer_spin.setSuffix(" s")
 
-        custom_form.addRow(form_label("Generation Mode"), row_mode)
-        custom_form.addRow(form_label("Max Notes/Sec"), self.max_nps_spin)
-        custom_form.addRow(form_label("Min Note Spacing"), self.min_gap_spin)
-        custom_form.addRow(form_label("Pattern Variation"), self.seed_spin)
+        form_expert.addRow(form_label("Generation Mode"), row_mode)
+        form_expert.addRow(form_label("Max Notes/Sec"), self.max_nps_spin)
+        form_expert.addRow(form_label("Min Note Spacing"), self.min_gap_spin)
+        form_expert.addRow(form_label("Pattern Variation"), self.seed_spin)
 
         div3 = QFrame()
         div3.setFrameShape(QFrame.HLine)
         div3.setStyleSheet("color: palette(mid);")
-        custom_form.addRow(div3)
+        form_expert.addRow(div3)
 
-        # Removed the grid snap / 5th lane / rhythm glue layout rows
+        form_expert.addRow(form_label("Chord Density"), self.chord_slider)
+        form_expert.addRow(form_label("Sustain Prob."), self.sustain_slider)
+        form_expert.addRow(form_label("Min Gap for Sustain"), self.sustain_gap_spin)
+        form_expert.addRow(form_label("Sustain End Buffer"), self.sustain_buffer_spin)
 
-        custom_form.addRow(form_label("Chord Density"), self.chord_slider)
-        custom_form.addRow(form_label("Sustain Prob."), self.sustain_slider)
+        self.tabs_config.addTab(tab_expert, "Expert Baseline")
 
-        # Sustain Tuning Group
-        custom_form.addRow(form_label("Min Gap for Sustain"), self.sustain_gap_spin)
-        custom_form.addRow(form_label("Sustain End Buffer"), self.sustain_buffer_spin)
+        # --- TAB 2: DIFFICULTY SCALING ---
+        tab_scaling = QWidget()
+        lay_scaling = QVBoxLayout(tab_scaling)
 
-        adv_form.addRow(self.custom_controls)
+        lbl_info = QLabel("Lower difficulties are created by filtering the Expert chart. "
+                          "Increasing the 'Gap' removes more notes, making it easier.")
+        lbl_info.setWordWrap(True)
+        lbl_info.setStyleSheet("color: palette(disabled-text); font-style: italic; margin-bottom: 10px;")
+        lay_scaling.addWidget(lbl_info)
+
+        form_scaling = QFormLayout()
+        form_scaling.setLabelAlignment(Qt.AlignRight)
+
+        self.spin_hard_gap = SafeSpinBox()
+        self.spin_hard_gap.setRange(50, 500)
+        self.spin_hard_gap.setValue(120)
+        self.spin_hard_gap.setSuffix(" ms")
+        self.spin_hard_gap.setToolTip("Minimum gap for HARD difficulty")
+        self.spin_hard_gap.valueChanged.connect(self._update_scaling_labels)
+
+        self.lbl_hard_desc = QLabel()
+        self.lbl_hard_desc.setStyleSheet("color: palette(disabled-text);")
+
+        self.spin_med_gap = SafeSpinBox()
+        self.spin_med_gap.setRange(100, 800)
+        self.spin_med_gap.setValue(220)
+        self.spin_med_gap.setSuffix(" ms")
+        self.spin_med_gap.setToolTip("Minimum gap for MEDIUM difficulty")
+        self.spin_med_gap.valueChanged.connect(self._update_scaling_labels)
+
+        self.lbl_med_desc = QLabel()
+        self.lbl_med_desc.setStyleSheet("color: palette(disabled-text);")
+
+        self.spin_easy_gap = SafeSpinBox()
+        self.spin_easy_gap.setRange(200, 1500)
+        self.spin_easy_gap.setValue(450)
+        self.spin_easy_gap.setSuffix(" ms")
+        self.spin_easy_gap.setToolTip("Minimum gap for EASY difficulty")
+        self.spin_easy_gap.valueChanged.connect(self._update_scaling_labels)
+
+        self.lbl_easy_desc = QLabel()
+        self.lbl_easy_desc.setStyleSheet("color: palette(disabled-text);")
+
+        # Side-by-side Layouts
+        row_h = QHBoxLayout()
+        row_h.addWidget(self.spin_hard_gap)
+        row_h.addWidget(self.lbl_hard_desc)
+        form_scaling.addRow(form_label("Hard Gap"), row_h)
+
+        row_m = QHBoxLayout()
+        row_m.addWidget(self.spin_med_gap)
+        row_m.addWidget(self.lbl_med_desc)
+        form_scaling.addRow(form_label("Medium Gap"), row_m)
+
+        row_e = QHBoxLayout()
+        row_e.addWidget(self.spin_easy_gap)
+        row_e.addWidget(self.lbl_easy_desc)
+        form_scaling.addRow(form_label("Easy Gap"), row_e)
+
+        lay_scaling.addLayout(form_scaling)
+        lay_scaling.addStretch()
+
+        self.tabs_config.addTab(tab_scaling, "Difficulty Scaling")
+
+        adv_inner_layout.addWidget(self.tabs_config)
+
         adv_layout.addWidget(self.chk_adv)
         adv_layout.addWidget(self.adv_content)
         main_layout_inner.addWidget(self.adv_container)
@@ -1330,7 +1385,6 @@ class MainWindow(QMainWindow):
     def apply_preset(self, name: str) -> None:
         preset = self.all_presets.get(name)
         is_custom = preset is None
-        self.custom_controls.setVisible(is_custom)
 
         if is_custom:
             self.preset_hint.setText("Manual control enabled.")
@@ -1341,7 +1395,7 @@ class MainWindow(QMainWindow):
             self.sustain_slider.setValue(int(preset["sustain"]))
             self.chord_slider.setValue(int(preset["chord"]))
 
-            # Difficulty Scaling Settings (The fix you requested)
+            # Difficulty Scaling Settings
             self.spin_hard_gap.setValue(int(preset.get("hard_gap", 120)))
             self.spin_med_gap.setValue(int(preset.get("med_gap", 220)))
             self.spin_easy_gap.setValue(int(preset.get("easy_gap", 450)))
@@ -1350,6 +1404,25 @@ class MainWindow(QMainWindow):
 
         is_default = name in DEFAULT_PRESETS
         self.btn_del_preset.setEnabled(not is_default and name != "Custom…")
+
+        # Trigger label update manually since signals might be blocked or not fired
+        self._update_scaling_labels()
+
+    def _update_scaling_labels(self):
+        # Hard
+        h_ms = self.spin_hard_gap.value()
+        h_nps = 1000.0 / h_ms if h_ms > 0 else 0
+        self.lbl_hard_desc.setText(f"(Max ~{h_nps:.1f} notes/sec)")
+
+        # Med
+        m_ms = self.spin_med_gap.value()
+        m_nps = 1000.0 / m_ms if m_ms > 0 else 0
+        self.lbl_med_desc.setText(f"(Max ~{m_nps:.1f} notes/sec)")
+
+        # Easy
+        e_ms = self.spin_easy_gap.value()
+        e_nps = 1000.0 / e_ms if e_ms > 0 else 0
+        self.lbl_easy_desc.setText(f"(Max ~{e_nps:.1f} notes/sec)")
 
     # ---------- Logic / Processing ----------
     def _update_queue_display(self) -> None:
