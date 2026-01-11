@@ -71,10 +71,22 @@ class SafeSlider(QSlider):
 # --- PRESETS MANAGEMENT ---
 # UPDATED: Tuned for EXPERT Baseline (Harder, Faster, Stronger)
 DEFAULT_PRESETS: dict[str, dict[str, float | int]] = {
-    "1) Casual":           {"max_nps": 9.0,  "min_gap_ms": 75, "sustain": 40, "chord": 15},
-    "2) Standard":         {"max_nps": 13.0, "min_gap_ms": 55, "sustain": 25, "chord": 22},
-    "3) Shred":            {"max_nps": 17.0, "min_gap_ms": 35, "sustain": 10, "chord": 30},
-    "4) Lose Fingerprints":{"max_nps": 22.0, "min_gap_ms": 25, "sustain": 5,  "chord": 40},
+    "1) Casual": {
+        "max_nps": 9.0, "min_gap_ms": 75, "sustain": 40, "chord": 15,
+        "hard_gap": 150, "med_gap": 350, "easy_gap": 600
+    },
+    "2) Standard": {
+        "max_nps": 13.0, "min_gap_ms": 55, "sustain": 25, "chord": 22,
+        "hard_gap": 120, "med_gap": 220, "easy_gap": 450
+    },
+    "3) Shred": {
+        "max_nps": 17.0, "min_gap_ms": 35, "sustain": 10, "chord": 30,
+        "hard_gap": 90, "med_gap": 180, "easy_gap": 350
+    },
+    "4) Lose Fingerprints": {
+        "max_nps": 22.0, "min_gap_ms": 25, "sustain": 5,  "chord": 40,
+        "hard_gap": 60, "med_gap": 120, "easy_gap": 250
+    },
 }
 
 def get_user_preset_path() -> Path:
@@ -1007,8 +1019,9 @@ class MainWindow(QMainWindow):
         self.sustain_gap_spin = SafeDoubleSpinBox()
         self.sustain_gap_spin.setRange(0.1, 2.0)
         self.sustain_gap_spin.setSingleStep(0.1)
-        self.sustain_gap_spin.setValue(0.8)
+        self.sustain_gap_spin.setValue(0.2) # Changed from 0.8 -> 0.2
         self.sustain_gap_spin.setSuffix(" s")
+        self.sustain_gap_spin.setToolTip("Gaps larger than this will become sustains.")
 
         self.sustain_buffer_spin = SafeDoubleSpinBox()
         self.sustain_buffer_spin.setRange(0.05, 0.5)
@@ -1292,7 +1305,11 @@ class MainWindow(QMainWindow):
                 "max_nps": self.max_nps_spin.value(),
                 "min_gap_ms": self.min_gap_spin.value(),
                 "sustain": self.sustain_slider.value(),
-                "chord": self.chord_slider.value()
+                "chord": self.chord_slider.value(),
+                # NEW: Save scaling values too
+                "hard_gap": self.spin_hard_gap.value(),
+                "med_gap": self.spin_med_gap.value(),
+                "easy_gap": self.spin_easy_gap.value()
             }
             save_user_preset(name, data)
             self.refresh_presets()
@@ -1314,14 +1331,22 @@ class MainWindow(QMainWindow):
         preset = self.all_presets.get(name)
         is_custom = preset is None
         self.custom_controls.setVisible(is_custom)
+
         if is_custom:
             self.preset_hint.setText("Manual control enabled.")
         else:
+            # Expert Settings
             self.max_nps_spin.setValue(float(preset["max_nps"]))
             self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
             self.sustain_slider.setValue(int(preset["sustain"]))
             self.chord_slider.setValue(int(preset["chord"]))
-            self.preset_hint.setText(f"Active: {preset['max_nps']} NPS | {preset['min_gap_ms']}ms Gap")
+
+            # Difficulty Scaling Settings (The fix you requested)
+            self.spin_hard_gap.setValue(int(preset.get("hard_gap", 120)))
+            self.spin_med_gap.setValue(int(preset.get("med_gap", 220)))
+            self.spin_easy_gap.setValue(int(preset.get("easy_gap", 450)))
+
+            self.preset_hint.setText(f"Active: {preset['max_nps']} NPS | Med Gap: {preset.get('med_gap', 220)}ms")
 
         is_default = name in DEFAULT_PRESETS
         self.btn_del_preset.setEnabled(not is_default and name != "Custom…")
