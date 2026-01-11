@@ -11,9 +11,10 @@ import mido  # type: ignore
 
 # ---- Your chart conventions ----
 TRACK_NAME = "PART GUITAR"
-LANE_PITCHES = {72, 73, 74, 75, 76}
-ORANGE_PITCH = 76
-DEFAULT_MIN_NOTE_START = 1.0
+# We only validate against Expert ranges now for the baseline
+LANE_PITCHES = {96, 97, 98, 99, 100}
+ORANGE_PITCH = 100
+DEFAULT_MIN_NOTE_START = 0.5 # Relaxed from 1.0
 DEFAULT_SP_PITCH = 116
 
 
@@ -60,7 +61,8 @@ def _iter_notes(inst: pretty_midi.Instrument) -> Iterable[pretty_midi.Note]:
         yield n
 
 
-def _count_density_spikes(note_starts: list[float], window_sec: float = 1.0, nps_warn: float = 9.0) -> int:
+def _count_density_spikes(note_starts: list[float], window_sec: float = 1.0, nps_warn: float = 16.0) -> int:
+    # EXPERT TUNING: Warn only if NPS exceeds 16.0 (DragonForce speeds)
     if not note_starts:
         return 0
     starts = sorted(note_starts)
@@ -96,10 +98,6 @@ def _group_sp_phrases(sp_starts: list[float], sp_ends: list[float], gap_join_sec
 
 
 def _parse_sections(midi_path: Path, pm: pretty_midi.PrettyMIDI) -> tuple[list[tuple[str, float]], str]:
-    """
-    Scans the raw MIDI file for Text or Lyric events starting with 'section '.
-    Returns (list_of_sections, track_name_info)
-    """
     out: list[tuple[str, float]] = []
     found_in_track_name = None
 
@@ -108,7 +106,6 @@ def _parse_sections(midi_path: Path, pm: pretty_midi.PrettyMIDI) -> tuple[list[t
 
         for i, track in enumerate(mid.tracks):
             track_name = f"Track {i}"
-            # Check for track name event first
             for msg in track:
                 if msg.type == 'track_name':
                     track_name = msg.name
@@ -117,10 +114,8 @@ def _parse_sections(midi_path: Path, pm: pretty_midi.PrettyMIDI) -> tuple[list[t
             abs_time = 0
             for msg in track:
                 abs_time += msg.time
-
                 if msg.type in ('text', 'lyrics') and isinstance(msg.text, str):
                     text = msg.text.strip()
-
                     is_sec = False
                     clean_name = ""
 
@@ -225,12 +220,12 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
         errors.append(f"{bad_dur} notes have non-positive duration (end <= start).")
 
     if lane_notes == 0:
-        errors.append("No lane notes found in PART GUITAR (expected Medium pitches 72–76).")
+        errors.append("No lane notes found (checked Expert 96-100).")
 
     if too_early:
         warnings.append(
             f"{too_early} notes start before {min_note_start:.2f}s. "
-            "Not always fatal, but many CH charts start at ~1.0s."
+            "This may cause issues with some Clone Hero versions."
         )
 
     if sp_notes == 0:
@@ -245,9 +240,10 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
     elif track_loc != "EVENTS":
         warnings.append(f"Sections found in '{track_loc}', but expected 'EVENTS' track.")
 
-    spikes = _count_density_spikes(lane_note_starts, window_sec=1.0, nps_warn=9.0)
+    # EXPERT TUNING: 16.0 NPS threshold
+    spikes = _count_density_spikes(lane_note_starts, window_sec=1.0, nps_warn=16.0)
     if spikes > 0:
-        warnings.append(f"High-density spikes detected (>= 9 NPS): {spikes}")
+        warnings.append(f"Extreme density spikes detected (>= 16 NPS): {spikes}")
 
     ok = len(errors) == 0
     return ValidationResult(ok, errors, warnings)
@@ -269,8 +265,8 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
     sp_starts: list[float] = []
     sp_ends: list[float] = []
 
-    # Map for Medium Difficulty (72-76)
-    lane_pitch_counts = {72: 0, 73: 0, 74: 0, 75: 0, 76: 0}
+    # Map for Expert Difficulty (96-100)
+    lane_pitch_counts = {96: 0, 97: 0, 98: 0, 99: 0, 100: 0}
 
     for n in guitar.notes:
         if n.pitch in LANE_PITCHES:
@@ -287,17 +283,17 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
     sections, track_loc = _parse_sections(notes_mid, pm)
     sp_phrases = _group_sp_phrases(sp_starts, sp_ends, gap_join_sec=0.45)
 
-    print("\n--- SUMMARY (Medium Difficulty) ---")
+    print("\n--- SUMMARY (Expert Difficulty) ---")
     print(f"Folder: {song_dir}")
     print("\nPART GUITAR:")
     print(f"  Lane notes: {total_lane}")
     print(f"  Chords (est): {chords_est}")
     print("  Lane counts:")
-    print(f"    Green(72):  {lane_pitch_counts[72]}")
-    print(f"    Red(73):    {lane_pitch_counts[73]}")
-    print(f"    Yellow(74): {lane_pitch_counts[74]}")
-    print(f"    Blue(75):   {lane_pitch_counts[75]}")
-    print(f"    Orange(76): {lane_pitch_counts[76]}")
+    print(f"    Green(96):  {lane_pitch_counts[96]}")
+    print(f"    Red(97):    {lane_pitch_counts[97]}")
+    print(f"    Yellow(98): {lane_pitch_counts[98]}")
+    print(f"    Blue(99):   {lane_pitch_counts[99]}")
+    print(f"    Orange(100): {lane_pitch_counts[100]}")
 
     print("\nSTAR POWER:")
     print(f"  Phrases:  {len(sp_phrases)}")

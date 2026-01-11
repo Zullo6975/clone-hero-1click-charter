@@ -62,6 +62,11 @@ def parse_args() -> argparse.Namespace:
     # Validation
     p.add_argument("--validate", help="Path to a song folder to validate (Health Check).")
 
+    # Difficulty Scaling
+    p.add_argument("--hard-gap-ms", type=int, default=120)
+    p.add_argument("--med-gap-ms", type=int, default=220)
+    p.add_argument("--easy-gap-ms", type=int, default=450)
+
     return p.parse_args()
 
 def main():
@@ -96,7 +101,10 @@ def main():
         grid_snap=args.grid_snap,
         sustain_threshold=args.sustain_threshold,
         sustain_buffer=args.sustain_buffer,
-        rhythmic_glue=not args.no_rhythmic_glue
+        rhythmic_glue=not args.no_rhythmic_glue,
+        hard_min_gap_ms=args.hard_gap_ms,
+        medium_min_gap_ms=args.med_gap_ms,
+        easy_min_gap_ms=args.easy_gap_ms,
     )
 
     audio_path = Path(args.audio).resolve()

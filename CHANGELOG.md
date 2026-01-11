@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.0] - 2026-01-11
+
+### 🚀 The "Full Stack" Update
+
+This major release brings 1-Click Charter up to industry standards by generating full difficulty stacks (Easy, Medium, Hard, Expert) automatically.
+
+### 🌟 New Features
+
+- **Multi-Difficulty Generation:** The engine now produces 4 separate difficulty tracks (`PART GUITAR`, `EASY`, `MEDIUM`, `HARD`, `EXPERT`) in a single MIDI file.
+- **Difficulty Scaling:** A new **"Difficulty Scaling"** tab in Advanced Settings allows you to tune the reduction logic. Set a **"Target NPS"** (e.g., 5.0 NPS for Medium) and the engine calculates the required millisecond gap automatically.
+- **Review Tabs:** The Density Visualizer now has tabs for **Expert, Hard, Medium, and Easy**, letting you inspect the difficulty curve for every level before generating.
+- **Preset Ordering:** Default presets are now numbered 1-4, and custom presets start at 5, keeping your list organized.
+
+### 🛠 Improvements
+
+- **Reduction Algorithm:** Expert charts are intelligently "reduced" to create lower difficulties:
+  - **Hard:** Simplifies complex chords and reduces density by ~20%.
+  - **Medium:** Removes 5th lane (Orange) and enforces stricter timing.
+  - **Easy:** Focuses on downbeats and single notes.
+- **UI Polish:** The progress bar now animates (bounces) to show activity during long generation tasks.
+- **Documentation:** Added a "Help" (Info) button to the Settings panel explaining the new scaling controls.
+
 ## [1.3.0] - 2026-01-10
 
 ### 🩹 Critical Fixes & Polish

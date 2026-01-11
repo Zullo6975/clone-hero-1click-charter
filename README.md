@@ -2,7 +2,7 @@
 
 **CloneHero 1-Click Charter** is a desktop application that creates **fun, playable lead guitar charts** from any audio file in seconds.
 
-It is designed for players who want to expand their library without spending hours manually charting. The focus is on **Medium-difficulty** gameplay that feels good—predictable, rhythmic, and fair.
+It is designed for players who want to expand their library without spending hours manually charting.
 
 Assisted by ChatGPT and Gemini.
 
@@ -10,25 +10,25 @@ Assisted by ChatGPT and Gemini.
 
 ## ✨ Features
 
+- **Multi-Difficulty Generation:** Automatically creates Easy, Medium, Hard, and Expert charts in one go.
 - **One-Click Generation:** Drag an audio file, click "Generate", and play.
 - **Batch Queueing:** Drag an entire folder of songs to process them one by one automatically.
 - **Smart Difficulty:** Charts are "groove-locked" to a 1/8 beat grid to ensure they feel musical, not random.
 - **Auto-Metadata:** Fetches Album Art, Year, and Album Title from MusicBrainz automatically.
 - **Smart Delay:** Automatically shifts the chart to ensure you have a "runway" before the first note hits.
 - **Validation:** Built-in health check scans for errors (like impossible patterns or silence) before you even launch the game.
-- **Density Visualizer:** See a graph of the song's difficulty spikes before you generate.
+- **Density Visualizer:** See graphs of the song's difficulty spikes for every difficulty level.
 - **User Presets:** Save and load your own custom configuration profiles.
 
 ### 🎛 Advanced Customization
 
-While the defaults are tuned for a "GH3 Medium" feel, you can tweak the engine:
+While the defaults are tuned for a "GH3 feel", you can tweak the engine:
 
+- **Difficulty Scaling:** Set specific **Target NPS** (Notes Per Second) for Easy, Medium, and Hard to fine-tune the difficulty curve.
 - **User Presets:** Save your favorite settings (e.g., "Chill", "Chaotic") and load them instantly.
 - **Manual Overrides:** Rename sections (like "Guitar Solo") before the chart is built.
-- **No Orange Toggle:** Disable the 5th lane for a purer 4-lane experience.
 - **Chord Density:** Slide from "All Taps" to "Power Chord Heavy".
 - **Sustain Length:** Control how "sticky" the notes are.
-- **Grid Snap:** Loosen the timing to 1/16 notes for faster songs, or lock it to 1/4 for a march feel.
 
 ---
 
@@ -59,14 +59,7 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 
 ## 🗺 Roadmap
 
-### v1.0 (Current)
-
-- [x] Full GUI with Dark Mode
-- [x] Batch Queue System
-- [x] Auto-Metadata & Cover Art
-- [x] Chart Validation
-
-### v1.3 (Current)
+### v1.0 - v1.3 (Completed)
 
 - [x] Full GUI with Dark Mode
 - [x] Batch Queue System
@@ -75,11 +68,12 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 - [x] User Presets & Density Visualization
 - [x] Dynamic Difficulty Rating
 
-### Future Goals (v2.0)
+### v2.0 (Current)
 
-- [ ] **Multi-Difficulty:** Generate Easy, Medium, Hard, and Expert charts simultaneously.
-- [ ] **Cascading Reduction:** Algorithmically reduce Expert charts to create lower difficulties.
-- [ ] **Unified Output:** One folder containing all 4 difficulties ready for full party play.
+- [x] **Multi-Difficulty:** Generate Easy, Medium, Hard, and Expert charts simultaneously.
+- [x] **Cascading Reduction:** Algorithmically reduce Expert charts to create lower difficulties.
+- [x] **Unified Output:** One folder containing all 4 difficulties ready for full party play.
+- [x] **Difficulty Scaling GUI:** Fine-tune the reduction parameters using Target NPS.
 
 ---
 
