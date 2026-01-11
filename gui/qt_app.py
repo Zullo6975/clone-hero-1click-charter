@@ -70,10 +70,10 @@ class SafeSlider(QSlider):
 
 # --- PRESETS MANAGEMENT ---
 DEFAULT_PRESETS: dict[str, dict[str, float | int]] = {
-    "Medium 1 (Casual)":   {"max_nps": 2.25, "min_gap_ms": 170, "sustain": 50, "chord": 5},
-    "Medium 2 (Balanced)": {"max_nps": 2.80, "min_gap_ms": 140, "sustain": 15, "chord": 12},
-    "Medium 3 (Intense)":  {"max_nps": 3.40, "min_gap_ms": 110, "sustain": 5,  "chord": 25},
-    "Medium 4 (Chaotic)":  {"max_nps": 4.20, "min_gap_ms": 85,  "sustain": 0,  "chord": 40},
+    "Expert 1 (Casual)":   {"max_nps": 9.0,  "min_gap_ms": 80, "sustain": 40, "chord": 15},
+    "Expert 2 (Standard)":   {"max_nps": 12.0, "min_gap_ms": 60, "sustain": 25, "chord": 22},
+    "Expert 3 (Shred)":      {"max_nps": 16.0, "min_gap_ms": 40, "sustain": 10, "chord": 30},
+    "Expert 4 (Lose Fingerprints)":{"max_nps": 22.0, "min_gap_ms": 30, "sustain": 5,  "chord": 40},
 }
 
 def get_user_preset_path() -> Path:
@@ -653,12 +653,13 @@ class MainWindow(QMainWindow):
 
         # Load Presets
         self.refresh_presets()
-        last_preset = self.settings.value("preset", "Medium 2 (Balanced)", type=str)
-        if last_preset in self.all_presets:
-            self.preset_combo.setCurrentText(last_preset)
-        else:
-            self.preset_combo.setCurrentText("Medium 2 (Balanced)")
+        last_preset = self.settings.value("preset", "Expert 2 (Standard)", type=str)
 
+        # FIX: Ensure we default to Expert if the old "Medium" setting is stuck in cache
+        if last_preset not in self.all_presets:
+            last_preset = "Expert 2 (Standard)"
+
+        self.preset_combo.setCurrentText(last_preset)
         self.apply_preset(self.preset_combo.currentText())
         self._update_queue_display()
 
