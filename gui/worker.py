@@ -14,8 +14,9 @@ class GenerationWorker(QObject):
     log_message = Signal(str)
     # Emits (success, output_path)
     finished = Signal(bool, Path)
-    # Emits (sections_list, density_list) for the Review Dialog
-    analysis_ready = Signal(list, list)
+
+    # CHANGED: density_list (list) -> density_data (dict) to match the new backend structure
+    analysis_ready = Signal(list, dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -71,12 +72,6 @@ class GenerationWorker(QObject):
              cmd_base = [str(py_exec), "-m", "charter.cli"]
 
         args = cmd_base + ["--validate", str(song_dir)]
-
-        # We don't use self._run_process here because validation is a separate
-        # light-weight step that we might want to handle differently (or in parallel),
-        # but for simplicity we can use a separate QProcess logic or just piggyback.
-        # To avoid complex state, let's just run it as a detached simple process here.
-        # However, to keep Main clean, let's wrap it properly.
 
         validator = QProcess(self)
         validator.finished.connect(lambda c, s: self._on_validation_finished(validator, song_dir))
@@ -143,7 +138,8 @@ class GenerationWorker(QObject):
             if json_path.exists():
                 try:
                     data = json.loads(json_path.read_text(encoding='utf-8'))
-                    self.analysis_ready.emit(data.get("sections", []), data.get("density", []))
+                    # Ensure we pass the 'density' field which is now a DICT, not a list
+                    self.analysis_ready.emit(data.get("sections", []), data.get("density", {}))
                 except Exception as e:
                     self.log_message.emit(f"Error parsing analysis: {e}")
                     self.finished.emit(False, self._out_song)
@@ -156,10 +152,7 @@ class GenerationWorker(QObject):
         self._proc = None
 
     def _on_validation_finished(self, proc: QProcess, song_dir: Path):
-        # We repurpose the log_message signal to send the validation report back
         stdout = bytes(proc.readAllStandardOutput()).decode("utf-8", errors="replace")
         stderr = bytes(proc.readAllStandardError()).decode("utf-8", errors="replace")
         report = "\n--- VALIDATION REPORT ---\n" + stdout + stderr
         self.log_message.emit(report)
-        # Validation is fire-and-forget regarding the 'finished' state of the worker
-        # But usually it runs at the very end.
