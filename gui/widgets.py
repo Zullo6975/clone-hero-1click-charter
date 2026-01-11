@@ -2,7 +2,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import (QComboBox, QSpinBox, QDoubleSpinBox, QSlider, QWidget, QVBoxLayout,
                                QTextEdit, QPushButton, QHBoxLayout, QSizePolicy, QTabWidget)
 from PySide6.QtGui import (QFontDatabase, QPainter, QPainterPath, QPen, QLinearGradient, QColor)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 
 # --- Custom Widgets ---
 class SafeComboBox(QComboBox):
@@ -22,7 +22,20 @@ class SafeSlider(QSlider):
         event.ignore()
 
 class SafeTabWidget(QTabWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        # Install an event filter on the internal TabBar to catch mouse wheel events
+        # occurring directly over the tabs themselves.
+        self.tabBar().installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        # If the event is a Wheel event on the TabBar, block it (return True)
+        if obj == self.tabBar() and event.type() == QEvent.Wheel:
+            return True
+        return super().eventFilter(obj, event)
+
     def wheelEvent(self, event):
+        # Block wheel events on the general widget area
         event.ignore()
 
 # ---------------- Log Window ----------------

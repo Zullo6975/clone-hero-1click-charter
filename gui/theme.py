@@ -176,14 +176,6 @@ class ThemeManager:
                 background-color: palette(highlight);
             }}
 
-            /* POPUPS: Explicit 500px width */
-            QMessageBox {{
-                min-width: 500px;
-            }}
-            QMessageBox QLabel {{
-                min-width: 500px;
-            }}
-
             /* TABS */
             QTabWidget::pane {{
                 border: 1px solid palette(mid);
