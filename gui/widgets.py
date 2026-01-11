@@ -1,6 +1,6 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QComboBox, QSpinBox, QDoubleSpinBox, QSlider, QWidget, QVBoxLayout,
-                               QTextEdit, QPushButton, QHBoxLayout, QSizePolicy)
+                               QTextEdit, QPushButton, QHBoxLayout, QSizePolicy, QTabWidget)
 from PySide6.QtGui import (QFontDatabase, QPainter, QPainterPath, QPen, QLinearGradient, QColor)
 from PySide6.QtCore import Qt
 
@@ -18,6 +18,10 @@ class SafeDoubleSpinBox(QDoubleSpinBox):
         event.ignore()
 
 class SafeSlider(QSlider):
+    def wheelEvent(self, event):
+        event.ignore()
+
+class SafeTabWidget(QTabWidget):
     def wheelEvent(self, event):
         event.ignore()
 

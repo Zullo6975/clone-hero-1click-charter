@@ -1,11 +1,11 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QTableWidget, QHeaderView, QAbstractItemView,
-                               QTableWidgetItem, QLineEdit, QDialogButtonBox, QWidget, QTabWidget, QPushButton)
+                               QTableWidgetItem, QLineEdit, QDialogButtonBox, QWidget, QPushButton)
 from PySide6.QtGui import QDesktopServices, Qt
 from PySide6.QtCore import QUrl
 
 # Imports from other GUI modules
-from gui.widgets import DensityGraphWidget
+from gui.widgets import DensityGraphWidget, SafeTabWidget
 from charter.config import SUPPORT_EMAIL, VENMO_URL, REPO_URL
 
 # ---------------- Review Dialog ----------------
@@ -13,7 +13,7 @@ class SectionReviewDialog(QDialog):
     def __init__(self, sections: list[dict], density_data: list[dict], parent=None):
         super().__init__(parent)
         self.setWindowTitle("Review Sections")
-        self.resize(500, 600) # Increased width for graph
+        self.resize(500, 600)
         self.sections = sections
 
         layout = QVBoxLayout(self)
@@ -34,7 +34,7 @@ class SectionReviewDialog(QDialog):
         layout.addWidget(lbl)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(2) # Time, Name
+        self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(["Start Time (s)", "Section Name"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -70,7 +70,6 @@ class SectionReviewDialog(QDialog):
     def on_name_changed(self, row: int, new_name: str):
         if 0 <= row < len(self.sections):
             self.sections[row]['name'] = new_name
-            # Update the graph labels in real-time
             self.graph.set_sections(self.sections)
 
     def get_sections(self) -> list[dict]:
@@ -86,7 +85,7 @@ class SupportDialog(QDialog):
         layout = QVBoxLayout(self)
 
         # Tabs for separation of concerns
-        tabs = QTabWidget()
+        tabs = SafeTabWidget()
         tabs.addTab(self._build_help_tab(), "Tech Support")
         tabs.addTab(self._build_donate_tab(), "Support Development")
 
@@ -112,22 +111,30 @@ class SupportDialog(QDialog):
         sub.setStyleSheet("color: palette(disabled-text);")
         sub.setAlignment(Qt.AlignCenter)
 
+        # Center buttons and limit width
+        btn_layout = QVBoxLayout()
+        btn_layout.setAlignment(Qt.AlignCenter)
+
         btn_email = QPushButton("📧 Email Support")
         btn_email.setCursor(Qt.PointingHandCursor)
         btn_email.setMinimumHeight(40)
+        btn_email.setFixedWidth(150)
         btn_email.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"mailto:{SUPPORT_EMAIL}")))
 
         btn_issue = QPushButton("🐞 Report on GitHub")
         btn_issue.setCursor(Qt.PointingHandCursor)
         btn_issue.setMinimumHeight(40)
+        btn_issue.setFixedWidth(150)
         btn_issue.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"{REPO_URL}/issues")))
+
+        btn_layout.addWidget(btn_email)
+        btn_layout.addWidget(btn_issue)
 
         lay.addStretch()
         lay.addWidget(lbl)
         lay.addWidget(sub)
         lay.addStretch()
-        lay.addWidget(btn_email)
-        lay.addWidget(btn_issue)
+        lay.addLayout(btn_layout)
         lay.addStretch()
         return w
 
@@ -152,6 +159,7 @@ class SupportDialog(QDialog):
         btn_venmo = QPushButton("💙 Tip with Venmo")
         btn_venmo.setCursor(Qt.PointingHandCursor)
         btn_venmo.setMinimumHeight(45)
+        btn_venmo.setFixedWidth(150)
         # Venmo Brand Colors
         btn_venmo.setStyleSheet("""
             QPushButton {
@@ -171,7 +179,7 @@ class SupportDialog(QDialog):
         lay.addWidget(lbl)
         lay.addWidget(txt)
         lay.addStretch()
-        lay.addWidget(btn_venmo)
+        lay.addWidget(btn_venmo, 0, Qt.AlignCenter)
         lay.addStretch()
 
         return w

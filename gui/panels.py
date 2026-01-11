@@ -1,12 +1,12 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QWidget, QGroupBox, QVBoxLayout, QHBoxLayout, QFormLayout,
-                               QLineEdit, QToolButton, QLabel, QCheckBox, QTabWidget,
+                               QLineEdit, QToolButton, QLabel, QCheckBox,
                                QButtonGroup, QRadioButton, QFrame, QPushButton, QInputDialog, QMessageBox, QStyle)
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 
 # Import custom widgets and helpers
 from gui.utils import form_label
-from gui.widgets import SafeComboBox, SafeSpinBox, SafeDoubleSpinBox, SafeSlider
+from gui.widgets import SafeComboBox, SafeSpinBox, SafeDoubleSpinBox, SafeSlider, SafeTabWidget
 from gui.presets import DEFAULT_PRESETS, load_all_presets, save_user_preset, delete_user_preset
 
 class MetadataWidget(QGroupBox):
@@ -120,7 +120,7 @@ class SettingsWidget(QGroupBox):
         content_layout.addLayout(row_review)
 
         # Tabs
-        self.tabs = QTabWidget()
+        self.tabs = SafeTabWidget()
         self.init_expert_tab()
         self.init_scaling_tab()
         content_layout.addWidget(self.tabs)

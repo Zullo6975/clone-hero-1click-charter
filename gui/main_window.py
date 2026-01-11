@@ -129,6 +129,7 @@ class MainWindow(QMainWindow):
         # Scroll Area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff) # Removed Horizontal Scroll
         scroll.setWidget(self.main_widget)
         scroll.setFrameShape(QFrame.NoFrame)
 
@@ -160,9 +161,9 @@ class MainWindow(QMainWindow):
         layout.addWidget(w)
 
         line = QFrame()
+        line.setObjectName("HeaderLine") # Named object for theming
         line.setFixedHeight(1)
         line.setFixedWidth(750)
-        line.setStyleSheet("background-color: rgba(0, 0, 0, 0.12);")
         layout.addWidget(line, alignment=Qt.AlignHCenter)
 
     def _build_sidebar_content(self, layout):
@@ -280,7 +281,7 @@ class MainWindow(QMainWindow):
         # Footer
         self.chk_dark.toggled.connect(self.on_dark_toggle)
         self.btn_show_logs.clicked.connect(self.log_window.show)
-        self.btn_help.clicked.connect(lambda: QMessageBox.information(self, "Help", "Load Audio -> Fill Meta -> Generate."))
+        self.btn_help.clicked.connect(self.show_help)
         self.btn_support.clicked.connect(lambda: SupportDialog(self).exec())
 
         # Worker / Generation
@@ -294,6 +295,18 @@ class MainWindow(QMainWindow):
         # State updates
         for w in [self.out_panel.dir_edit, self.meta_panel.title_edit, self.meta_panel.artist_edit]:
             w.textChanged.connect(self._update_state)
+
+    def show_help(self) -> None:
+        msg = """
+        <h3>How to Use 1-Click Charter</h3>
+        <ol>
+            <li><b>Add Audio:</b> Drag files or click "+ Add".</li>
+            <li><b>Metadata:</b> Fill in Title/Artist for the current song.</li>
+            <li><b>Generate:</b> Process the current song. If queue items exist, the next one loads automatically.</li>
+        </ol>
+        <p><b>Queue:</b> The small box below the audio input shows pending songs. Use the Trash icon on the input box to skip the current song.</p>
+        """
+        QMessageBox.information(self, "Help", msg.strip())
 
     def _update_state(self):
         running = self.worker.is_running()

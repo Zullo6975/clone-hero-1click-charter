@@ -35,6 +35,8 @@ class ThemeManager:
             palette.setColor(QPalette.Disabled, QPalette.ButtonText, QColor(100, 100, 100))
             palette.setColor(QPalette.PlaceholderText, QColor(120, 130, 140))
 
+            line_color = "rgba(255, 255, 255, 0.15)"
+
         else:
             # Light Theme
             base = QColor(245, 245, 250)
@@ -65,11 +67,17 @@ class ThemeManager:
             palette.setColor(QPalette.Disabled, QPalette.WindowText, disabled_text)
             palette.setColor(QPalette.PlaceholderText, QColor(150, 150, 160))
 
+            line_color = "rgba(0, 0, 0, 0.12)"
+
         app.setPalette(palette)
 
         # Stylesheet overrides
-        app.setStyleSheet("""
-            QGroupBox {
+        app.setStyleSheet(f"""
+            QFrame#HeaderLine {{
+                background-color: {line_color};
+            }}
+
+            QGroupBox {{
                 border: 1px solid palette(mid);
                 border-radius: 6px;
                 margin-top: 24px;
@@ -77,10 +85,10 @@ class ThemeManager:
                 font-weight: bold;
                 font-size: 12pt;
                 max-width: 550px;
-            }
-            QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }
+            }}
+            QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 5px; }}
 
-            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget {
+            QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget {{
                 padding: 5px;
                 border-radius: 4px;
                 border: 1px solid palette(mid);
@@ -89,100 +97,100 @@ class ThemeManager:
                 min-height: 18px;
                 max-width: 425px;
                 font-size: 11pt;
-            }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus, QSlider:focus {
+            }}
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus, QSlider:focus {{
                 border: 1px solid palette(highlight);
-            }
+            }}
 
             /* Disabled Inputs */
-            QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {
+            QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {{
                 background-color: palette(window);
                 color: palette(disabled-text);
                 border: 1px dashed palette(mid);
-            }
+            }}
 
-            QComboBox QAbstractItemView {
+            QComboBox QAbstractItemView {{
                 background-color: palette(base);
                 color: palette(text);
                 selection-background-color: palette(highlight);
                 selection-color: palette(highlighted-text);
-            }
+            }}
 
             /* STANDARD BUTTONS - SCALED DOWN */
-            QPushButton {
+            QPushButton {{
                 padding: 5px 10px;
                 border-radius: 5px;
                 border: 1px solid palette(mid);
                 background-color: palette(button);
                 color: palette(text);
                 font-size: 11pt; /* Slightly smaller font */
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background-color: palette(midlight);
                 border: 1px solid palette(dark);
-            }
-            QPushButton:disabled {
+            }}
+            QPushButton:disabled {{
                 background-color: palette(window);
                 color: palette(disabled-text);
                 border: 1px solid palette(mid);
-            }
+            }}
 
             /* PRIMARY BUTTON (GENERATE) */
-            QPushButton#Primary {
+            QPushButton#Primary {{
                 padding: 6px 12px;
                 border-radius: 5px;
                 border: 1px solid palette(mid);
                 background-color: palette(button);
                 color: palette(text);
                 font-size: 11pt; /* Slightly smaller font */
-            }
-            QPushButton#Primary:hover {
+            }}
+            QPushButton#Primary:hover {{
                 border: 1px solid palette(text);
                 background-color: palette(highlight);
-            }
-            QPushButton#Primary:disabled {
+            }}
+            QPushButton#Primary:disabled {{
                 background-color: palette(mid);
                 color: palette(disabled-text);
                 border: 1px solid palette(mid);
-            }
+            }}
 
-            QCheckBox { spacing: 8px; }
+            QCheckBox {{ spacing: 8px; }}
 
             /* STATUS BAR */
-            QStatusBar {
+            QStatusBar {{
                 background: palette(window);
                 border-top: 1px solid palette(mid);
                 min-height: 50px;
                 max-height: 50px;
-            }
-            QStatusBar::item { border: none; }
+            }}
+            QStatusBar::item {{ border: none; }}
 
-            QProgressBar {
+            QProgressBar {{
                 border: 1px solid palette(mid);
                 border-radius: 4px;
                 text-align: center;
                 color: palette(text);
                 background: palette(base);
-            }
-            QProgressBar::chunk {
+            }}
+            QProgressBar::chunk {{
                 background-color: palette(highlight);
-            }
+            }}
 
             /* POPUPS: Explicit 500px width */
-            QMessageBox {
+            QMessageBox {{
                 min-width: 500px;
-            }
-            QMessageBox QLabel {
+            }}
+            QMessageBox QLabel {{
                 min-width: 500px;
-            }
+            }}
 
             /* TABS */
-            QTabWidget::pane {
+            QTabWidget::pane {{
                 border: 1px solid palette(mid);
                 border-radius: 4px;
                 top: -1px;
-            }
-            QTabBar::tab {
+            }}
+            QTabBar::tab {{
                 background: palette(button);
                 border: 1px solid palette(mid);
                 border-bottom-color: palette(mid);
@@ -190,10 +198,10 @@ class ThemeManager:
                 border-top-right-radius: 4px;
                 padding: 6px 12px;
                 margin-right: 2px;
-            }
-            QTabBar::tab:selected {
+            }}
+            QTabBar::tab:selected {{
                 background: palette(base);
                 border-bottom-color: palette(base);
                 font-weight: bold;
-            }
+            }}
         """)
