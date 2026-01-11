@@ -320,7 +320,7 @@ class MainWindow(QMainWindow):
         if not cfg: return
 
         self.log_window.clear()
-        self.btn_generate.setText("Generating...")
+        self.btn_generate.setText("Generating....")
         self.btn_generate.setEnabled(False)
         self.progress_bar.setVisible(True)
         self.status_label.setText("Working...")

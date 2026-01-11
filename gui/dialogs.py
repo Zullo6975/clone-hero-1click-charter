@@ -1,6 +1,6 @@
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QTableWidget, QHeaderView, QAbstractItemView,
-                               QTableWidgetItem, QLineEdit, QDialogButtonBox, QWidget, QPushButton)
+                               QTableWidgetItem, QLineEdit, QDialogButtonBox, QTabWidget, QWidget, QPushButton)
 from PySide6.QtGui import QDesktopServices, Qt
 from PySide6.QtCore import QUrl
 
@@ -10,22 +10,41 @@ from charter.config import SUPPORT_EMAIL, VENMO_URL, REPO_URL
 
 # ---------------- Review Dialog ----------------
 class SectionReviewDialog(QDialog):
-    def __init__(self, sections: list[dict], density_data: list[dict], parent=None):
+    def __init__(self, sections: list[dict], density_data: list[dict] | dict, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Review Sections")
-        self.resize(500, 600)
+        self.resize(550, 650) # Made slightly taller for tabs
         self.sections = sections
+
+        # Handle backward compatibility (if data is just a list)
+        if isinstance(density_data, list):
+            self.density_map = {"Expert": density_data}
+        else:
+            self.density_map = density_data
 
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        # 1. Density Graph
+        # 1. Density Graphs (Now in Tabs)
         lbl_graph = QLabel("Note Density & Structure")
         lbl_graph.setStyleSheet("font-weight: bold;")
         layout.addWidget(lbl_graph)
 
-        self.graph = DensityGraphWidget(density_data, sections)
-        layout.addWidget(self.graph)
+        self.graph_tabs = QTabWidget()
+        self.graphs = {} # Keep track of graph widgets to update them all later
+
+        # Order of tabs
+        diffs = ["Expert", "Hard", "Medium", "Easy"]
+
+        for diff in diffs:
+            if diff not in self.density_map: continue
+
+            data = self.density_map[diff]
+            graph = DensityGraphWidget(data, sections)
+            self.graph_tabs.addTab(graph, diff)
+            self.graphs[diff] = graph
+
+        layout.addWidget(self.graph_tabs)
 
         # 2. Table Header
         lbl = QLabel("Section List (Rename Only)")
@@ -34,7 +53,7 @@ class SectionReviewDialog(QDialog):
         layout.addWidget(lbl)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(2)
+        self.table.setColumnCount(2) # Time, Name
         self.table.setHorizontalHeaderLabels(["Start Time (s)", "Section Name"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -47,6 +66,35 @@ class SectionReviewDialog(QDialog):
         btns.accepted.connect(self.accept)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
+
+    def refresh_table(self):
+        self.table.setRowCount(len(self.sections))
+
+        for i, s in enumerate(self.sections):
+            # 1. TIME (Read Only)
+            t_val = float(s.get('start', 0.0))
+            t_item = QTableWidgetItem(f"{t_val:.2f}")
+            t_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+            t_item.setTextAlignment(Qt.AlignCenter)
+
+            # 2. NAME EDIT
+            le = QLineEdit(str(s.get('name', '')))
+            le.setPlaceholderText("Section Name")
+            le.setClearButtonEnabled(True)
+            le.textChanged.connect(lambda txt, idx=i: self.on_name_changed(idx, txt))
+
+            self.table.setItem(i, 0, t_item)
+            self.table.setCellWidget(i, 1, le)
+
+    def on_name_changed(self, row: int, new_name: str):
+        if 0 <= row < len(self.sections):
+            self.sections[row]['name'] = new_name
+            # Update ALL graph instances so lines move/update on all tabs
+            for graph in self.graphs.values():
+                graph.set_sections(self.sections)
+
+    def get_sections(self) -> list[dict]:
+        return self.sections
 
     def refresh_table(self):
         self.table.setRowCount(len(self.sections))

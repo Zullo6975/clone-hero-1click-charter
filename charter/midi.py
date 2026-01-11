@@ -306,7 +306,7 @@ def write_real_notes_mid(
     stats_out_path: Path | None = None,
     override_sections: list[dict] | None = None,
     dry_run: bool = False,
-) -> tuple[float, list[dict], list[dict]]:
+) -> tuple[float, list[dict], list[dict] | dict]:
     """
     Main Orchestrator.
     1. Analyzes Audio
@@ -370,20 +370,16 @@ def write_real_notes_mid(
     shifted_beat_times = [b + shift_seconds for b in beat_times]
 
     # --- STEP 2: GENERATE EXPERT NOTES ---
-    expert_notes = []
-    chord_starts = []
-
-    if not dry_run:
-        expert_notes, chord_starts = generate_expert_notes(
-            times, pitches, shifted_beat_times, cfg
-        )
+    # NOTE: We now generate notes even in dry_run mode to calculate density stats for all diffs
+    expert_notes, chord_starts = generate_expert_notes(
+        times, pitches, shifted_beat_times, cfg
+    )
 
     hard_notes = []
     medium_notes = []
     easy_notes = []
 
-    if not dry_run and expert_notes:
-        # Pass the dynamic config values here
+    if expert_notes:
         hard_notes = reduce_to_hard(expert_notes, min_gap_ms=cfg.hard_min_gap_ms)
         medium_notes = reduce_to_medium(hard_notes, min_gap_ms=cfg.medium_min_gap_ms)
         easy_notes = reduce_to_easy(medium_notes, min_gap_ms=cfg.easy_min_gap_ms)
@@ -416,8 +412,6 @@ def write_real_notes_mid(
         pm = pretty_midi.PrettyMIDI(initial_tempo=float(tempo))
         guitar = pretty_midi.Instrument(program=0, name=TRACK_NAME)
 
-        # MERGE ALL DIFFICULTIES INTO ONE TRACK
-        # Clone Hero parses them based on pitch range
         guitar.notes.extend(expert_notes)
         guitar.notes.extend(hard_notes)
         guitar.notes.extend(medium_notes)
@@ -438,7 +432,18 @@ def write_real_notes_mid(
             _inject_sections_mido(out_path, final_sections, pm)
 
     # --- STEP 5: STATS ---
-    density_data = _compute_rolling_density(times, duration)
+    # Calculate density for ALL difficulties for the Review Graph
+    expert_times = times
+    hard_times = [n.start for n in hard_notes]
+    med_times = [n.start for n in medium_notes]
+    easy_times = [n.start for n in easy_notes]
+
+    density_data = {
+        "Expert": _compute_rolling_density(expert_times, duration),
+        "Hard": _compute_rolling_density(hard_times, duration),
+        "Medium": _compute_rolling_density(med_times, duration),
+        "Easy": _compute_rolling_density(easy_times, duration)
+    }
 
     if stats_out_path and final_sections:
         sec_objs = []
