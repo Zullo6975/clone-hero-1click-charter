@@ -6,6 +6,8 @@ It is designed for players who want to expand their library without spending hou
 
 Assisted by ChatGPT and Gemini.
 
+![Main Application Interface](/static/main_app.png)
+
 ---
 
 ## ✨ Features
@@ -23,6 +25,9 @@ Assisted by ChatGPT and Gemini.
 ### 🎛 Advanced Customization
 
 While the defaults are tuned for a "GH3 feel", you can tweak the engine:
+
+![Advanced Settings Baseline Panel](/static/settings_panel1.png)
+![Advanced Settings Difficulty Gap Panel](/static/settings_panel2.png)
 
 - **Difficulty Scaling:** Set specific **Target NPS** (Notes Per Second) for Easy, Medium, and Hard to fine-tune the difficulty curve.
 - **User Presets:** Save your favorite settings (e.g., "Chill", "Chaotic") and load them instantly.
@@ -52,8 +57,12 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 2. **Metadata:** Verify the Song Title and Artist. The app will try to auto-fill these.
 3. **Cover Art:** Drag an image into the "Album Art" box (optional).
 4. **Output:** Select where you want the song folder to be saved (e.g., your Clone Hero `Songs` folder).
-5. **Generate:** Click the **GENERATE CHART** button.
-6. **Next Song:** If you queued multiple files, the app automatically loads the next one for you to review.
+5. **Review (Optional):** If you enabled "Review Sections", you'll see the visualizer before generation.
+
+![Section Review & Visualizer](/static/review_window.png)
+
+6. **Generate:** Click the **GENERATE CHART** button.
+7. **Next Song:** If you queued multiple files, the app automatically loads the next one for you to review.
 
 ---
 
