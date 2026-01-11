@@ -1,7 +1,0 @@
-include README.md
-include CHANGELOG.md
-include TODO.md
-include SETUP.md
-recursive-include samples *
-recursive-include gui *.py
-recursive-include charter *.py
