@@ -5,18 +5,18 @@ from dataclasses import dataclass
 TRACK_NAME = "PART GUITAR"
 SP_PITCH = 116
 
-# CLONE HERO PITCH MAP
-# Easy:   60-64
-# Medium: 72-76
-# Hard:   84-88
-# Expert: 96-100
-LANE_PITCHES = {
-    0: 72,  # Green (Medium)
-    1: 73,  # Red
-    2: 74,  # Yellow
-    3: 75,  # Blue
-    4: 76,  # Orange
+# CLONE HERO PITCH MAPS (MIDI Note Numbers)
+# These define which MIDI notes correspond to Green, Red, Yellow, Blue, Orange
+# for each difficulty tier.
+DIFFICULTY_PITCHES = {
+    "Expert": {0: 96, 1: 97, 2: 98, 3: 99, 4: 100},
+    "Hard":   {0: 84, 1: 85, 2: 86, 3: 87, 4: 88},
+    "Medium": {0: 72, 1: 73, 2: 74, 3: 75, 4: 76},
+    "Easy":   {0: 60, 1: 61, 2: 62, 3: 63, 4: 64}
 }
+
+# Default to Expert for the base generation (we will reduce down from here)
+LANE_PITCHES = DIFFICULTY_PITCHES["Expert"]
 
 # --- SUPPORT INFO (v2.0) ---
 SUPPORT_EMAIL = "oneclickcharter-support@outlook.com"
@@ -30,6 +30,7 @@ class ChartConfig:
     mode: str = "real"  # "real" or "dummy"
 
     # --- Difficulty / Feel ---
+    # Bumped defaults slightly for Expert baseline
     max_nps: float = 3.8
     min_gap_ms: int = 140
     seed: int = 42
