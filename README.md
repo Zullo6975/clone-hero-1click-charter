@@ -68,12 +68,19 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 - [x] User Presets & Density Visualization
 - [x] Dynamic Difficulty Rating
 
-### v2.0 (Current)
+### v2.0 (Completed)
 
 - [x] **Multi-Difficulty:** Generate Easy, Medium, Hard, and Expert charts simultaneously.
 - [x] **Cascading Reduction:** Algorithmically reduce Expert charts to create lower difficulties.
 - [x] **Unified Output:** One folder containing all 4 difficulties ready for full party play.
 - [x] **Difficulty Scaling GUI:** Fine-tune the reduction parameters using Target NPS.
+
+## v2.1: Interoperability (NEXT)
+
+- [ ] **Chart Export:** Option to export in `.chart` format (text-based) for editing in Moonscraper.
+- [ ] **Batch Reporting:** A summary screen after a large batch job ("Processed 50 songs: 48 Success, 2 Failed").
+- [ ] **Lyrics:** Basic lyric generation integration.
+- [ ] **Auto-Update:** In-app notification when a new GitHub Release is available.
 
 ---
 
