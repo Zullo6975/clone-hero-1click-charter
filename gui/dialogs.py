@@ -13,7 +13,7 @@ class SectionReviewDialog(QDialog):
     def __init__(self, sections: list[dict], density_data: list[dict] | dict, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Review Sections")
-        self.resize(550, 650) # Made slightly taller for tabs
+        self.resize(575, 675) # Made slightly taller for tabs
         self.sections = sections
 
         # Handle backward compatibility (if data is just a list)
