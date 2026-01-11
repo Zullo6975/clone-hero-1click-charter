@@ -18,6 +18,12 @@ LANE_PITCHES = {
     4: 76,  # Orange
 }
 
+# --- SUPPORT INFO (v2.0) ---
+SUPPORT_EMAIL = "oneclickcharter-support@outlook.com"
+VENMO_HANDLE = "oneclickcharter"
+VENMO_URL = "https://venmo.com/u/oneclickcharter"
+REPO_URL = "https://github.com/zullo6975/clone-hero-1click-charter"
+
 @dataclass
 class ChartConfig:
     # --- Basic ---

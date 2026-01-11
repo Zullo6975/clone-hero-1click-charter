@@ -6,9 +6,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QProcess, QSettings, QSize, Qt, QTimer
-from PySide6.QtGui import (QAction, QColor, QDragEnterEvent, QDropEvent, QFont,
-                           QFontDatabase, QIcon, QPalette, QPixmap, QPainter,
+from PySide6.QtCore import QProcess, QSettings, QSize, Qt, QTimer, QUrl
+from PySide6.QtGui import (QAction, QColor, QDesktopServices, QDragEnterEvent, QDropEvent, QFont,
+                           QFontDatabase, QPalette, QPixmap, QPainter,
                            QPainterPath, QPen, QLinearGradient)
 from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup,
                                QCheckBox, QComboBox, QDialog, QDialogButtonBox,
@@ -20,7 +20,10 @@ from PySide6.QtWidgets import (QAbstractItemView, QApplication, QButtonGroup,
                                QScrollArea, QSizePolicy, QSlider, QSpinBox,
                                QSplitter, QStyle, QTableWidget,
                                QTableWidgetItem, QTextEdit, QToolButton,
-                               QVBoxLayout, QWidget, QAbstractSpinBox)
+                               QVBoxLayout, QWidget, QTabWidget) # Added QTabWidget
+
+# Import constants
+from charter.config import SUPPORT_EMAIL, VENMO_URL, REPO_URL
 
 
 # ---------------- Paths & Config ----------------
@@ -518,6 +521,106 @@ class SectionReviewDialog(QDialog):
     def get_sections(self) -> list[dict]:
         return self.sections
 
+# ---------------- Support Dialog ----------------
+class SupportDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Help & Support")
+        self.resize(400, 320)
+
+        layout = QVBoxLayout(self)
+
+        # Tabs for separation of concerns
+        tabs = QTabWidget()
+        tabs.addTab(self._build_help_tab(), "Tech Support")
+        tabs.addTab(self._build_donate_tab(), "Support Development")
+
+        layout.addWidget(tabs)
+
+        btn_close = QPushButton("Close")
+        btn_close.clicked.connect(self.close)
+        layout.addWidget(btn_close, 0, Qt.AlignRight)
+
+    def _build_help_tab(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setSpacing(15)
+        lay.setContentsMargins(20, 30, 20, 20)
+
+        lbl = QLabel("Having trouble with a chart? Found a bug?")
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        lbl.setAlignment(Qt.AlignCenter)
+
+        sub = QLabel("We're happy to help. Please check the docs or send us a message.")
+        sub.setWordWrap(True)
+        sub.setStyleSheet("color: palette(disabled-text);")
+        sub.setAlignment(Qt.AlignCenter)
+
+        btn_email = QPushButton("📧 Email Support")
+        btn_email.setCursor(Qt.PointingHandCursor)
+        btn_email.setMinimumHeight(40)
+        btn_email.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"mailto:{SUPPORT_EMAIL}")))
+
+        btn_issue = QPushButton("🐞 Report on GitHub")
+        btn_issue.setCursor(Qt.PointingHandCursor)
+        btn_issue.setMinimumHeight(40)
+        btn_issue.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"{REPO_URL}/issues")))
+
+        lay.addStretch()
+        lay.addWidget(lbl)
+        lay.addWidget(sub)
+        lay.addStretch()
+        lay.addWidget(btn_email)
+        lay.addWidget(btn_issue)
+        lay.addStretch()
+        return w
+
+    def _build_donate_tab(self) -> QWidget:
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setSpacing(15)
+        lay.setContentsMargins(20, 30, 20, 20)
+
+        lbl = QLabel("Enjoying 1-Click Charter?")
+        lbl.setStyleSheet("font-size: 12pt; font-weight: bold;")
+        lbl.setAlignment(Qt.AlignCenter)
+
+        txt = QLabel(
+            "This tool is free and open source. If it saved you time, "
+            "consider buying me a coffee to keep the development going!"
+        )
+        txt.setWordWrap(True)
+        txt.setAlignment(Qt.AlignCenter)
+        txt.setStyleSheet("line-height: 1.4;")
+
+        btn_venmo = QPushButton("💙 Tip with Venmo")
+        btn_venmo.setCursor(Qt.PointingHandCursor)
+        btn_venmo.setMinimumHeight(45)
+        # Venmo Brand Colors
+        btn_venmo.setStyleSheet("""
+            QPushButton {
+                background-color: #008CFF;
+                color: white;
+                font-weight: bold;
+                font-size: 11pt;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #0074D4;
+            }
+        """)
+        btn_venmo.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(VENMO_URL)))
+
+        lay.addStretch()
+        lay.addWidget(lbl)
+        lay.addWidget(txt)
+        lay.addStretch()
+        lay.addWidget(btn_venmo)
+        lay.addStretch()
+
+        return w
+
 # ---------------- Main Window ----------------
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -572,6 +675,10 @@ class MainWindow(QMainWindow):
         self.settings.setValue("preset", self.preset_combo.currentText())
         self.settings.setValue("geometry", self.saveGeometry())
         super().closeEvent(event)
+
+    def show_support_dialog(self) -> None:
+        dlg = SupportDialog(self)
+        dlg.exec()
 
     def _build_ui(self) -> None:
         central = QWidget()
@@ -962,6 +1069,10 @@ class MainWindow(QMainWindow):
         self.btn_help.setCursor(Qt.PointingHandCursor)
         self.btn_help.clicked.connect(self.show_help)
 
+        self.btn_support = QPushButton("Support")
+        self.btn_support.setCursor(Qt.PointingHandCursor)
+        self.btn_support.clicked.connect(self.show_support_dialog)
+
         self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.setObjectName("FooterBtn")
         self.btn_cancel.setCursor(Qt.PointingHandCursor)
@@ -1000,6 +1111,7 @@ class MainWindow(QMainWindow):
         footer_layout.addWidget(self.chk_dark)
         footer_layout.addWidget(self.btn_show_logs)
         footer_layout.addWidget(self.btn_help)
+        footer_layout.addWidget(self.btn_support)
         footer_layout.addWidget(sep)
 
         footer_layout.addWidget(self.btn_cancel)
