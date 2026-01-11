@@ -50,7 +50,7 @@ class LogWindow(QWidget):
 
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
-        self.text_edit.setFixedWidth(700)
+        self.text_edit.setFixedWidth(676)
 
         mono_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         mono_font.setPointSize(11)

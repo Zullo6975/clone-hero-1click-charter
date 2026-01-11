@@ -45,8 +45,17 @@ class MainWindow(QMainWindow):
 
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
 
+        # Load Presets
         self.settings_panel.refresh_presets()
-        self.settings_panel.preset_combo.setCurrentText("2) Standard")
+        last_preset = self.settings.value("preset", "2) Standard", type=str)
+
+        # We need to manually set this on the combo box in the panel
+        idx = self.settings_panel.preset_combo.findText(last_preset)
+        if idx >= 0:
+            self.settings_panel.preset_combo.setCurrentIndex(idx)
+        else:
+            self.settings_panel.preset_combo.setCurrentText("2) Standard")
+
         self.settings_panel.apply_preset(self.settings_panel.preset_combo.currentText())
 
         self._update_queue_display()
@@ -190,6 +199,7 @@ class MainWindow(QMainWindow):
         self.grp_queue = QGroupBox("Pending Queue")
         v_q = QVBoxLayout(self.grp_queue)
         self.queue_list = QListWidget()
+        self.queue_list.setMaximumHeight(90) # Taller queue box
         self.btn_clear_queue = QPushButton("Clear Queue")
         v_q.addWidget(self.queue_list)
         v_q.addWidget(self.btn_clear_queue)
@@ -440,10 +450,21 @@ class MainWindow(QMainWindow):
 
     def clear_audio(self):
         self._clear_song_info()
-        self.audio_path = None
-        self.audio_label.setText("Drag Audio Files Here")
-        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
-        self._update_state()
+
+        # Check queue
+        if self.song_queue:
+            next_song = self.song_queue.pop(0)
+            self._update_queue_display()
+            self.load_audio(next_song)
+            self.status_label.setText(f"Queue: Loaded {next_song.name}")
+        else:
+            self.audio_path = None
+            self.audio_label.setText("Drag Audio Files Here")
+            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+            self.status_label.setText("Audio cleared")
+            self._update_state()
+            self.audio_label.adjustSize()
+            QTimer.singleShot(10, self.snap_to_content)
 
     def _clear_song_info(self):
         self.meta_panel.clear_fields()
@@ -470,7 +491,7 @@ class MainWindow(QMainWindow):
 
             # Smaller text for the label
             lbl = QLabel(p.name)
-            lbl.setStyleSheet("background: transparent; font-size: 11pt;")
+            lbl.setStyleSheet("background: transparent; font-size: 11pt")
             h.addWidget(lbl, 1)
 
             # Compact trash button
@@ -546,3 +567,46 @@ class MainWindow(QMainWindow):
             if not self.audio_path: self.load_audio(new_s.pop(0))
             self.song_queue.extend(new_s)
             self._update_queue_display()
+
+    def _on_health_finished(self, code: int, status: QProcess.ExitStatus, song_dir: Path) -> None:
+        stdout = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+        stderr = bytes(self.validator_proc.readAllStandardError()).decode("utf-8", errors="replace")
+
+        full_output = stdout + stderr
+
+        if not full_output.strip():
+            full_output = "[No output from validator process]"
+
+        warnings = []
+        for line in full_output.splitlines():
+            line = line.strip()
+            line_lower = line.lower()
+            if line.startswith("- ") or "warning" in line_lower or "error" in line_lower or "traceback" in line_lower:
+                warnings.append(line)
+
+        self.append_log("\n--- VALIDATION REPORT ---")
+        self.append_log(full_output)
+
+        if not self.song_queue:
+            self.status_label.setText("Ready")
+
+            # Prepare message
+            msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
+            if warnings:
+                msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
+                if len(warnings) > 5: msg += "\n... (check logs for more)"
+
+            title = "Generation Complete" if not warnings else "Complete (With Warnings)"
+            icon = QMessageBox.Information if not warnings else QMessageBox.Warning
+
+            # Helper to show box safely
+            def show_box():
+                self.activateWindow() # Bring main window to front
+                mbox = QMessageBox(icon, title, msg, QMessageBox.Ok, self)
+                mbox.setMinimumWidth(450)
+                mbox.exec()
+
+            # Small delay to let UI refresh
+            QTimer.singleShot(100, show_box)
+
+        self.validator_proc = None
