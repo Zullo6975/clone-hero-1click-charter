@@ -31,7 +31,7 @@ Thumbs.db
 icons/AppIcon.*
 samples/
 output/
-# tools/
+legacy*/
 
 # Logs
 *.log
