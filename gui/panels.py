@@ -87,7 +87,8 @@ class SettingsWidget(QGroupBox):
         self.preset_combo = SafeComboBox()
         self.preset_combo.setCursor(Qt.PointingHandCursor)
         self.preset_combo.setMinimumWidth(200)
-        self.preset_combo.currentTextChanged.connect(self.apply_preset)
+        # CHANGED: Use currentIndexChanged to handle clean keys from itemData
+        self.preset_combo.currentIndexChanged.connect(self._on_combo_changed)
 
         self.btn_save_preset = QToolButton()
         self.btn_save_preset.setIcon(self.style().standardIcon(QStyle.SP_DialogSaveButton))
@@ -123,6 +124,15 @@ class SettingsWidget(QGroupBox):
         self.tabs = SafeTabWidget()
         self.init_expert_tab()
         self.init_scaling_tab()
+
+        # ADDED: Help Button in Corner
+        self.btn_help = QToolButton()
+        self.btn_help.setIcon(self.style().standardIcon(QStyle.SP_MessageBoxInformation))
+        self.btn_help.setToolTip("Explanation of Settings")
+        self.btn_help.setCursor(Qt.PointingHandCursor)
+        self.btn_help.clicked.connect(self.show_explanation)
+        self.tabs.setCornerWidget(self.btn_help, Qt.TopRightCorner)
+
         content_layout.addWidget(self.tabs)
 
         main_layout.addWidget(self.content_widget)
@@ -147,23 +157,26 @@ class SettingsWidget(QGroupBox):
         self.max_nps_spin = SafeDoubleSpinBox()
         self.max_nps_spin.setRange(1.0, 30.0)
         self.max_nps_spin.setSingleStep(0.1)
+        self.max_nps_spin.setValue(13.0)
         self.max_nps_spin.setSuffix(" NPS")
 
         self.min_gap_spin = SafeSpinBox()
         self.min_gap_spin.setRange(10, 1000)
         self.min_gap_spin.setSingleStep(10)
+        self.min_gap_spin.setValue(55)
         self.min_gap_spin.setSuffix(" ms")
 
         self.seed_spin = SafeSpinBox()
         self.seed_spin.setRange(0, 999999)
+        self.seed_spin.setValue(0)
 
         self.chord_slider = SafeSlider(Qt.Horizontal)
         self.chord_slider.setRange(0, 50)
-        self.chord_slider.setValue(12)
+        self.chord_slider.setValue(22)
 
         self.sustain_slider = SafeSlider(Qt.Horizontal)
         self.sustain_slider.setRange(0, 100)
-        self.sustain_slider.setValue(50)
+        self.sustain_slider.setValue(25)
 
         self.sustain_gap_spin = SafeDoubleSpinBox()
         self.sustain_gap_spin.setRange(0.1, 2.0)
@@ -199,100 +212,171 @@ class SettingsWidget(QGroupBox):
         layout = QVBoxLayout(tab)
 
         lbl_info = QLabel("Lower difficulties are created by filtering the Expert chart. "
-                          "Increasing the 'Gap' removes more notes, making it easier.")
+                          "Edit the 'Gap' (ms) or the 'Target NPS' to adjust difficulty.")
         lbl_info.setWordWrap(True)
-        lbl_info.setStyleSheet("color: palette(disabled-text); font-style: italic; margin-bottom: 10px;")
+        lbl_info.setStyleSheet("color: palette(disabled-text); font-style: italic; margin-bottom: 10px; font-size: 11pt;")
         layout.addWidget(lbl_info)
 
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight)
 
+        # CHANGED: Added NPS SpinBoxes for Hard/Med/Easy
+
+        # Hard Controls
         self.spin_hard_gap = SafeSpinBox()
         self.spin_hard_gap.setRange(50, 500)
-        self.spin_hard_gap.setValue(120)
         self.spin_hard_gap.setSuffix(" ms")
-        self.spin_hard_gap.valueChanged.connect(self._update_scaling_labels)
-        self.lbl_hard_desc = QLabel()
+        self.spin_hard_nps = SafeDoubleSpinBox()
+        self.spin_hard_nps.setRange(0.1, 20.0)
+        self.spin_hard_nps.setSingleStep(0.1)
+        self.spin_hard_nps.setSuffix(" NPS")
+        self.spin_hard_nps.setToolTip("Approximate max notes per second")
 
+        # Medium Controls
         self.spin_med_gap = SafeSpinBox()
         self.spin_med_gap.setRange(100, 800)
-        self.spin_med_gap.setValue(220)
         self.spin_med_gap.setSuffix(" ms")
-        self.spin_med_gap.valueChanged.connect(self._update_scaling_labels)
-        self.lbl_med_desc = QLabel()
+        self.spin_med_nps = SafeDoubleSpinBox()
+        self.spin_med_nps.setRange(0.1, 15.0)
+        self.spin_med_nps.setSingleStep(0.1)
+        self.spin_med_nps.setSuffix(" NPS")
 
+        # Easy Controls
         self.spin_easy_gap = SafeSpinBox()
         self.spin_easy_gap.setRange(200, 1500)
-        self.spin_easy_gap.setValue(450)
         self.spin_easy_gap.setSuffix(" ms")
-        self.spin_easy_gap.valueChanged.connect(self._update_scaling_labels)
-        self.lbl_easy_desc = QLabel()
+        self.spin_easy_nps = SafeDoubleSpinBox()
+        self.spin_easy_nps.setRange(0.1, 10.0)
+        self.spin_easy_nps.setSingleStep(0.1)
+        self.spin_easy_nps.setSuffix(" NPS")
 
-        # Helpers for rows
-        def row(spin, lbl):
+        # Wire up the sync logic
+        self._wire_sync(self.spin_hard_gap, self.spin_hard_nps)
+        self._wire_sync(self.spin_med_gap, self.spin_med_nps)
+        self._wire_sync(self.spin_easy_gap, self.spin_easy_nps)
+
+        # Default Values (will be overwritten by presets)
+        self.spin_hard_gap.setValue(120)
+        self.spin_med_gap.setValue(220)
+        self.spin_easy_gap.setValue(450)
+
+        # Helper for rows
+        def row(spin_ms, spin_nps):
             h = QHBoxLayout()
-            h.addWidget(spin)
-            h.addWidget(lbl)
+            h.addWidget(spin_ms, 1)
+            h.addWidget(QLabel("↔"))
+            h.addWidget(spin_nps, 1)
             return h
 
-        form.addRow(form_label("Hard Gap"), row(self.spin_hard_gap, self.lbl_hard_desc))
-        form.addRow(form_label("Medium Gap"), row(self.spin_med_gap, self.lbl_med_desc))
-        form.addRow(form_label("Easy Gap"), row(self.spin_easy_gap, self.lbl_easy_desc))
+        form.addRow(form_label("Hard Scaling"), row(self.spin_hard_gap, self.spin_hard_nps))
+        form.addRow(form_label("Medium Scaling"), row(self.spin_med_gap, self.spin_med_nps))
+        form.addRow(form_label("Easy Scaling"), row(self.spin_easy_gap, self.spin_easy_nps))
 
         layout.addLayout(form)
         layout.addStretch()
         self.tabs.addTab(tab, "Difficulty Scaling")
 
+    def _wire_sync(self, spin_ms: SafeSpinBox, spin_nps: SafeDoubleSpinBox):
+        # Sync Gap -> NPS
+        spin_ms.valueChanged.connect(lambda val: spin_nps.setValue(1000.0 / val if val > 0 else 0))
+        # Sync NPS -> Gap
+        spin_nps.valueChanged.connect(lambda val: spin_ms.setValue(int(1000.0 / val) if val > 0 else 1000))
+
     def toggle_advanced(self, checked: bool):
         self.content_widget.setVisible(checked)
 
+    def show_explanation(self):
+        msg = """
+        <h3>Difficulty & Tuning Guide</h3>
+        <p><b>Expert Baseline:</b> This is how the Expert chart is generated. It sets the maximum intensity.</p>
+        <ul>
+            <li><b>Max NPS:</b> The speed limit for the hardest sections.</li>
+            <li><b>Min Spacing:</b> Minimum time (ms) between any two notes.</li>
+            <li><b>Chords/Sustain:</b> Probability of these events occurring.</li>
+        </ul>
+        <hr/>
+        <p><b>Difficulty Scaling:</b> Lower difficulties are created by filtering the Expert chart.</p>
+        <ul>
+            <li><b>Gap (ms):</b> Notes closer together than this value are removed.</li>
+            <li><b>Target NPS:</b> An easier way to think about Gap. "5 NPS" means we try to limit the chart to roughly 5 notes per second.</li>
+        </ul>
+        <p><i>Example: If Expert has a fast stream (100ms gap), setting Hard Gap to 150ms will force the stream to thin out.</i></p>
+        """
+        QMessageBox.information(self, "Settings Guide", msg.strip())
+
     def refresh_presets(self):
-        current = self.preset_combo.currentText()
+        # preserve current key if possible
+        current_idx = self.preset_combo.currentIndex()
+        current_key = self.preset_combo.itemData(current_idx) if current_idx >= 0 else None
+        if not current_key and self.preset_combo.count() > 0:
+            current_key = self.preset_combo.currentText() # Fallback for initial load
+
         self.all_presets = load_all_presets()
         self.preset_combo.blockSignals(True)
         self.preset_combo.clear()
+
+        # 1. Defaults (Sorted 1-4)
         defaults = sorted(list(DEFAULT_PRESETS.keys()))
+        for k in defaults:
+            self.preset_combo.addItem(k, k) # Text=Key, Data=Key
+
+        # 2. Custom (Sorted Alphabetically, Displayed as "5) Name")
         others = sorted([k for k in self.all_presets.keys() if k not in DEFAULT_PRESETS])
+        for i, k in enumerate(others):
+            # i starts at 0, so we add 5 to start numbering at 5
+            display_name = f"{i + 5}) {k}"
+            self.preset_combo.addItem(display_name, k) # Text="5) Name", Data="Name"
 
-        self.preset_combo.addItems(defaults + others)
-        self.preset_combo.addItem("Custom…")
+        self.preset_combo.addItem("Custom…", None)
 
-        if current in self.all_presets:
-            self.preset_combo.setCurrentText(current)
+        # Restore Selection
+        if current_key:
+            idx = self.preset_combo.findData(current_key)
+            if idx >= 0:
+                self.preset_combo.setCurrentIndex(idx)
+            else:
+                self.preset_combo.setCurrentText("2) Standard")
         else:
             self.preset_combo.setCurrentText("2) Standard")
 
         self.preset_combo.blockSignals(False)
         self._update_del_button()
 
+    def _on_combo_changed(self, index: int):
+        key = self.preset_combo.itemData(index)
+        if key:
+            self.apply_preset(key)
+        else:
+            # Custom selected
+            self.preset_hint.setText("Manual control enabled.")
+            self._update_del_button()
+
     def _update_del_button(self):
-        name = self.preset_combo.currentText()
-        is_default = name in DEFAULT_PRESETS
-        self.btn_del_preset.setEnabled(not is_default and name != "Custom…")
+        idx = self.preset_combo.currentIndex()
+        key = self.preset_combo.itemData(idx)
+        # Enable delete only if it's a valid key (not Custom) and not a default
+        is_default = key in DEFAULT_PRESETS
+        self.btn_del_preset.setEnabled(bool(key) and not is_default)
 
     def apply_preset(self, name: str):
         preset = self.all_presets.get(name)
-        is_custom = preset is None
+        if not preset: return
 
-        if is_custom:
-            self.preset_hint.setText("Manual control enabled.")
-        else:
-            self.max_nps_spin.setValue(float(preset["max_nps"]))
-            self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
-            self.sustain_slider.setValue(int(preset["sustain"]))
-            self.chord_slider.setValue(int(preset["chord"]))
+        self.max_nps_spin.setValue(float(preset["max_nps"]))
+        self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
+        self.sustain_slider.setValue(int(preset["sustain"]))
+        self.chord_slider.setValue(int(preset["chord"]))
 
-            self.spin_hard_gap.setValue(int(preset.get("hard_gap", 120)))
-            self.spin_med_gap.setValue(int(preset.get("med_gap", 220)))
-            self.spin_easy_gap.setValue(int(preset.get("easy_gap", 450)))
+        self.spin_hard_gap.setValue(int(preset.get("hard_gap", 120)))
+        self.spin_med_gap.setValue(int(preset.get("med_gap", 220)))
+        self.spin_easy_gap.setValue(int(preset.get("easy_gap", 450)))
 
-            self.preset_hint.setText(f"Active: {preset['max_nps']} NPS | Med Gap: {preset.get('med_gap', 220)}ms")
-
+        self.preset_hint.setText(f"Active: {preset['max_nps']} NPS | Med Gap: {preset.get('med_gap', 220)}ms")
         self._update_del_button()
-        self._update_scaling_labels()
 
     def on_save_preset(self):
-        name, ok = QInputDialog.getText(self, "Save Preset", "Enter preset name:")
+        # Ask for name without numbers
+        name, ok = QInputDialog.getText(self, "Save Preset", "Enter preset name (without numbers):")
         if ok and name.strip():
             name = name.strip()
             data = {
@@ -306,24 +390,20 @@ class SettingsWidget(QGroupBox):
             }
             save_user_preset(name, data)
             self.refresh_presets()
-            self.preset_combo.setCurrentText(name)
+
+            # Select the new item using findData because the Text is different
+            idx = self.preset_combo.findData(name)
+            if idx >= 0: self.preset_combo.setCurrentIndex(idx)
 
     def on_delete_preset(self):
-        name = self.preset_combo.currentText()
-        if name in DEFAULT_PRESETS: return
-        ret = QMessageBox.question(self, "Delete Preset", f"Delete '{name}'?")
+        idx = self.preset_combo.currentIndex()
+        key = self.preset_combo.itemData(idx)
+        if not key or key in DEFAULT_PRESETS: return
+
+        ret = QMessageBox.question(self, "Delete Preset", f"Delete '{key}'?")
         if ret == QMessageBox.Yes:
-            delete_user_preset(name)
+            delete_user_preset(key)
             self.refresh_presets()
-
-    def _update_scaling_labels(self):
-        def calc(spin):
-            ms = spin.value()
-            return f"(Max ~{1000.0/ms:.1f} notes/sec)" if ms > 0 else "(0)"
-
-        self.lbl_hard_desc.setText(calc(self.spin_hard_gap))
-        self.lbl_med_desc.setText(calc(self.spin_med_gap))
-        self.lbl_easy_desc.setText(calc(self.spin_easy_gap))
 
 
 class OutputWidget(QGroupBox):

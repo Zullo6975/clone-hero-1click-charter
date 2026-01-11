@@ -45,11 +45,6 @@ class MainWindow(QMainWindow):
 
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
 
-        # Pre-load settings
-        last_preset = self.settings.value("preset", "2) Standard", type=str)
-        self.settings_panel.preset_combo.setCurrentText(last_preset)
-        self.settings_panel.apply_preset(last_preset)
-
         self._update_queue_display()
         self._update_state()
         QTimer.singleShot(100, self.snap_to_content)
