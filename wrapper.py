@@ -37,7 +37,7 @@ def setup_ffmpeg_env():
 setup_ffmpeg_env()
 # ------------------------------------------------------------
 
-from gui import qt_app
+from gui import qt_app_premod
 
 if __name__ == "__main__":
-    qt_app.main()
+    qt_app_premod.main()
