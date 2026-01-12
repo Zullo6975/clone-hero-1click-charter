@@ -1,5 +1,12 @@
 # Changelog
+
 <!-- markdownlint-disable md024 -->
+
+## [2.1.1] - 2026-01-12
+
+### 🩹 Batch Workflow Hotfix
+
+- **Consistent Autofill:** The "Run Queue" command now forces metadata autofill (Title/Artist) for the _entire_ batch, including the currently loaded song. This overrides manual text entry in the main window to ensure that large batches processed from folders utilize the correct metadata from the file tags every time.
 
 ## [2.1.0] - 2026-01-12
 
