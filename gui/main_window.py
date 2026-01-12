@@ -1,22 +1,26 @@
 from __future__ import annotations
+
 import json
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt, QTimer, QProcess
-from PySide6.QtGui import QDragEnterEvent, QDropEvent, QPixmap
-from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QFileDialog,
-                               QListWidgetItem, QWidget, QHBoxLayout, QLabel, QToolButton, QStyle)
-
 from charter.config import REPO_URL
-from gui.utils import repo_root, RunConfig
+from gui.dialogs import (BatchEntryDialog, BatchResultDialog,
+                         SectionReviewDialog, SupportDialog)
 from gui.theme import ThemeManager
-from gui.widgets import LogWindow
-from gui.dialogs import SectionReviewDialog, SupportDialog, BatchEntryDialog
-from gui.worker import GenerationWorker
-
 # Import the UI Builder
 from gui.ui_layout import UiBuilder
+from gui.updater import CURRENT_VERSION, UpdateWorker
+from gui.utils import RunConfig
+from gui.widgets import LogWindow
+from gui.worker import GenerationWorker
+from PySide6.QtCore import QProcess, QSettings, Qt, QTimer, QUrl
+from PySide6.QtGui import (QDesktopServices, QDragEnterEvent, QDropEvent,
+                           QPixmap)
+from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QLabel,
+                               QListWidgetItem, QMainWindow, QMessageBox,
+                               QStyle, QToolButton, QWidget)
+
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -35,6 +39,8 @@ class MainWindow(QMainWindow):
         self._title_user_edited = False
         self._is_batch_running = False
 
+        self.batch_results: list[dict] = []
+
         self.log_window = LogWindow()
         self.worker = GenerationWorker(self)
 
@@ -49,6 +55,11 @@ class MainWindow(QMainWindow):
         self._restore_settings()
 
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
+
+        self.update_thread = UpdateWorker(self)
+        self.update_thread.checker.update_available.connect(self.on_update_available)
+        # Delay check by 2 seconds to allow UI to render first
+        QTimer.singleShot(2000, self.update_thread.start)
 
         # Load Presets
         self.settings_panel.refresh_presets()
@@ -66,6 +77,39 @@ class MainWindow(QMainWindow):
         # Initial State Update will happen via QTimer to ensure UI is ready
         QTimer.singleShot(100, self.snap_to_content)
         self.status_label.setText("Ready")
+
+    def on_update_available(self, tag: str, url: str):
+        """Adds a prominent update button to the footer."""
+        self.btn_update = QToolButton()
+        self.btn_update.setText(f"Update Available: {tag}")
+        self.btn_update.setIcon(self.style().standardIcon(QStyle.SP_ArrowUp))
+        self.btn_update.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.btn_update.setCursor(Qt.PointingHandCursor)
+
+        # Green style to indicate 'New/Safe'
+        self.btn_update.setStyleSheet("""
+            QToolButton {
+                background-color: #2da44e;
+                color: white;
+                border: 1px solid #2da44e;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-weight: bold;
+            }
+            QToolButton:hover {
+                background-color: #2c974b;
+            }
+        """)
+
+        self.btn_update.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
+
+        # Insert into footer layout next to Support button
+        if hasattr(self, "btn_support") and self.btn_support.parentWidget():
+            layout = self.btn_support.parentWidget().layout()
+            if layout:
+                idx = layout.indexOf(self.btn_support)
+                # Insert after Support button
+                layout.insertWidget(idx + 1, self.btn_update)
 
     def closeEvent(self, event) -> None:
         self.log_window.close()
@@ -232,6 +276,7 @@ class MainWindow(QMainWindow):
                 # 4. START
                 self.log_window.clear()
                 self._is_batch_running = True
+                self.batch_results = []
                 self._start_generation_process()
 
     def _start_generation_process(self):
@@ -267,14 +312,42 @@ class MainWindow(QMainWindow):
             self._is_batch_running = False
 
     def on_worker_finished(self, success: bool, out_song: Path):
+        # 1. RECORD RESULT
+        current_title = self.meta_panel.title_edit.text()
+
+        result_entry = {
+            "title": current_title,
+            "status": "Success" if success else "Failed",
+            "path": str(out_song) if success else "Generation failed (check logs)"
+        }
+        self.batch_results.append(result_entry)
+
+        # 2. HANDLE FAILURE
         if not success:
+            self.append_log(f"❌ Error processing {current_title}")
+
+            # If in batch mode, we CONTINUE instead of stopping
+            if self._is_batch_running and self.song_queue:
+                 self.status_label.setText(f"Failed: {current_title}. Moving to next...")
+                 # Short delay before next song to let UI breathe
+                 QTimer.singleShot(1000, self._pop_and_start_next)
+                 return
+
+            # If single run or last item failed:
             self.status_label.setText("Failed")
             self._is_batch_running = False
             self.reset_ui_after_run()
             self._toggle_ui_state(True)
-            QMessageBox.critical(self, "Process Failed", "Check logs for details.")
+
+            if len(self.batch_results) > 1:
+                # Show summary if we processed multiple
+                BatchResultDialog(self.batch_results, self).exec()
+            else:
+                # Standard single error
+                QMessageBox.critical(self, "Process Failed", "Check logs for details.")
             return
 
+        # 3. HANDLE SUCCESS (Existing logic)
         self.last_out_song = out_song
 
         if self.cover_path and self.cover_path.exists():
@@ -289,17 +362,17 @@ class MainWindow(QMainWindow):
         is_continuing = self._is_batch_running and bool(self.song_queue)
 
         # Run health check (Validator)
-        # If continuing, we pass a flag to suppress the "Finished" popup
         self.run_health_check(out_song, is_batch_intermediate=is_continuing)
 
-        # AUTO-QUEUE LOGIC
+        # AUTO-QUEUE LOGIC moved to helper
         if is_continuing:
-            self._pop_next_song()
-            self.status_label.setText(f"Batch: Starting {self.audio_path.name}...")
-            # We do NOT reset UI here; we stay locked and move to next song
-            QTimer.singleShot(1000, self._start_generation_process)
+            self._pop_and_start_next()
 
-        # If NOT continuing, we simply wait for run_health_check callback to finalize UI
+    def _pop_and_start_next(self):
+        """Helper to move queue forward"""
+        self._pop_next_song()
+        self.status_label.setText(f"Batch: Starting {self.audio_path.name}...")
+        QTimer.singleShot(1000, self._start_generation_process)
 
     def _pop_next_song(self):
         if not self.song_queue: return
@@ -548,10 +621,23 @@ class MainWindow(QMainWindow):
         self._toggle_ui_state(True)
         self.status_label.setText("Finished")
 
-        if self._is_batch_running:
-            msg = f"Batch processing complete!\n\nLast Chart:\n{song_dir}"
-        else:
-            msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
+        # CHECK IF BATCH SUMMARY IS NEEDED
+        if self._is_batch_running or len(self.batch_results) > 1:
+            self._is_batch_running = False
+
+            # Clear queue UI if done
+            if not self.song_queue:
+                self._clear_song_info()
+                self.audio_path = None
+                self.audio_label.setText("Drag Audio Files Here")
+                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+
+            # Show Summary Dialog INSTEAD of standard popup
+            BatchResultDialog(self.batch_results, self).exec()
+            self._update_state()
+            return
+
+        msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
 
         # Now we are truly done with the batch
         self._is_batch_running = False

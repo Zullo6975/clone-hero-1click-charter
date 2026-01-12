@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from charter.config import REPO_URL, SUPPORT_EMAIL, VENMO_URL
-# Imports from other GUI modules
+# Add get_font here:
+from gui.utils import get_font
 from gui.widgets import DensityGraphWidget, SafeTabWidget
+
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, Qt
 from PySide6.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox,
@@ -355,3 +357,71 @@ class SupportDialog(QDialog):
         lay.addStretch()
 
         return w
+
+class BatchResultDialog(QDialog):
+    def __init__(self, results: list[dict], parent=None):
+        """
+        results: list of dicts with keys: 'title', 'status', 'path'
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Batch Processing Complete")
+        self.resize(700, 400)
+
+        layout = QVBoxLayout(self)
+
+        # Summary Header
+        total = len(results)
+        success = sum(1 for r in results if r['status'] == 'Success')
+        failed = total - success
+
+        lbl = QLabel(f"Processed {total} songs: {success} Succeeded, {failed} Failed.")
+        if failed > 0:
+            lbl.setStyleSheet("font-size: 12pt; font-weight: bold; color: #ff5555;")
+        else:
+            lbl.setStyleSheet("font-size: 12pt; font-weight: bold; color: #4caf50;")
+        layout.addWidget(lbl)
+
+        # Table
+        self.table = QTableWidget()
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Song", "Status", "Output / Error"])
+        self.table.setRowCount(total)
+
+        # Styling
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setAlternatingRowColors(True)
+
+        for r, data in enumerate(results):
+            # Title
+            item_title = QTableWidgetItem(data.get('title', 'Unknown'))
+            self.table.setItem(r, 0, item_title)
+
+            # Status
+            stat = data.get('status', 'Unknown')
+            item_status = QTableWidgetItem(stat)
+            item_status.setTextAlignment(Qt.AlignCenter)
+
+            if stat == 'Success':
+                item_status.setForeground(QBrush(QColor("#4caf50"))) # Green
+            else:
+                item_status.setForeground(QBrush(QColor("#f44336"))) # Red
+                # Requires 'from gui.utils import get_font'
+                item_status.setFont(get_font(weight="bold"))
+
+            self.table.setItem(r, 1, item_status)
+
+            # Details
+            details = str(data.get('path', ''))
+            item_detail = QTableWidgetItem(details)
+            item_detail.setToolTip(details)
+            self.table.setItem(r, 2, item_detail)
+
+        layout.addWidget(self.table)
+
+        # Buttons
+        btns = QDialogButtonBox(QDialogButtonBox.Close)
+        btns.rejected.connect(self.accept)
+        layout.addWidget(btns)
