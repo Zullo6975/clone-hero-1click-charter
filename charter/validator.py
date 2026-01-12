@@ -335,7 +335,6 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
 
 
 def validate_chart_file(song_dir: Path, summary_only: bool = False):
-    print(f"DEBUG: Validator started for {song_dir.name}", flush=True)
     res = validate_song_dir(song_dir, sp_pitch=DEFAULT_SP_PITCH)
 
     if res.errors:

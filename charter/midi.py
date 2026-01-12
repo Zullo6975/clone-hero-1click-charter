@@ -427,8 +427,6 @@ def write_real_notes_mid(
         medium_notes = reduce_to_medium(hard_notes, min_gap_ms=cfg.medium_min_gap_ms)
         easy_notes = reduce_to_easy(medium_notes, min_gap_ms=cfg.easy_min_gap_ms)
 
-        print(f"DEBUG: Expert({len(expert_notes)}) -> Hard({len(hard_notes)}) -> Med({len(medium_notes)}) -> Easy({len(easy_notes)})")
-
     # --- STEP 3: SECTIONS ---
     final_sections = []
     if override_sections:
