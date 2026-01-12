@@ -1,13 +1,18 @@
 from __future__ import annotations
-from PySide6.QtWidgets import (QWidget, QGroupBox, QVBoxLayout, QHBoxLayout, QFormLayout,
-                               QLineEdit, QToolButton, QLabel, QCheckBox,
-                               QButtonGroup, QRadioButton, QFrame, QPushButton, QInputDialog, QMessageBox, QStyle, QAbstractSpinBox)
-from PySide6.QtCore import Qt
 
+from gui.presets import (DEFAULT_PRESETS, delete_user_preset, load_all_presets,
+                         save_user_preset)
 # Import custom widgets and helpers
-from gui.utils import form_label
-from gui.widgets import SafeComboBox, SafeSpinBox, SafeDoubleSpinBox, SafeSlider, SafeTabWidget
-from gui.presets import DEFAULT_PRESETS, load_all_presets, save_user_preset, delete_user_preset
+from gui.utils import form_label, get_font
+from gui.widgets import (SafeComboBox, SafeDoubleSpinBox, SafeSlider,
+                         SafeSpinBox, SafeTabWidget)
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (QAbstractSpinBox, QButtonGroup, QCheckBox,
+                               QFormLayout, QFrame, QGroupBox, QHBoxLayout,
+                               QInputDialog, QLabel, QLineEdit, QMessageBox,
+                               QPushButton, QRadioButton, QStyle, QToolButton,
+                               QVBoxLayout, QWidget)
+
 
 class MetadataWidget(QGroupBox):
     def __init__(self, parent=None):
@@ -34,15 +39,23 @@ class MetadataWidget(QGroupBox):
         self.btn_clear.setCursor(Qt.PointingHandCursor)
         self.btn_clear.clicked.connect(self.clear_fields)
 
-        layout.addRow(form_label("Title", required=True, align=Qt.AlignCenter), self.title_edit)
-        layout.addRow(form_label("Artist", required=True, align=Qt.AlignCenter), self.artist_edit)
-        layout.addRow(form_label("Album", align=Qt.AlignCenter), self.album_edit)
-        layout.addRow(form_label("Genre", align=Qt.AlignCenter), self.genre_edit)
-        layout.addRow(form_label("Charter", align=Qt.AlignCenter), self.charter_edit)
+        # Helper to create styled labels
+        def meta_label(text, required=False):
+            lbl = form_label(text, required=required, align=Qt.AlignCenter)
+            lbl.setFont(get_font(11))
+            return lbl
+
+        layout.addRow(meta_label("Title", required=True), self.title_edit)
+        layout.addRow(meta_label("Artist", required=True), self.artist_edit)
+        layout.addRow(meta_label("Album"), self.album_edit)
+        layout.addRow(meta_label("Genre"), self.genre_edit)
+        layout.addRow(meta_label("Charter"), self.charter_edit)
 
         row_clear = QHBoxLayout()
         row_clear.addStretch()
-        row_clear.addWidget(QLabel("Clear Fields "))
+        lbl_cf = QLabel("Clear Fields ")
+        lbl_cf.setStyleSheet("font-size: 11pt;")
+        row_clear.addWidget(lbl_cf)
         row_clear.addWidget(self.btn_clear)
         layout.addRow("", row_clear)
 
@@ -64,7 +77,7 @@ class SettingsWidget(QGroupBox):
         main_layout = QVBoxLayout(self)
 
         self.chk_adv = QCheckBox("Show Tuning Controls")
-        self.chk_adv.setStyleSheet("font-weight: bold; margin-bottom: 6px;")
+        self.chk_adv.setStyleSheet("font-weight: bold; margin-bottom: 6px; font-size: 11pt;")
         self.chk_adv.setCursor(Qt.PointingHandCursor)
         self.chk_adv.toggled.connect(self.toggle_advanced)
         main_layout.addWidget(self.chk_adv)
@@ -81,6 +94,7 @@ class SettingsWidget(QGroupBox):
         preset_layout.setContentsMargins(0, 0, 0, 0)
 
         lbl_preset = QLabel("Expert Style:")
+        lbl_preset.setStyleSheet("font-size: 11pt;")
         lbl_preset.setMinimumWidth(100)
         lbl_preset.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
@@ -112,13 +126,25 @@ class SettingsWidget(QGroupBox):
         self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11pt; margin-left: 110px;")
         content_layout.addWidget(self.preset_hint)
 
-        self.chk_review = QCheckBox("Review Sections before Generation")
+        row_opts = QHBoxLayout()
+        row_opts.setContentsMargins(110, 0, 0, 0)
+
+        self.chk_review = QCheckBox("Review Sections")
+        self.chk_review.setStyleSheet("font-size: 11pt;")
         self.chk_review.setToolTip("Show a list of detected sections to rename/edit before creating the chart.")
         self.chk_review.setCursor(Qt.PointingHandCursor)
-        row_review = QHBoxLayout()
-        row_review.addSpacing(110)
-        row_review.addWidget(self.chk_review)
-        content_layout.addLayout(row_review)
+
+        self.chk_export_chart = QCheckBox("Export .chart") # <--- New Checkbox
+        self.chk_export_chart.setStyleSheet("font-size: 11pt;")
+        self.chk_export_chart.setToolTip("Generate a text-based .chart file for editing in Moonscraper.")
+        self.chk_export_chart.setCursor(Qt.PointingHandCursor)
+
+        row_opts.addWidget(self.chk_review)
+        row_opts.addSpacing(20)
+        row_opts.addWidget(self.chk_export_chart)
+        row_opts.addStretch()
+
+        content_layout.addLayout(row_opts)
 
         # Tabs
         self.tabs = SafeTabWidget()
@@ -144,7 +170,9 @@ class SettingsWidget(QGroupBox):
 
         self.mode_group = QButtonGroup(self)
         self.mode_real = QRadioButton("Real (Audio Analysis)")
+        self.mode_real.setStyleSheet("font-size: 11pt;")
         self.mode_dummy = QRadioButton("Dummy (Metronome)")
+        self.mode_dummy.setStyleSheet("font-size: 11pt;")
         self.mode_real.setChecked(True)
         self.mode_group.addButton(self.mode_real)
         self.mode_group.addButton(self.mode_dummy)
@@ -194,6 +222,7 @@ class SettingsWidget(QGroupBox):
         self.sustain_buffer_spin.setValue(0.15)
         self.sustain_buffer_spin.setSuffix(" s")
         self.sustain_buffer_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.PlusMinus) # Arrows Enabled
+
 
         form.addRow(form_label("Generation Mode"), row_mode)
         form.addRow(form_label("Max Notes/Sec"), self.max_nps_spin)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 
 # Constants used across the app
@@ -31,6 +32,9 @@ class ChartConfig:
     max_nps: float = 12.0
     min_gap_ms: int = 60
     seed: int = 42
+
+    # --- NEW: Export Options ---
+    write_chart: bool = False  # <--- Added Flag
 
     # --- REDUCTION TUNING ---
     hard_min_gap_ms: int = 120

@@ -1,17 +1,21 @@
 from __future__ import annotations
+
 import argparse
-from dataclasses import asdict
 import json
+from dataclasses import asdict
 from pathlib import Path
 
+import pretty_midi
+from charter.audio import normalize_and_save
+from charter.chart_format import write_chart_file
 from charter.config import ChartConfig
 from charter.ini import write_song_ini
 from charter.metadata import enrich_from_musicbrainz
 from charter.midi import write_dummy_notes_mid, write_real_notes_mid
-from charter.audio import normalize_and_save
-from charter.validator import validate_chart_file
 # Import the stats engine to calculate complexity
 from charter.stats import compute_chart_stats
+from charter.validator import validate_chart_file
+
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="1clickcharter CLI")
@@ -67,6 +71,9 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--med-gap-ms", type=int, default=220)
     p.add_argument("--easy-gap-ms", type=int, default=450)
 
+    # Interoperability
+    p.add_argument("--write-chart", action="store_true", help="Export .chart file for Moonscraper.") # <--- Added Arg
+
     return p.parse_args()
 
 def main():
@@ -105,6 +112,7 @@ def main():
         hard_min_gap_ms=args.hard_gap_ms,
         medium_min_gap_ms=args.med_gap_ms,
         easy_min_gap_ms=args.easy_gap_ms,
+        write_chart=args.write_chart,
     )
 
     audio_path = Path(args.audio).resolve()
@@ -156,6 +164,7 @@ def main():
     if args.mode == "dummy":
         shift_seconds = write_dummy_notes_mid(notes_mid, args.bpm, args.bars, args.density)
     else:
+        # Note: write_real_notes_mid returns shift_seconds used to align audio
         shift_seconds, final_sections, density_data = write_real_notes_mid(
             audio_path=audio_path,
             out_path=notes_mid,
@@ -164,6 +173,41 @@ def main():
             override_sections=loaded_sections,
             dry_run=args.analyze_only
         )
+
+    if cfg.write_chart and not args.analyze_only and args.mode != "dummy":
+        try:
+            # Reload the generated MIDI to get the full combined note list
+            # or refactor write_real_notes_mid to return notes.
+            # Re-reading is safer and cleaner here as it captures exactly what was written.
+            pm_data = pretty_midi.PrettyMIDI(str(notes_mid))
+
+            # Find the GUITAR track
+            guitar_notes = []
+            for inst in pm_data.instruments:
+                if inst.name == "PART GUITAR":
+                    guitar_notes = inst.notes
+                    break
+
+            chart_path = out_dir / "notes.chart"
+
+            # Determine tempo (use initial tempo from MIDI)
+            tempo = pm_data.get_tempo_changes()[1][0]
+
+            print(f"   Exporting Moonscraper chart: {chart_path.name}")
+            write_chart_file(
+                out_path=chart_path,
+                song_name=title,
+                artist_name=args.artist,
+                charter_name=args.charter,
+                bpm=tempo,
+                notes=guitar_notes,
+                sections=final_sections,
+                offset_seconds=0.0 # MIDI is already shifted, so no offset needed relative to audio start?
+                                   # Actually, .chart defines Offset=0 and SyncTrack starts at 0.
+                                   # If audio is padded by shift_seconds, the notes align naturally.
+            )
+        except Exception as e:
+            print(f"Warning: Failed to write .chart file: {e}")
 
     if args.analyze_only:
         out_json = out_dir / "sections.json"

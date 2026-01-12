@@ -83,7 +83,7 @@ class ThemeManager:
                 margin-top: 24px;
                 padding-top: 12px;
                 font-weight: bold;
-                font-size: 12pt;
+                font-size: 11pt;
                 max-width: 550px;
             }}
             QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 5px; }}
@@ -143,6 +143,8 @@ class ThemeManager:
                 background-color: palette(button);
                 color: palette(text);
                 font-size: 11pt; /* Slightly smaller font */
+                min-width: 75px;
+                max-width: 75px;
             }}
             QPushButton#Primary:hover {{
                 border: 1px solid palette(text);

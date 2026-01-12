@@ -229,25 +229,74 @@ def generate_expert_notes(
 # 3. SECTION & FILE IO
 # -------------------------------------------------------------------------
 
-def _rename_sections_based_on_density(sections: list, note_times: list[float], total_duration: float) -> list:
+def _rename_sections_based_on_density(
+    sections: list,
+    note_times: list[float],
+    note_pitches: list[float],
+    total_duration: float
+) -> list:
+    """
+    Intelligently renames sections to 'Guitar Solo' if they meet:
+    1. High Density (NPS) relative to song average.
+    2. High Pitch Variance (Standard Deviation) - Solos move around, strumming doesn't.
+    """
     if not note_times:
         return sections
 
+    # Filter out 0.0 pitches (failed detection) for statistics
+    valid_pitches = [p for p in note_pitches if p > 0]
+    if not valid_pitches:
+        return sections
+
     avg_nps = len(note_times) / total_duration if total_duration > 0 else 0.0
-    solo_threshold = max(avg_nps * 1.15, 2.0)
+
+    # 1. Density Threshold: Only consider sections much faster than average
+    solo_nps_threshold = max(avg_nps * 1.3, 3.0)
 
     new_sections = []
+
+    # Pre-zip times and pitches for easier slicing
+    notes_zipped = list(zip(note_times, note_pitches))
+
     for i, s in enumerate(sections):
-        start = s.start
-        end = sections[i+1].start if i+1 < len(sections) else total_duration
+        start = float(s.start)
+        end = float(sections[i+1].start) if i+1 < len(sections) else total_duration
         duration = end - start
 
-        notes_in_section = sum(1 for t in note_times if start <= t < end)
-        section_nps = notes_in_section / duration if duration > 0.5 else 0.0
+        # Gather notes in this section
+        sec_notes = [p for t, p in notes_zipped if start <= t < end and p > 0]
+        count = len(sec_notes)
 
-        if (section_nps > solo_threshold
-            and s.name not in ["Intro", "Outro"]
-            and duration > 5.0):
+        section_nps = count / duration if duration > 0.5 else 0.0
+
+        # 2. Pitch Variance: Calculate Standard Deviation
+        # Solos move up/down the neck. Breakdowns/Strumming stay on 1-2 notes (low std dev).
+        pitch_std = np.std(sec_notes) if count > 1 else 0.0
+
+        is_solo = False
+        is_bridge = (s.name == "Bridge")
+
+        # Criteria:
+        # - Must be fast (High NPS) OR be a Bridge with Moderate NPS
+        # - Must move around (High Std Dev)
+
+        # Standard Detection
+        if (section_nps > solo_nps_threshold
+            and pitch_std > 3.5
+            and duration > 10.0
+            and s.name not in ["Intro", "Outro"]):
+            is_solo = True
+
+        # Bridge Rescue: Bridges are often melodic solos
+        # Lower thresholds if it's already identified structurally as a Bridge
+        if is_bridge:
+             # Just slightly above average is fine for a bridge solo
+             relaxed_nps = max(avg_nps * 1.15, 2.5)
+             # Allow more melodic playing (lower variance)
+             if section_nps > relaxed_nps and pitch_std > 2.5 and duration > 8.0:
+                 is_solo = True
+
+        if is_solo:
             new_sections.append(asdict(s) | {"name": "Guitar Solo"})
         else:
             new_sections.append(asdict(s))
@@ -387,8 +436,6 @@ def write_real_notes_mid(
         medium_notes = reduce_to_medium(hard_notes, min_gap_ms=cfg.medium_min_gap_ms)
         easy_notes = reduce_to_easy(medium_notes, min_gap_ms=cfg.easy_min_gap_ms)
 
-        print(f"DEBUG: Expert({len(expert_notes)}) -> Hard({len(hard_notes)}) -> Med({len(medium_notes)}) -> Easy({len(easy_notes)})")
-
     # --- STEP 3: SECTIONS ---
     final_sections = []
     if override_sections:
@@ -401,12 +448,13 @@ def write_real_notes_mid(
             shifted_start = s.start + shift_seconds
             shifted_sections.append(asdict(s) | {"start": shifted_start})
 
-        raw_onset_times = [o.t + shift_seconds for o in onsets]
         obj_sections = [Section(s["name"], s["start"]) for s in shifted_sections]
 
+        # Use actual charted notes (times & pitches) for better solo detection
         final_sections = _rename_sections_based_on_density(
             obj_sections,
-            raw_onset_times,
+            times,    # Charted note times
+            pitches,  # Charted note pitches
             duration
         )
 
@@ -425,6 +473,22 @@ def write_real_notes_mid(
             phrases = generate_star_power_phrases(note_times=times, duration_sec=duration)
             for p in phrases:
                 guitar.notes.append(pretty_midi.Note(100, SP_PITCH, p.start, p.end))
+
+        # Add Solo Markers (Note 103)
+        if final_sections:
+            for i, sec in enumerate(final_sections):
+                s_name = sec["name"] if isinstance(sec, dict) else sec.name
+                if s_name == "Guitar Solo":
+                    s_start = float(sec["start"] if isinstance(sec, dict) else sec.start)
+                    # Determine end time based on next section
+                    if i + 1 < len(final_sections):
+                        next_s = final_sections[i+1]
+                        s_end = float(next_s["start"] if isinstance(next_s, dict) else next_s.start)
+                    else:
+                        s_end = duration
+
+                    # 103 is the standard Solo Marker pitch in Clone Hero
+                    guitar.notes.append(pretty_midi.Note(100, 103, s_start, s_end))
 
         pm.instruments.append(guitar)
         out_path.parent.mkdir(parents=True, exist_ok=True)

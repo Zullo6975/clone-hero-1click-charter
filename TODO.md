@@ -36,20 +36,19 @@
 
 ---
 
-## 🟡 v2.1: Interoperability (NEXT)
+## 🟢 v2.1: Interoperability (COMPLETE)
 
-**Focus:** Making it easier to use 1-Click Charter with other tools.
+**Focus:** Making it easier to use 1-Click Charter with other tools and improving batch reliability.
 
-- [ ] **Chart Export:** Option to export in `.chart` format (text-based) for editing in Moonscraper.
-- [ ] **Batch Reporting:** A summary screen after a large batch job ("Processed 50 songs: 48 Success, 2 Failed").
-- [ ] **Lyrics:** Basic lyric generation integration.
-- [ ] **Auto-Update:** In-app notification when a new GitHub Release is available.
+- [x] **Chart Export:** Option to export in `.chart` format (text-based) for editing in Moonscraper.
+- [x] **Batch Reporting:** A summary screen after a large batch job.
+- [x] **Resilient Queue:** Ensure one failed song doesn't stop the whole queue.
+- [x] **Auto-Update:** In-app notification when a new GitHub Release is available.
 
 ---
 
-## 🔴 Long-term Goals
+## 🟡 v2.2 and Beyond (NEXT)
 
-**Focus:** Features for sharing and distribution.
-
+- [ ] **Lyrics:** Basic lyric generation integration.
 - [ ] **Full Band:** Possible addition of further instruments.
 - [ ] **UI Refinement:** Always ongoing, nit-picking my GUI configurations.
