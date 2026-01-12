@@ -14,7 +14,8 @@ Assisted by ChatGPT and Gemini.
 
 - **Multi-Difficulty Generation:** Automatically creates Easy, Medium, Hard, and Expert charts in one go.
 - **One-Click Generation:** Drag an audio file, click "Generate", and play.
-- **Batch Queueing:** Drag an entire folder of songs to process them one by one automatically.
+- **Moonscraper Support:** Option to export `.chart` files for manual editing.
+- **Batch Queueing:** Drag an entire folder of songs to process them automatically with a detailed summary report.
 - **Smart Difficulty:** Charts are "groove-locked" to a 1/8 beat grid to ensure they feel musical, not random.
 - **Auto-Metadata:** Fetches Album Art, Year, and Album Title from MusicBrainz automatically.
 - **Smart Delay:** Automatically shifts the chart to ensure you have a "runway" before the first note hits.
@@ -61,35 +62,31 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 
 ![Section Review & Visualizer](/static/section_review.png)
 
-6. **Generate:** Click the **GENERATE CHART** button.
-7. **Next Song:** If you queued multiple files, the app automatically loads the next one for you to review.
+1. **Generate:** Click the **GENERATE CHART** button.
+2. **Next Song:** If you queued multiple files, the app automatically loads the next one for you to review.
 
 ---
 
 ## 🗺 Roadmap
 
-### v1.0 - v1.3 (Completed)
+### v1.0 - v2.0 (Completed)
 
 - [x] Full GUI with Dark Mode
 - [x] Batch Queue System
-- [x] Auto-Metadata & Cover Art
-- [x] Chart Validation & Health Checks
-- [x] User Presets & Density Visualization
-- [x] Dynamic Difficulty Rating
+- [x] Multi-Difficulty Generation (Easy -> Expert)
+- [x] Difficulty Scaling & Visualizers
 
-### v2.0 (Completed)
+### v2.1: Interoperability (Completed)
 
-- [x] **Multi-Difficulty:** Generate Easy, Medium, Hard, and Expert charts simultaneously.
-- [x] **Cascading Reduction:** Algorithmically reduce Expert charts to create lower difficulties.
-- [x] **Unified Output:** One folder containing all 4 difficulties ready for full party play.
-- [x] **Difficulty Scaling GUI:** Fine-tune the reduction parameters using Target NPS.
+- [x] **Chart Export:** Option to export in `.chart` format for Moonscraper.
+- [x] **Batch Reporting:** Summary screen after large batch jobs ("Processed 50 songs: 48 Success, 2 Failed").
+- [x] **Resilient Queue:** Failures no longer stop the entire batch.
+- [x] **Auto-Update:** In-app notification for new GitHub Releases.
 
-## v2.1: Interoperability (NEXT)
+### Future Goals
 
-- [ ] **Chart Export:** Option to export in `.chart` format (text-based) for editing in Moonscraper.
-- [ ] **Batch Reporting:** A summary screen after a large batch job ("Processed 50 songs: 48 Success, 2 Failed").
 - [ ] **Lyrics:** Basic lyric generation integration.
-- [ ] **Auto-Update:** In-app notification when a new GitHub Release is available.
+- [ ] **Full Band:** Possible addition of Bass/Rhythm.
 
 ---
 

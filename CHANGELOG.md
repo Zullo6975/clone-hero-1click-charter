@@ -1,6 +1,24 @@
 # Changelog
+<!-- markdownlint-disable md024 -->
 
-## [2.0.1] - 2026-01-??
+## [2.1.0] - 2026-01-12
+
+### 🔌 The "Interoperability" Update
+
+This release focuses on making 1-Click Charter play nicely with other tools and improving the experience for power users processing large libraries.
+
+### 🌟 New Features
+
+- **.chart Export:** You can now generate `.chart` files alongside the standard MIDI. This allows for immediate editing in **Moonscraper** without conversion. Enable this in the "Advanced Settings" tab.
+- **Batch Reporting:** The batch processor is now smarter.
+  - **Continue-on-Error:** If one song fails, the queue will log it and keep going instead of stopping.
+  - **Summary Screen:** At the end of a batch, a detailed table shows which songs succeeded and which failed.
+- **Auto-Update Check:** The app now checks for new releases on startup and displays a notification button in the footer if an update is available.
+
+### 🛠 Improvements
+
+- **Queue Stability:** Fixed issues where the UI could freeze between songs in a large queue.
+- **Error Handling:** Improved error logging for audio normalization failures.
 
 ## [2.0.0] - 2026-01-11
 

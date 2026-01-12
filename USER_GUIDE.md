@@ -53,6 +53,14 @@ Want to make "Hard" harder or "Easy" easier?
 4. You can click on any **Section Name** to rename it (e.g., change "Chorus" to "Guitar Solo").
 5. Click **OK** to finish generating the chart with your custom names.
 
+### Export for Moonscraper
+
+If you want to edit the generated chart manually:
+
+1. Open the **"Show Tuning Controls"** panel.
+2. Check the box **"Export .chart"**.
+3. The app will now generate a `notes.chart` file in your output folder alongside the MIDI.
+
 ## Tips
 
 - **Difficulty:** Use the "Advanced Settings" to choose a preset. "Medium (Balanced)" is recommended for most songs.
