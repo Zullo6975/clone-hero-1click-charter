@@ -15,7 +15,7 @@ from gui.theme import ThemeManager
 from gui.widgets import LogWindow
 from gui.dialogs import SectionReviewDialog, SupportDialog, BatchEntryDialog, BatchResultDialog
 from gui.worker import GenerationWorker
-from gui.updater import UpdateWorker, CURRENT_VERSION
+from gui.updater import UpdateWorker
 
 # Import the UI Builder
 from gui.ui_layout import UiBuilder
@@ -23,7 +23,7 @@ from gui.ui_layout import UiBuilder
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle(f"CloneHero 1-Click Charter v{CURRENT_VERSION}")
+        self.setWindowTitle(f"CloneHero 1-Click Charter")
         self.setAcceptDrops(True)
         self.settings = QSettings("Zullo", "1ClickCharter")
 
