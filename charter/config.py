@@ -10,7 +10,7 @@ SP_PITCH = 116
 DIFFICULTY_PITCHES = {
     "Expert": {0: 96, 1: 97, 2: 98, 3: 99, 4: 100}, # 5 Lanes
     "Hard":   {0: 84, 1: 85, 2: 86, 3: 87, 4: 88},  # 5 Lanes
-    "Medium": {0: 72, 1: 73, 2: 74, 3: 75},         # 4 Lanes (No Orange)
+    "Medium": {0: 72, 1: 73, 2: 74, 3: 75, 4: 76},  # 5 Lanes (but heavily restricted in reduction)
     "Easy":   {0: 60, 1: 61, 2: 62}                 # 3 Lanes (No Blue/Orange)
 }
 
