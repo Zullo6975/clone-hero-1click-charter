@@ -642,7 +642,12 @@ class MainWindow(QMainWindow):
         # Now we are truly done with the batch
         self._is_batch_running = False
 
-        if not self.song_queue:
+        if self.song_queue:
+            # If Single Generation finished but queue has items, Auto-Load next
+            self._pop_next_song()
+            self.status_label.setText(f"Loaded next: {self.audio_path.name}")
+        else:
+            # Queue empty, clear everything
             self._clear_song_info()
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
