@@ -162,8 +162,16 @@ class MainWindow(QMainWindow):
         self.out_panel.btn_open_folder.setEnabled(has_out)
         self.out_panel.btn_open_song.setEnabled(self.last_out_song is not None and self.last_out_song.exists())
 
+    def _toggle_ui_state(self, enabled: bool):
+        """Grays out or enables main forms during processing."""
+        self.sidebar_widget.setEnabled(enabled)
+        self.meta_panel.setEnabled(enabled)
+        self.settings_panel.setEnabled(enabled)
+        self.out_panel.setEnabled(enabled)
+
     def run_generate(self):
         """Standard Generation - ONE SONG ONLY"""
+        self.log_window.clear()
         self._is_batch_running = False
         self._start_generation_process()
 
@@ -222,6 +230,7 @@ class MainWindow(QMainWindow):
                 self._update_queue_display()
 
                 # 4. START
+                self.log_window.clear()
                 self._is_batch_running = True
                 self._start_generation_process()
 
@@ -229,10 +238,12 @@ class MainWindow(QMainWindow):
         cfg = self.build_cfg()
         if not cfg: return
 
-        self.log_window.clear()
+        # UI Lock
         self.btn_generate.setText("Generating....")
         self.btn_generate.setEnabled(False)
         self.btn_run_queue.setEnabled(False)
+        self.btn_cancel.setEnabled(True)
+        self._toggle_ui_state(False)
 
         self.progress_bar.setVisible(True)
         self.progress_bar.setRange(0, 0)
@@ -240,7 +251,6 @@ class MainWindow(QMainWindow):
 
         analyze = self.settings_panel.chk_review.isChecked()
         self.worker.start(cfg, analyze_first=analyze)
-        # Note: We do NOT call _update_state() here because we want buttons disabled manually above
 
     def on_analysis_ready(self, sections, density):
         dlg = SectionReviewDialog(sections, density, self)
@@ -252,14 +262,16 @@ class MainWindow(QMainWindow):
         else:
             self.worker.cancel()
             self.reset_ui_after_run()
+            self._toggle_ui_state(True)
             self.status_label.setText("Cancelled")
             self._is_batch_running = False
 
     def on_worker_finished(self, success: bool, out_song: Path):
-        self.reset_ui_after_run()
         if not success:
             self.status_label.setText("Failed")
             self._is_batch_running = False
+            self.reset_ui_after_run()
+            self._toggle_ui_state(True)
             QMessageBox.critical(self, "Process Failed", "Check logs for details.")
             return
 
@@ -272,23 +284,22 @@ class MainWindow(QMainWindow):
             except: pass
 
         self.status_label.setText("Validating...")
-        self.run_health_check(out_song)
+
+        # Determine if we will continue processing the queue after this
+        is_continuing = self._is_batch_running and bool(self.song_queue)
+
+        # Run health check (Validator)
+        # If continuing, we pass a flag to suppress the "Finished" popup
+        self.run_health_check(out_song, is_batch_intermediate=is_continuing)
 
         # AUTO-QUEUE LOGIC
-        if self._is_batch_running and self.song_queue:
+        if is_continuing:
             self._pop_next_song()
             self.status_label.setText(f"Batch: Starting {self.audio_path.name}...")
+            # We do NOT reset UI here; we stay locked and move to next song
             QTimer.singleShot(1000, self._start_generation_process)
-        else:
-            self._is_batch_running = False
-            self.status_label.setText("Finished")
-            if not self.song_queue:
-                self._clear_song_info()
-                self.audio_path = None
-                self.audio_label.setText("Drag Audio Files Here")
-                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
 
-        self._update_state()
+        # If NOT continuing, we simply wait for run_health_check callback to finalize UI
 
     def _pop_next_song(self):
         if not self.song_queue: return
@@ -489,7 +500,7 @@ class MainWindow(QMainWindow):
             self._update_queue_display()
 
     # --- Health Check / Validation Popup Logic ---
-    def run_health_check(self, song_dir: Path) -> None:
+    def run_health_check(self, song_dir: Path, is_batch_intermediate: bool = False) -> None:
         from gui.utils import get_python_exec, is_frozen
 
         py_exec = get_python_exec()
@@ -501,10 +512,10 @@ class MainWindow(QMainWindow):
         cmd.extend(["--validate", str(song_dir)])
 
         self.validator_proc = QProcess(self)
-        self.validator_proc.finished.connect(lambda c, s: self._on_health_finished(c, s, song_dir))
+        self.validator_proc.finished.connect(lambda c, s: self._on_health_finished(c, s, song_dir, is_batch_intermediate))
         self.validator_proc.start(cmd[0], cmd[1:])
 
-    def _on_health_finished(self, code: int, status: QProcess.ExitStatus, song_dir: Path) -> None:
+    def _on_health_finished(self, code: int, status: QProcess.ExitStatus, song_dir: Path, is_batch_intermediate: bool) -> None:
         stdout = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8", errors="replace")
         stderr = bytes(self.validator_proc.readAllStandardError()).decode("utf-8", errors="replace")
 
@@ -523,30 +534,44 @@ class MainWindow(QMainWindow):
         self.append_log("\n--- VALIDATION REPORT ---")
         self.append_log(full_output)
 
-        is_middle_of_batch = self._is_batch_running and bool(self.song_queue)
-
-        if not is_middle_of_batch:
-            self.status_label.setText("Ready")
-
-            if self._is_batch_running and not self.song_queue:
-                msg = f"Batch processing complete!\n\nLast Chart:\n{song_dir}"
-            else:
-                msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
-
-            if warnings:
-                msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
-                if len(warnings) > 5: msg += "\n... (check logs for more)"
-
-            title = "Generation Complete" if not warnings else "Complete (With Warnings)"
-            icon = QMessageBox.Information if not warnings else QMessageBox.Warning
-
-            def show_box():
-                self.activateWindow()
-                mbox = QMessageBox(icon, title, msg, QMessageBox.Ok, self)
-                mbox.setMinimumWidth(450)
-                mbox.setWindowModality(Qt.ApplicationModal)
-                mbox.exec()
-
-            QTimer.singleShot(100, show_box)
-
         self.validator_proc = None
+
+        # If this is an intermediate song in a batch, we don't show popups or reset UI yet.
+        if is_batch_intermediate:
+            return
+
+        # --- FINAL COMPLETION (Single Song OR Last in Batch) ---
+        self.reset_ui_after_run()
+        self._toggle_ui_state(True)
+        self.status_label.setText("Finished")
+
+        if self._is_batch_running:
+            msg = f"Batch processing complete!\n\nLast Chart:\n{song_dir}"
+        else:
+            msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
+
+        # Now we are truly done with the batch
+        self._is_batch_running = False
+
+        if not self.song_queue:
+            self._clear_song_info()
+            self.audio_path = None
+            self.audio_label.setText("Drag Audio Files Here")
+            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+
+        if warnings:
+            msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
+            if len(warnings) > 5: msg += "\n... (check logs for more)"
+
+        title = "Generation Complete" if not warnings else "Complete (With Warnings)"
+        icon = QMessageBox.Information if not warnings else QMessageBox.Warning
+
+        def show_box():
+            self.activateWindow()
+            mbox = QMessageBox(icon, title, msg, QMessageBox.Ok, self)
+            mbox.setMinimumWidth(450)
+            mbox.setWindowModality(Qt.ApplicationModal)
+            mbox.exec()
+
+        QTimer.singleShot(100, show_box)
+        self._update_state()

@@ -131,6 +131,8 @@ class UiBuilder:
 
         window.queue_list = QListWidget()
         window.queue_list.setMaximumHeight(90)
+        # Disable horizontal scrolling
+        window.queue_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         # Queue Control Row
         row_q_btns = QHBoxLayout()
