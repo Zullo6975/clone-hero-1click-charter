@@ -82,11 +82,13 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 - [x] **Batch Reporting:** Summary screen after large batch jobs ("Processed 50 songs: 48 Success, 2 Failed").
 - [x] **Resilient Queue:** Failures no longer stop the entire batch.
 - [x] **Auto-Update:** In-app notification for new GitHub Releases.
+- [x] **Batch Workflow Fix:** Consistent metadata autofill for all queued songs.
 
 ### Future Goals
 
-- [ ] **Lyrics:** Basic lyric generation integration.
-- [ ] **Full Band:** Possible addition of Bass/Rhythm.
+- [ ] **v2.2.0:** Basic Lyric support (Metadata fetching & Track scaffolding).
+- [ ] **v2.2.1:** Smart Lyric support (Rhythmic alignment).
+- [ ] **v3.0.0:** Full Band support (Bass, Rhythm).
 
 ---
 

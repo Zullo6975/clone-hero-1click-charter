@@ -44,11 +44,22 @@
 - [x] **Batch Reporting:** A summary screen after a large batch job.
 - [x] **Resilient Queue:** Ensure one failed song doesn't stop the whole queue.
 - [x] **Auto-Update:** In-app notification when a new GitHub Release is available.
+- [x] **Unified Batch Metadata:** (v2.1.1) Ensure queue runner autofills metadata for all items, ignoring manual inputs for the first song.
 
 ---
 
-## 🟡 v2.2 and Beyond (NEXT)
+## 🟡 v2.2: Lyric Support (NEXT)
 
-- [ ] **Lyrics:** Basic lyric generation integration.
-- [ ] **Full Band:** Possible addition of further instruments.
-- [ ] **UI Refinement:** Always ongoing, nit-picking my GUI configurations.
+**Focus:** Adding vocal engagement to the charts.
+
+- [ ] **v2.2.0 (Basic):** Retrieve lyrics from metadata services and implement basic `PART VOCALS` track structure.
+- [ ] **v2.2.1 (Smart):** Intelligent syllable alignment and rhythmic placement of lyric events.
+
+---
+
+## 🟡 v3.0: Full Band (FUTURE)
+
+**Focus:** Transforming from a guitar tool to a full band suite.
+
+- [ ] **Instrument Expansion:** Support for Bass and Rhythm Guitar generation.
+- [ ] **Stem Separation:** (Potential) Integration of source separation to isolate bass lines.

@@ -244,15 +244,11 @@ class MainWindow(QMainWindow):
 
         # Add Current Loaded Song
         if has_audio:
-            current_data = {
-                "path": self.audio_path,
-                "title": self.meta_panel.title_edit.text(),
-                "artist": self.meta_panel.artist_edit.text(),
-                "album": self.meta_panel.album_edit.text(),
-                "genre": self.meta_panel.genre_edit.text(),
-                "charter": self.meta_panel.charter_edit.text()
-            }
-            all_items.append(current_data)
+            # v2.1.1: We now pass the Path object directly instead of the 'current_data' dict.
+            # This ensures BatchEntryDialog treats it as a 'new' file and autofills metadata
+            # from the file tags (via Mutagen), ignoring any manual (potentially stale) text
+            # in the main window form.
+            all_items.append(self.audio_path)
 
         # Add Queue Items
         all_items.extend(self.song_queue)
