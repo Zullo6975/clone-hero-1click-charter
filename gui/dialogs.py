@@ -8,9 +8,9 @@ from gui.widgets import DensityGraphWidget, SafeTabWidget
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, Qt
 from PySide6.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox,
-                               QHBoxLayout, QHeaderView, QLabel, QLineEdit,
-                               QPushButton, QTableWidget, QTableWidgetItem,
-                               QTabWidget, QVBoxLayout, QWidget)
+                               QHeaderView, QLabel, QLineEdit, QPushButton,
+                               QTableWidget, QTableWidgetItem, QVBoxLayout,
+                               QWidget)
 
 # Try to import mutagen for metadata reading
 try:
@@ -22,13 +22,16 @@ try:
 except ImportError:
     HAS_MUTAGEN = False
 
-# ---------------- Batch Entry Dialog (NEW) ----------------
+# ---------------- Batch Entry Dialog (UPDATED) ----------------
 class BatchEntryDialog(QDialog):
-    def __init__(self, file_paths: list[Path], parent=None):
+    def __init__(self, items: list[Path | dict], parent=None):
+        """
+        items: Can be a list of pure Paths (new files) or dicts (existing queue items).
+        """
         super().__init__(parent)
-        self.setWindowTitle(f"Batch Add: {len(file_paths)} Songs")
+        self.setWindowTitle(f"Batch Add: {len(items)} Songs")
         self.resize(900, 500)
-        self.files = file_paths
+        self.items = items
         self.result_data = []
 
         layout = QVBoxLayout(self)
@@ -46,7 +49,7 @@ class BatchEntryDialog(QDialog):
         self.columns = ["Filename", "Title", "Artist", "Album", "Genre", "Year", "Charter"]
         self.table.setColumnCount(len(self.columns))
         self.table.setHorizontalHeaderLabels(self.columns)
-        self.table.setRowCount(len(self.files))
+        self.table.setRowCount(len(self.items))
 
         # Styling
         self.table.setAlternatingRowColors(True)
@@ -60,38 +63,55 @@ class BatchEntryDialog(QDialog):
 
         # Buttons
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        btns.button(QDialogButtonBox.Ok).setText("Add to Queue")
+        btns.button(QDialogButtonBox.Ok).setText("Run Batch")
         btns.accepted.connect(self.collect_data_and_accept)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
 
     def _populate_table(self):
-        for r, path in enumerate(self.files):
-            # 0. Filename (Read-onlyish, acting as label)
+        for r, item in enumerate(self.items):
+            # 1. Resolve Data Source
+            if isinstance(item, Path):
+                # Raw Path: Read from disk
+                path = item
+                meta = self._read_metadata(path)
+                data = {
+                    "title": meta.get("title", path.stem),
+                    "artist": meta.get("artist", "Unknown Artist"),
+                    "album": meta.get("album", ""),
+                    "genre": meta.get("genre", "Rock"),
+                    "year": meta.get("year", ""),
+                    "charter": "Zullo7569"
+                }
+            else:
+                # Existing Dict: Use provided values (preserve edits)
+                path = item["path"]
+                data = item
+                # Ensure defaults if keys missing
+                if "title" not in data: data["title"] = path.stem
+                if "artist" not in data: data["artist"] = "Unknown Artist"
+                if "genre" not in data: data["genre"] = "Rock"
+                if "charter" not in data: data["charter"] = "Zullo7569"
+
+            # 2. Filename (Visual only)
             item_fn = QTableWidgetItem(path.name)
             item_fn.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             item_fn.setForeground(QBrush(QColor("gray")))
             self.table.setItem(r, 0, item_fn)
 
-            # Metadata defaults
-            meta = self._read_metadata(path)
-
-            # Columns 1-6: Title, Artist, Album, Genre, Year, Charter
-            defaults = [
-                meta.get("title", path.stem),
-                meta.get("artist", "Unknown Artist"),
-                meta.get("album", ""),
-                meta.get("genre", "Rock"),
-                meta.get("year", ""),
-                "Zullo7569" # Default charter
+            # 3. Fill Columns
+            cols = [
+                data.get("title", ""),
+                data.get("artist", ""),
+                data.get("album", ""),
+                data.get("genre", ""),
+                data.get("year", ""),
+                data.get("charter", "")
             ]
 
-            for c, val in enumerate(defaults, 1):
+            for c, val in enumerate(cols, 1):
                 self.table.setItem(r, c, QTableWidgetItem(str(val)))
 
-        # Resize columns to content
-        self.table.resizeColumnsToContents()
-        # Cap filename width so it doesn't take over
         if self.table.columnWidth(0) > 250: self.table.setColumnWidth(0, 250)
 
     def _read_metadata(self, path: Path) -> dict:
@@ -103,7 +123,6 @@ class BatchEntryDialog(QDialog):
             f = mutagen.File(str(path))
             if not f: return {}
 
-            # Helper to get first item safely
             def get_tag(keys):
                 for k in keys:
                     if k in f.tags:
@@ -111,34 +130,31 @@ class BatchEntryDialog(QDialog):
                         return val[0] if isinstance(val, list) else str(val)
                 return None
 
-            # ID3 (MP3)
             if isinstance(f.tags, mutagen.id3.ID3) or hasattr(f, 'tags'):
-                # Try EasyID3 keys first if mapped, else raw frames
                 data["title"] = get_tag(['TIT2', 'title'])
                 data["artist"] = get_tag(['TPE1', 'artist'])
                 data["album"] = get_tag(['TALB', 'album'])
                 data["genre"] = get_tag(['TCON', 'genre'])
                 data["year"] = get_tag(['TDRC', 'date', 'year'])
 
-            # Vorbis (Ogg/FLAC) uses simpler keys usually
-            if not data["title"] and 'title' in f.tags:
+            if not data.get("title") and 'title' in f.tags:
                 data["title"] = f.tags['title'][0]
-            if not data["artist"] and 'artist' in f.tags:
+            if not data.get("artist") and 'artist' in f.tags:
                 data["artist"] = f.tags['artist'][0]
 
         except Exception:
             pass
-
-        # Clean None values
         return {k: v for k, v in data.items() if v}
 
     def collect_data_and_accept(self):
         self.result_data = []
         for r in range(self.table.rowCount()):
-            # Map columns back to config object structure
-            # Path is implicit from self.files[r]
+            # Recover path from original items list to ensure object identity/type correctness
+            original_item = self.items[r]
+            original_path = original_item if isinstance(original_item, Path) else original_item["path"]
+
             row_data = {
-                "path": self.files[r],
+                "path": original_path,
                 "title": self.table.item(r, 1).text().strip(),
                 "artist": self.table.item(r, 2).text().strip(),
                 "album": self.table.item(r, 3).text().strip(),
@@ -152,7 +168,7 @@ class BatchEntryDialog(QDialog):
     def get_data(self) -> list[dict]:
         return self.result_data
 
-# ---------------- Review Dialog ----------------
+# ---------------- Review Dialog (Unchanged) ----------------
 class SectionReviewDialog(QDialog):
     def __init__(self, sections: list[dict], density_data: list[dict] | dict, parent=None):
         super().__init__(parent)
@@ -160,7 +176,6 @@ class SectionReviewDialog(QDialog):
         self.resize(575, 675)
         self.sections = sections
 
-        # Handle backward compatibility (if data is just a list)
         if isinstance(density_data, list):
             self.density_map = {"Expert": density_data}
         else:
@@ -169,20 +184,17 @@ class SectionReviewDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        # 1. Density Graphs (Now in Tabs)
         lbl_graph = QLabel("Note Density & Structure")
         lbl_graph.setStyleSheet("font-weight: bold;")
         layout.addWidget(lbl_graph)
 
         self.graph_tabs = SafeTabWidget()
-        self.graphs = {} # Keep track of graph widgets to update them all later
+        self.graphs = {}
 
-        # Order of tabs
         diffs = ["Expert", "Hard", "Medium", "Easy"]
 
         for diff in diffs:
             if diff not in self.density_map: continue
-
             data = self.density_map[diff]
             graph = DensityGraphWidget(data, sections)
             self.graph_tabs.addTab(graph, diff)
@@ -190,21 +202,19 @@ class SectionReviewDialog(QDialog):
 
         layout.addWidget(self.graph_tabs)
 
-        # 2. Table Header
         lbl = QLabel("Section List (Rename Only)")
         lbl.setStyleSheet("color: palette(text); font-weight: bold; margin-top: 10px;")
         lbl.setWordWrap(True)
         layout.addWidget(lbl)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(2) # Time, Name
+        self.table.setColumnCount(2)
         self.table.setHorizontalHeaderLabels(["Start Time (s)", "Section Name"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self.table.setSelectionMode(QAbstractItemView.NoSelection)
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
-        # Tighten padding to remove space between X and scrollbar
         self.table.setStyleSheet("QTableWidget::item { padding: 0px; margin: 0px; border: none; }")
 
         self.refresh_table()
@@ -219,19 +229,15 @@ class SectionReviewDialog(QDialog):
         self.table.setRowCount(len(self.sections))
 
         for i, s in enumerate(self.sections):
-            # 1. TIME (Read Only)
             t_val = float(s.get('start', 0.0))
             t_item = QTableWidgetItem(f"{t_val:.2f}")
             t_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
             t_item.setTextAlignment(Qt.AlignCenter)
 
-            # 2. NAME EDIT
             le = QLineEdit(str(s.get('name', '')))
             le.setPlaceholderText("Section Name")
             le.setClearButtonEnabled(True)
             le.textChanged.connect(lambda txt, idx=i: self.on_name_changed(idx, txt))
-
-            # Minimize internal margins/padding for the line edit to sit flush
             le.setStyleSheet("QLineEdit { border: none; background: transparent; padding: 2px 0px; margin: 0px; }")
 
             self.table.setItem(i, 0, t_item)
@@ -240,14 +246,13 @@ class SectionReviewDialog(QDialog):
     def on_name_changed(self, row: int, new_name: str):
         if 0 <= row < len(self.sections):
             self.sections[row]['name'] = new_name
-            # Update ALL graph instances so lines move/update on all tabs
             for graph in self.graphs.values():
                 graph.set_sections(self.sections)
 
     def get_sections(self) -> list[dict]:
         return self.sections
 
-# ---------------- Support Dialog ----------------
+# ---------------- Support Dialog (Unchanged) ----------------
 class SupportDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -255,12 +260,9 @@ class SupportDialog(QDialog):
         self.resize(400, 320)
 
         layout = QVBoxLayout(self)
-
-        # Tabs for separation of concerns
         tabs = SafeTabWidget()
         tabs.addTab(self._build_help_tab(), "Tech Support")
         tabs.addTab(self._build_donate_tab(), "Support Development")
-
         layout.addWidget(tabs)
 
         btn_close = QPushButton("Close")
@@ -283,7 +285,6 @@ class SupportDialog(QDialog):
         sub.setStyleSheet("color: palette(disabled-text); font-size: 11pt;")
         sub.setAlignment(Qt.AlignCenter)
 
-        # Center buttons and limit width
         btn_layout = QVBoxLayout()
         btn_layout.setAlignment(Qt.AlignCenter)
 
@@ -332,7 +333,6 @@ class SupportDialog(QDialog):
         btn_venmo.setCursor(Qt.PointingHandCursor)
         btn_venmo.setMinimumHeight(45)
         btn_venmo.setFixedWidth(150)
-        # Venmo Brand Colors
         btn_venmo.setStyleSheet("""
             QPushButton {
                 background-color: #008CFF;

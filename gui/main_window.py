@@ -148,7 +148,6 @@ class MainWindow(QMainWindow):
 
         # 2. Batch Run Button Logic
         # Enabled ONLY if we have a queue (2+ songs total)
-        # We allow it even if has_out is False so the user can click it and see the "Setup Required" warning
         self.btn_run_queue.setEnabled((not running) and has_queue)
 
         # Tooltip Feedback
@@ -170,27 +169,61 @@ class MainWindow(QMainWindow):
 
     def run_batch_queue(self):
         """Batch Generation - Process Current + Loop Queue"""
-        # VALIDATION CHECKS with POPUPS
         has_audio = self.audio_path is not None and self.audio_path.exists()
         has_out = bool(self.out_panel.dir_edit.text().strip())
         has_queue = bool(self.song_queue)
 
         if not has_out:
             QMessageBox.warning(self, "Setup Required", "Please select an <b>Output Folder</b> before starting the queue.")
-            self.out_panel.btn_browse.click() # Auto-trigger the browse dialog
+            self.out_panel.btn_browse.click()
             return
 
         if not has_queue:
-            # Should be unreachable if disabled, but safe to keep
             QMessageBox.information(self, "Queue Empty", "Add more songs to start a batch run.")
             return
 
-        # Start Batch
-        if not self.audio_path and self.song_queue:
-            self._pop_next_song()
+        # 1. GATHER ALL ITEMS (Current + Queue)
+        all_items = []
 
-        self._is_batch_running = True
-        self._start_generation_process()
+        # Add Current Loaded Song
+        if has_audio:
+            current_data = {
+                "path": self.audio_path,
+                "title": self.meta_panel.title_edit.text(),
+                "artist": self.meta_panel.artist_edit.text(),
+                "album": self.meta_panel.album_edit.text(),
+                "genre": self.meta_panel.genre_edit.text(),
+                "charter": self.meta_panel.charter_edit.text()
+            }
+            all_items.append(current_data)
+
+        # Add Queue Items
+        all_items.extend(self.song_queue)
+
+        # 2. SHOW DIALOG
+        dlg = BatchEntryDialog(all_items, self)
+        if dlg.exec():
+            # 3. REDISTRIBUTE
+            new_data = dlg.get_data()
+
+            if new_data:
+                # Load first item as current
+                first = new_data.pop(0)
+                self.load_audio(first["path"])
+                self.meta_panel.title_edit.setText(first["title"])
+                self.meta_panel.artist_edit.setText(first["artist"])
+                self.meta_panel.album_edit.setText(first["album"])
+                self.meta_panel.genre_edit.setText(first["genre"])
+                if first.get("charter"):
+                    self.meta_panel.charter_edit.setText(first["charter"])
+
+                # Put the rest back in the queue
+                self.song_queue = new_data
+                self._update_queue_display()
+
+                # 4. START
+                self._is_batch_running = True
+                self._start_generation_process()
 
     def _start_generation_process(self):
         cfg = self.build_cfg()
