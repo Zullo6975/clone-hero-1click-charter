@@ -251,7 +251,8 @@ def _rename_sections_based_on_density(
     avg_nps = len(note_times) / total_duration if total_duration > 0 else 0.0
 
     # 1. Density Threshold: Only consider sections much faster than average
-    solo_nps_threshold = max(avg_nps * 1.45, 3.5)
+    # FIXED: Tightened to avoid false positives (was 1.45/3.5)
+    solo_nps_threshold = max(avg_nps * 1.3, 3.0)
 
     new_sections = []
 
@@ -277,12 +278,12 @@ def _rename_sections_based_on_density(
 
         # Criteria:
         # - Must be fast (High NPS)
-        # - Must move around (High Std Dev > 3.5 semitones)
-        # - Must not be super short (Duration > 8s)
+        # - Must move around (High Std Dev > 4.0 semitones)
+        # - Must not be super short (Duration > 10s)
         # - Name shouldn't already be Intro/Outro
         if (section_nps > solo_nps_threshold
             and pitch_std > 3.5
-            and duration > 8.0
+            and duration > 10.0
             and s.name not in ["Intro", "Outro"]):
             is_solo = True
 

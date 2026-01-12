@@ -28,11 +28,11 @@ class UiBuilder:
         window.splitter = QSplitter(Qt.Horizontal)
         window.splitter.setHandleWidth(1)
         # Visual line for the splitter handle
+        # UPDATED: Light gray, no margins (touch)
         window.splitter.setStyleSheet("""
             QSplitter::handle {
-                background-color: palette(mid);
-                margin-left: 2px;
-                margin-right: 2px;
+                background-color: #d0d0d0;
+                margin: 0px;
             }
         """)
         window.splitter.setChildrenCollapsible(False)
@@ -98,11 +98,12 @@ class UiBuilder:
         h.addWidget(title_lbl)
         layout.addWidget(w)
 
+        # UPDATED: Header separator horiz (Light gray, no fixed width)
         line = QFrame()
         line.setObjectName("HeaderLine")
         line.setFixedHeight(1)
-        line.setFixedWidth(900)
-        layout.addWidget(line, alignment=Qt.AlignHCenter)
+        line.setStyleSheet("background-color: #d0d0d0; border: none;")
+        layout.addWidget(line)
 
     def _build_sidebar_content(self, window, layout):
         # Audio
@@ -173,6 +174,9 @@ class UiBuilder:
         layout.addStretch()
 
     def _build_footer(self, window):
+        # UPDATED: Footer Separator Horiz (Top border on status bar)
+        window.statusBar().setStyleSheet("QStatusBar { border-top: 1px solid #d0d0d0; }")
+
         # We put the footer logic into the status bar area to keep it sticky at bottom
         footer_widget = QWidget()
         lay = QHBoxLayout(footer_widget)
@@ -184,7 +188,8 @@ class UiBuilder:
             f = QFrame()
             f.setFrameShape(QFrame.VLine)
             f.setFixedWidth(1)
-            f.setStyleSheet("background-color: palette(mid); margin-top: 4px; margin-bottom: 4px;")
+            # UPDATED: Vertical divs in the footer (Light gray, no margins/touch)
+            f.setStyleSheet("background-color: #d0d0d0; border: none; margin: 0px;")
             return f
 
         # --- LEFT CONTROLS ---

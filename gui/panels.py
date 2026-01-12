@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QWidget, QGroupBox, QVBoxLayout, QHBoxLayout, QFo
 from PySide6.QtCore import Qt
 
 # Import custom widgets and helpers
-from gui.utils import form_label
+from gui.utils import form_label, get_font
 from gui.widgets import SafeComboBox, SafeSpinBox, SafeDoubleSpinBox, SafeSlider, SafeTabWidget
 from gui.presets import DEFAULT_PRESETS, load_all_presets, save_user_preset, delete_user_preset
 
@@ -34,11 +34,17 @@ class MetadataWidget(QGroupBox):
         self.btn_clear.setCursor(Qt.PointingHandCursor)
         self.btn_clear.clicked.connect(self.clear_fields)
 
-        layout.addRow(form_label("Title", required=True, align=Qt.AlignCenter), self.title_edit)
-        layout.addRow(form_label("Artist", required=True, align=Qt.AlignCenter), self.artist_edit)
-        layout.addRow(form_label("Album", align=Qt.AlignCenter), self.album_edit)
-        layout.addRow(form_label("Genre", align=Qt.AlignCenter), self.genre_edit)
-        layout.addRow(form_label("Charter", align=Qt.AlignCenter), self.charter_edit)
+        # Helper to create styled labels
+        def meta_label(text, required=False):
+            lbl = form_label(text, required=required, align=Qt.AlignCenter)
+            lbl.setFont(get_font(11))
+            return lbl
+
+        layout.addRow(meta_label("Title", required=True), self.title_edit)
+        layout.addRow(meta_label("Artist", required=True), self.artist_edit)
+        layout.addRow(meta_label("Album"), self.album_edit)
+        layout.addRow(meta_label("Genre"), self.genre_edit)
+        layout.addRow(meta_label("Charter"), self.charter_edit)
 
         row_clear = QHBoxLayout()
         row_clear.addStretch()
