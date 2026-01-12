@@ -3,22 +3,20 @@ import json
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QSettings, Qt, QTimer, QProcess, QSize
-from PySide6.QtGui import (QDragEnterEvent, QDropEvent, QPixmap)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QFileDialog, QFrame, QGroupBox,
-                               QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMainWindow, QMessageBox,
-                               QProgressBar, QPushButton, QScrollArea, QSplitter, QStyle,
-                               QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtCore import QSettings, Qt, QTimer, QProcess
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QPixmap
+from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QFileDialog,
+                               QListWidgetItem, QWidget, QHBoxLayout, QLabel, QToolButton, QStyle)
 
 from charter.config import REPO_URL
-from gui.utils import repo_root, get_font, RunConfig
+from gui.utils import repo_root, RunConfig
 from gui.theme import ThemeManager
 from gui.widgets import LogWindow
 from gui.dialogs import SectionReviewDialog, SupportDialog
-
-# NEW MODULES
-from gui.panels import MetadataWidget, SettingsWidget, OutputWidget
 from gui.worker import GenerationWorker
+
+# Import the UI Builder
+from gui.ui_layout import UiBuilder
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
@@ -41,7 +39,11 @@ class MainWindow(QMainWindow):
 
         self.dark_mode = self.settings.value("dark_mode", True, type=bool)
 
-        self._build_ui()
+        # --- UI SETUP ---
+        self.ui_builder = UiBuilder()
+        self.ui_builder.setup_ui(self)
+        # ----------------
+
         self._wire()
         self._restore_settings()
 
@@ -86,209 +88,6 @@ class MainWindow(QMainWindow):
 
         geom = self.settings.value("geometry")
         if geom: self.restoreGeometry(geom)
-
-    def _build_ui(self) -> None:
-        central = QWidget()
-        self.setCentralWidget(central)
-        main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(24, 24, 24, 24)
-        main_layout.setSpacing(24)
-
-        # Header
-        self._build_header(main_layout)
-
-        # Splitter Body
-        self.splitter = QSplitter(Qt.Horizontal)
-        self.splitter.setHandleWidth(1) # Visual line handled by stylesheet or layout
-        # We can style the handle to be visible
-        self.splitter.setStyleSheet("QSplitter::handle { background-color: palette(mid); }")
-        self.splitter.setChildrenCollapsible(False)
-        main_layout.addWidget(self.splitter)
-
-        # SIDEBAR (Audio, Queue, Art)
-        self.sidebar_widget = QWidget()
-        self.sidebar_widget.setMinimumWidth(340)
-        self.sidebar_widget.setMaximumWidth(340)
-        sidebar_layout = QVBoxLayout(self.sidebar_widget)
-        sidebar_layout.setContentsMargins(0, 0, 16, 0)
-        sidebar_layout.setSpacing(20)
-        self._build_sidebar_content(sidebar_layout)
-
-        # MAIN PANEL (Meta, Config, Output)
-        self.main_widget = QWidget()
-        self.main_widget.setMinimumWidth(700)
-        main_inner = QVBoxLayout(self.main_widget)
-        main_inner.setContentsMargins(16, 0, 0, 0)
-        main_inner.setSpacing(24)
-
-        # 1. Metadata Panel
-        self.meta_panel = MetadataWidget()
-        main_inner.addWidget(self.meta_panel)
-
-        # 2. Settings Panel
-        self.settings_panel = SettingsWidget()
-        main_inner.addWidget(self.settings_panel)
-
-        # 3. Output Panel
-        self.out_panel = OutputWidget()
-        main_inner.addWidget(self.out_panel)
-        main_inner.addStretch(1)
-
-        # Scroll Area
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll.setWidget(self.main_widget)
-        scroll.setFrameShape(QFrame.NoFrame)
-
-        self.splitter.addWidget(self.sidebar_widget)
-        self.splitter.addWidget(scroll)
-        self.splitter.setStretchFactor(1, 1)
-
-        # Footer
-        self._build_footer()
-
-    def _build_header(self, layout):
-        w = QWidget()
-        h = QHBoxLayout(w)
-        h.setContentsMargins(0, 0, 0, 10)
-        h.setAlignment(Qt.AlignCenter)
-
-        icon_lbl = QLabel()
-        icon_path = repo_root() / "icons" / "icon_og.png"
-        if icon_path.exists():
-            pix = QPixmap(str(icon_path))
-            if not pix.isNull():
-                icon_lbl.setPixmap(pix.scaled(72, 72, Qt.KeepAspectRatio, Qt.SmoothTransformation))
-
-        title_lbl = QLabel("CloneHero 1-Click Charter")
-        title_lbl.setFont(get_font(32, True))
-
-        h.addWidget(icon_lbl)
-        h.addWidget(title_lbl)
-        layout.addWidget(w)
-
-        line = QFrame()
-        line.setObjectName("HeaderLine")
-        line.setFixedHeight(1)
-        line.setFixedWidth(900)
-        layout.addWidget(line, alignment=Qt.AlignHCenter)
-
-    def _build_sidebar_content(self, layout):
-        # Audio
-        grp_audio = QGroupBox("Input Audio (REQUIRED)")
-        v = QVBoxLayout(grp_audio)
-        self.audio_label = QLabel("Drag Audio Files Here")
-        self.audio_label.setAlignment(Qt.AlignCenter)
-        self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
-
-        self.btn_add_audio = QPushButton("Add Songs...")
-        self.btn_add_audio.setIcon(self.style().standardIcon(QStyle.SP_DirOpenIcon))
-
-        self.btn_clear_audio = QToolButton()
-        self.btn_clear_audio.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
-
-        h = QHBoxLayout()
-        h.addWidget(self.btn_add_audio, 1)
-        h.addWidget(self.btn_clear_audio, 0)
-        v.addWidget(self.audio_label)
-        v.addLayout(h)
-        layout.addWidget(grp_audio)
-
-        # Queue
-        self.grp_queue = QGroupBox("Pending Queue")
-        v_q = QVBoxLayout(self.grp_queue)
-        self.queue_list = QListWidget()
-        self.queue_list.setMaximumHeight(90)
-        self.btn_clear_queue = QPushButton("Clear Queue")
-        v_q.addWidget(self.queue_list)
-        v_q.addWidget(self.btn_clear_queue)
-        layout.addWidget(self.grp_queue)
-
-        # Art
-        grp_art = QGroupBox("Album Art")
-        v_a = QVBoxLayout(grp_art)
-        self.cover_preview = QLabel("Drag Art Here")
-        self.cover_preview.setAlignment(Qt.AlignCenter)
-        self.cover_preview.setFixedSize(280, 280)
-        self.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic;")
-
-        self.btn_pick_cover = QPushButton("Image...")
-        self.btn_clear_cover = QToolButton()
-        self.btn_clear_cover.setIcon(self.style().standardIcon(QStyle.SP_DialogDiscardButton))
-
-        h_a = QHBoxLayout()
-        h_a.addWidget(self.btn_pick_cover, 1)
-        h_a.addWidget(self.btn_clear_cover, 0)
-        v_a.addStretch()
-        v_a.addWidget(self.cover_preview, 0, Qt.AlignCenter)
-        v_a.addStretch()
-        v_a.addLayout(h_a)
-        layout.addWidget(grp_art)
-        layout.addStretch()
-
-    def _build_footer(self):
-        footer = QWidget()
-        lay = QHBoxLayout(footer)
-        lay.setContentsMargins(0, 5, 20, 5)
-
-        # --- LEFT SIDE CONTROLS ---
-        self.chk_dark = QCheckBox("Dark Mode")
-        self.chk_dark.setChecked(self.dark_mode)
-
-        self.btn_show_logs = QPushButton("Show Logs")
-        self.btn_help = QPushButton("Help")
-        self.btn_support = QPushButton("Support")
-
-        # Separators
-        sep1 = QFrame()
-        sep1.setFrameShape(QFrame.VLine)
-        sep1.setStyleSheet("color: palette(mid);")
-
-        sep2 = QFrame()
-        sep2.setFrameShape(QFrame.VLine)
-        sep2.setStyleSheet("color: palette(mid);")
-
-        lay.addWidget(sep1)
-        lay.addWidget(self.chk_dark)
-        lay.addWidget(self.btn_show_logs)
-        lay.addWidget(self.btn_help)
-        lay.addWidget(self.btn_support)
-        lay.addWidget(sep2)
-
-        lay.addStretch() # Spacer between left/right controls
-
-        # --- RIGHT SIDE ACTION ---
-        self.btn_cancel = QPushButton("Cancel")
-        self.btn_generate = QPushButton("  GENERATE  ")
-        self.btn_generate.setObjectName("Primary")
-
-        lay.addWidget(self.btn_cancel)
-        lay.addWidget(self.btn_generate)
-
-        # --- STATUS BAR ---
-        self.status_container = QWidget()
-        s_lay = QHBoxLayout(self.status_container)
-        s_lay.setContentsMargins(27, 0, 0, 0)
-        self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("font-weight: bold;")
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFixedWidth(200)
-        self.progress_bar.setFixedHeight(14)
-        s_lay.addWidget(self.status_label)
-        s_lay.addWidget(self.progress_bar)
-        s_lay.addStretch()
-
-        self.statusBar().addWidget(self.status_container, 1)
-        self.statusBar().addPermanentWidget(footer)
-
-        # Menu
-        menu = self.menuBar().addMenu("File")
-        menu.addAction("Clear Log", self.log_window.clear)
-        menu.addSeparator()
-        menu.addAction("Quit", self.close)
 
     def _wire(self):
         # Sidebar
@@ -421,7 +220,6 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", "Output folder required.")
             return None
 
-        # Gather data from Panels
         mp = self.meta_panel
         sp = self.settings_panel
 
@@ -506,7 +304,7 @@ class MainWindow(QMainWindow):
             h.setContentsMargins(4,0,4,0)
 
             lbl = QLabel(p.name)
-            lbl.setStyleSheet("background: transparent; font-size: 11pt")
+            lbl.setStyleSheet("background: transparent; font-size: 11pt;")
             h.addWidget(lbl, 1)
 
             btn = QToolButton()
@@ -581,7 +379,7 @@ class MainWindow(QMainWindow):
             self.song_queue.extend(new_s)
             self._update_queue_display()
 
-    # RESTORED: Health check runner to handle the success popup
+    # --- Health Check / Validation Popup Logic ---
     def run_health_check(self, song_dir: Path) -> None:
         from gui.utils import get_python_exec, is_frozen
 
@@ -619,7 +417,6 @@ class MainWindow(QMainWindow):
         if not self.song_queue:
             self.status_label.setText("Ready")
 
-            # Prepare message
             msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
             if warnings:
                 msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
@@ -628,14 +425,13 @@ class MainWindow(QMainWindow):
             title = "Generation Complete" if not warnings else "Complete (With Warnings)"
             icon = QMessageBox.Information if not warnings else QMessageBox.Warning
 
-            # Helper to show box safely
             def show_box():
-                self.activateWindow() # Bring main window to front
+                self.activateWindow() # Pull to front
                 mbox = QMessageBox(icon, title, msg, QMessageBox.Ok, self)
                 mbox.setMinimumWidth(450)
+                mbox.setWindowModality(Qt.ApplicationModal)
                 mbox.exec()
 
-            # Small delay to let UI refresh
             QTimer.singleShot(100, show_box)
 
         self.validator_proc = None
