@@ -3,10 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from charter.config import REPO_URL, SUPPORT_EMAIL, VENMO_URL
-# Add get_font here:
 from gui.utils import get_font
 from gui.widgets import DensityGraphWidget, SafeTabWidget
-
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, Qt
 from PySide6.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox,
@@ -45,6 +43,16 @@ class BatchEntryDialog(QDialog):
         sub = QLabel("Edit these fields now to ensure your charts are named correctly. Tab to move quickly.")
         sub.setStyleSheet("color: palette(disabled-text); margin-bottom: 5px;")
         layout.addWidget(sub)
+
+        # WARNING IF REVIEW IS ON
+        is_review_on = False
+        if parent and hasattr(parent, 'settings_panel'):
+            is_review_on = parent.settings_panel.chk_review.isChecked()
+
+        if is_review_on:
+            warn = QLabel("⚠️ Note: 'Review Sections' will be skipped during this batch run.")
+            warn.setStyleSheet("color: #e67e22; font-weight: bold; margin-bottom: 5px;")
+            layout.addWidget(warn)
 
         # Table Setup
         self.table = QTableWidget()
@@ -408,7 +416,6 @@ class BatchResultDialog(QDialog):
                 item_status.setForeground(QBrush(QColor("#4caf50"))) # Green
             else:
                 item_status.setForeground(QBrush(QColor("#f44336"))) # Red
-                # Requires 'from gui.utils import get_font'
                 item_status.setFont(get_font(weight="bold"))
 
             self.table.setItem(r, 1, item_status)

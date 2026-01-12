@@ -4,28 +4,26 @@ import json
 import sys
 from pathlib import Path
 
+from PySide6.QtCore import QProcess, QSettings, Qt, QTimer, QUrl
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QPixmap, QDesktopServices
+from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QFileDialog,
+                               QListWidgetItem, QWidget, QHBoxLayout, QLabel, QToolButton, QStyle)
+
 from charter.config import REPO_URL
-from gui.dialogs import (BatchEntryDialog, BatchResultDialog,
-                         SectionReviewDialog, SupportDialog)
+from gui.utils import RunConfig
 from gui.theme import ThemeManager
+from gui.widgets import LogWindow
+from gui.dialogs import SectionReviewDialog, SupportDialog, BatchEntryDialog, BatchResultDialog
+from gui.worker import GenerationWorker
+from gui.updater import UpdateWorker, CURRENT_VERSION
+
 # Import the UI Builder
 from gui.ui_layout import UiBuilder
-from gui.updater import CURRENT_VERSION, UpdateWorker
-from gui.utils import RunConfig
-from gui.widgets import LogWindow
-from gui.worker import GenerationWorker
-from PySide6.QtCore import QProcess, QSettings, Qt, QTimer, QUrl
-from PySide6.QtGui import (QDesktopServices, QDragEnterEvent, QDropEvent,
-                           QPixmap)
-from PySide6.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QLabel,
-                               QListWidgetItem, QMainWindow, QMessageBox,
-                               QStyle, QToolButton, QWidget)
-
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("CloneHero 1-Click Charter")
+        self.setWindowTitle(f"CloneHero 1-Click Charter v{CURRENT_VERSION}")
         self.setAcceptDrops(True)
         self.settings = QSettings("Zullo", "1ClickCharter")
 
@@ -38,7 +36,6 @@ class MainWindow(QMainWindow):
         self.song_queue: list[dict] = []
         self._title_user_edited = False
         self._is_batch_running = False
-
         self.batch_results: list[dict] = []
 
         self.log_window = LogWindow()
@@ -56,10 +53,12 @@ class MainWindow(QMainWindow):
 
         ThemeManager.apply_style(QApplication.instance(), self.dark_mode)
 
+        # --- AUTO UPDATE CHECK ---
         self.update_thread = UpdateWorker(self)
         self.update_thread.checker.update_available.connect(self.on_update_available)
         # Delay check by 2 seconds to allow UI to render first
         QTimer.singleShot(2000, self.update_thread.start)
+        # -------------------------
 
         # Load Presets
         self.settings_panel.refresh_presets()
@@ -167,6 +166,9 @@ class MainWindow(QMainWindow):
         for w in [self.out_panel.dir_edit, self.meta_panel.title_edit, self.meta_panel.artist_edit]:
             w.textChanged.connect(self._update_state)
 
+        # Update state when Review Checkbox is toggled (to update tooltip)
+        self.settings_panel.chk_review.toggled.connect(self._update_state)
+
     def show_help(self) -> None:
         msg = """
         <h3>How to Use 1-Click Charter</h3>
@@ -201,7 +203,10 @@ class MainWindow(QMainWindow):
             self.btn_run_queue.setToolTip("Click to set Output Folder.")
         else:
             total_count = len(self.song_queue) + (1 if has_audio else 0)
-            self.btn_run_queue.setToolTip(f"Process {total_count} song(s) in sequence.")
+            msg = f"Process {total_count} song(s) in sequence."
+            if self.settings_panel.chk_review.isChecked():
+                msg += "\n(Note: 'Review Sections' is disabled for batch runs)"
+            self.btn_run_queue.setToolTip(msg)
 
         self.out_panel.btn_open_folder.setEnabled(has_out)
         self.out_panel.btn_open_song.setEnabled(self.last_out_song is not None and self.last_out_song.exists())
@@ -295,6 +300,13 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Working...")
 
         analyze = self.settings_panel.chk_review.isChecked()
+
+        # FORCE DISABLE ANALYSIS FOR BATCH
+        if self._is_batch_running:
+            analyze = False
+            if self.settings_panel.chk_review.isChecked():
+                self.append_log("ℹ️ Batch Mode: Skipping 'Review Sections' step.")
+
         self.worker.start(cfg, analyze_first=analyze)
 
     def on_analysis_ready(self, sections, density):
@@ -347,7 +359,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Process Failed", "Check logs for details.")
             return
 
-        # 3. HANDLE SUCCESS (Existing logic)
+        # 3. HANDLE SUCCESS
         self.last_out_song = out_song
 
         if self.cover_path and self.cover_path.exists():
@@ -642,12 +654,11 @@ class MainWindow(QMainWindow):
         # Now we are truly done with the batch
         self._is_batch_running = False
 
+        # FIX: Pop next song even if Single Generation was run
         if self.song_queue:
-            # If Single Generation finished but queue has items, Auto-Load next
             self._pop_next_song()
             self.status_label.setText(f"Loaded next: {self.audio_path.name}")
         else:
-            # Queue empty, clear everything
             self._clear_song_info()
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
