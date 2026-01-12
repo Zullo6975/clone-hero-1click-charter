@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pretty_midi  # type: ignore
+import mido  # type: ignore
 
 
 # Clone Hero lead guitar track name we generate
@@ -47,11 +48,12 @@ class ChartStats:
     total_chords: int
     total_sustains: int
     sustain_ratio: float
+    total_solos: int  # NEW: Count of solo sections
 
     # difficulty-ish
     max_nps_1s: float
     avg_nps: float
-    complexity: int  # New field: 0-10 score
+    complexity: int  # 0-10 score
 
     # lanes
     lane_counts: dict[str, int]  # {"G":..., "R":..., ...}
@@ -155,11 +157,9 @@ def _calculate_complexity(avg_nps: float, max_nps: float, total_chords: int, tot
         return 0
 
     # 1. Base Score from NPS (Weight: 60%)
-    # 2.0 NPS = Tier 1, 8.0 NPS = Tier 6
     nps_score = min(6, (avg_nps / 1.5))
 
     # 2. Peak Score from Max NPS (Weight: 20%)
-    # Spikes indicate difficulty even if avg is low
     peak_score = min(6, (max_nps / 3.0))
 
     # 3. Chord Density Score (Weight: 20%)
@@ -167,11 +167,26 @@ def _calculate_complexity(avg_nps: float, max_nps: float, total_chords: int, tot
     chord_score = min(6, chord_ratio * 10)
 
     # Weighted Average
-    # Average NPS is king, but peaks and chords bump you up
     raw_score = (nps_score * 0.6) + (peak_score * 0.2) + (chord_score * 0.2)
 
     # Round to nearest integer 0-6
     return int(round(raw_score))
+
+
+def _count_solos_mido(midi_path: Path) -> int:
+    """Scans the EVENTS track for [section Guitar Solo] text events."""
+    count = 0
+    try:
+        mid = mido.MidiFile(str(midi_path))
+        for track in mid.tracks:
+            for msg in track:
+                if msg.type == 'text':
+                    txt = msg.text.lower()
+                    if "[section guitar solo]" in txt:
+                        count += 1
+    except Exception:
+        pass
+    return count
 
 
 def compute_chart_stats(
@@ -202,6 +217,9 @@ def compute_chart_stats(
     total_notes = len(notes)
     total_chords = sum(1 for g in chords if len(g) >= 2)
     total_sustains = sum(1 for n in notes if (n.end - n.start) * 1000.0 >= sustain_ms_threshold)
+
+    # Count Solos using mido scanner
+    total_solos = _count_solos_mido(notes_mid_path)
 
     chart_end = 0.0
     if notes:
@@ -263,6 +281,7 @@ def compute_chart_stats(
         total_chords=total_chords,
         total_sustains=total_sustains,
         sustain_ratio=_safe_float(sustain_ratio),
+        total_solos=total_solos,  # Add to stats object
         max_nps_1s=_safe_float(max_nps_1s),
         avg_nps=_safe_float(avg_nps),
         complexity=complexity,
@@ -281,10 +300,14 @@ def write_stats_json(out_path: Path, stats: ChartStats) -> None:
 def format_stats_summary(stats: ChartStats) -> str:
     lanes = stats.lane_counts
     lane_str = f"G{lanes['G']} R{lanes['R']} Y{lanes['Y']} B{lanes['B']} O{lanes['O']}"
+
+    # Optional Solo text
+    solo_txt = f" | Solos: {stats.total_solos}" if stats.total_solos > 0 else ""
+
     return (
         f"Stats\n"
         f"- Notes: {stats.total_notes} (chords: {stats.total_chords}, sustains: {stats.total_sustains}, sustain%: {stats.sustain_ratio:.2f})\n"
-        f"- Max NPS (1s): {stats.max_nps_1s:.2f} | Avg NPS: {stats.avg_nps:.2f}\n"
+        f"- Max NPS (1s): {stats.max_nps_1s:.2f} | Avg NPS: {stats.avg_nps:.2f}{solo_txt}\n"
         f"- Complexity: {stats.complexity}/6\n"
         f"- Lanes: {lane_str}\n"
         f"- Chart end: {stats.chart_duration_sec:.2f}s\n"

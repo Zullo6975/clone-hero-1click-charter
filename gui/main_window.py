@@ -146,15 +146,16 @@ class MainWindow(QMainWindow):
         self.btn_generate.setEnabled((not running) and has_audio and has_title and has_artist and has_out)
         self.btn_cancel.setEnabled(running)
 
-        # 2. Batch Run Button
-        can_batch = (not running) and (has_queue or has_audio) and has_out
-        self.btn_run_queue.setEnabled(can_batch)
+        # 2. Batch Run Button Logic
+        # Enabled ONLY if we have a queue (2+ songs total)
+        # We allow it even if has_out is False so the user can click it and see the "Setup Required" warning
+        self.btn_run_queue.setEnabled((not running) and has_queue)
 
         # Tooltip Feedback
-        if not has_out:
-            self.btn_run_queue.setToolTip("Select Output Folder to enable.")
-        elif not (has_queue or has_audio):
-            self.btn_run_queue.setToolTip("Add songs to the queue to enable.")
+        if not has_queue:
+            self.btn_run_queue.setToolTip("Add more songs to create a batch.")
+        elif not has_out:
+            self.btn_run_queue.setToolTip("Click to set Output Folder.")
         else:
             total_count = len(self.song_queue) + (1 if has_audio else 0)
             self.btn_run_queue.setToolTip(f"Process {total_count} song(s) in sequence.")
@@ -169,6 +170,22 @@ class MainWindow(QMainWindow):
 
     def run_batch_queue(self):
         """Batch Generation - Process Current + Loop Queue"""
+        # VALIDATION CHECKS with POPUPS
+        has_audio = self.audio_path is not None and self.audio_path.exists()
+        has_out = bool(self.out_panel.dir_edit.text().strip())
+        has_queue = bool(self.song_queue)
+
+        if not has_out:
+            QMessageBox.warning(self, "Setup Required", "Please select an <b>Output Folder</b> before starting the queue.")
+            self.out_panel.btn_browse.click() # Auto-trigger the browse dialog
+            return
+
+        if not has_queue:
+            # Should be unreachable if disabled, but safe to keep
+            QMessageBox.information(self, "Queue Empty", "Add more songs to start a batch run.")
+            return
+
+        # Start Batch
         if not self.audio_path and self.song_queue:
             self._pop_next_song()
 
@@ -190,7 +207,7 @@ class MainWindow(QMainWindow):
 
         analyze = self.settings_panel.chk_review.isChecked()
         self.worker.start(cfg, analyze_first=analyze)
-        self._update_state()
+        # Note: We do NOT call _update_state() here because we want buttons disabled manually above
 
     def on_analysis_ready(self, sections, density):
         dlg = SectionReviewDialog(sections, density, self)
@@ -338,7 +355,6 @@ class MainWindow(QMainWindow):
         if not files: return
         paths = [Path(f) for f in files]
 
-        # If nothing loaded, load first
         if not self.audio_path and paths:
             self.load_audio(paths.pop(0))
 
@@ -376,7 +392,6 @@ class MainWindow(QMainWindow):
             item.setSizeHint(wid.sizeHint())
             self.queue_list.setItemWidget(item, wid)
 
-        # CRITICAL FIX: Ensure button state updates when list changes
         self._update_state()
 
     def _remove_queue_item(self, idx):
@@ -429,51 +444,18 @@ class MainWindow(QMainWindow):
         urls = e.mimeData().urls()
         audio_ext = {".mp3", ".wav", ".ogg", ".flac"}
         img_ext = {".jpg", ".png", ".jpeg"}
-
-        new_songs = []
-        cover_found = None
-
+        new_s = []
         for u in urls:
             p = Path(u.toLocalFile())
-            if p.is_dir():
-                for f in p.rglob("*"):
-                    if f.suffix.lower() in audio_ext:
-                        new_songs.append(f)
-            else:
-                if p.suffix.lower() in audio_ext:
-                    new_songs.append(p)
-                elif p.suffix.lower() in img_ext:
-                    cover_found = p
+            if p.suffix.lower() in audio_ext: new_s.append(p)
+            elif p.suffix.lower() in img_ext: self.load_cover(p)
 
-        if cover_found:
-            self.load_cover(cover_found)
+        if new_s:
+            if not self.audio_path: self.load_audio(new_s.pop(0))
+            self.song_queue.extend(new_s)
+            self._update_queue_display()
 
-        if not new_songs:
-            return
-
-        if len(new_songs) > 1:
-            dlg = BatchEntryDialog(new_songs, self)
-            if dlg.exec():
-                batch_data = dlg.get_data()
-                first = batch_data.pop(0)
-
-                self.load_audio(first["path"])
-                self.meta_panel.title_edit.setText(first["title"])
-                self.meta_panel.artist_edit.setText(first["artist"])
-                self.meta_panel.album_edit.setText(first["album"])
-                self.meta_panel.genre_edit.setText(first["genre"])
-                if first["charter"]: self.meta_panel.charter_edit.setText(first["charter"])
-
-                self.song_queue.extend(batch_data)
-                self._update_queue_display()
-        else:
-            p = new_songs[0]
-            if not self.audio_path:
-                self.load_audio(p)
-            else:
-                self.song_queue.append(p)
-                self._update_queue_display()
-
+    # --- Health Check / Validation Popup Logic ---
     def run_health_check(self, song_dir: Path) -> None:
         from gui.utils import get_python_exec, is_frozen
 
