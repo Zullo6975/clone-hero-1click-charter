@@ -12,7 +12,7 @@ from charter.config import REPO_URL
 from gui.utils import repo_root, RunConfig
 from gui.theme import ThemeManager
 from gui.widgets import LogWindow
-from gui.dialogs import SectionReviewDialog, SupportDialog
+from gui.dialogs import SectionReviewDialog, SupportDialog, BatchEntryDialog
 from gui.worker import GenerationWorker
 
 # Import the UI Builder
@@ -31,8 +31,9 @@ class MainWindow(QMainWindow):
 
         self.validator_proc: QProcess | None = None
 
-        self.song_queue: list[Path] = []
+        self.song_queue: list[dict] = []
         self._title_user_edited = False
+        self._is_batch_running = False
 
         self.log_window = LogWindow()
         self.worker = GenerationWorker(self)
@@ -62,7 +63,7 @@ class MainWindow(QMainWindow):
         self.settings_panel.apply_preset(self.settings_panel.preset_combo.currentText())
 
         self._update_queue_display()
-        self._update_state()
+        # Initial State Update will happen via QTimer to ensure UI is ready
         QTimer.singleShot(100, self.snap_to_content)
         self.status_label.setText("Ready")
 
@@ -97,6 +98,8 @@ class MainWindow(QMainWindow):
         self.btn_pick_cover.clicked.connect(self.pick_cover)
         self.btn_clear_cover.clicked.connect(self.clear_cover)
 
+        self.btn_run_queue.clicked.connect(self.run_batch_queue)
+
         # Output
         self.out_panel.btn_browse.clicked.connect(self.pick_output_dir)
         self.out_panel.btn_open_folder.clicked.connect(self.open_output_root)
@@ -123,12 +126,11 @@ class MainWindow(QMainWindow):
     def show_help(self) -> None:
         msg = """
         <h3>How to Use 1-Click Charter</h3>
-        <ol>
-            <li><b>Add Audio:</b> Drag files or click "+ Add".</li>
-            <li><b>Metadata:</b> Fill in Title/Artist for the current song.</li>
-            <li><b>Generate:</b> Process the current song. If queue items exist, the next one loads automatically.</li>
-        </ol>
-        <p><b>Queue:</b> The small box below the audio input shows pending songs. Use the Trash icon on the input box to skip the current song.</p>
+        <ul>
+            <li><b>Generate:</b> Process ONLY the currently loaded song.</li>
+            <li><b>Run Queue:</b> Process current song + all pending songs automatically.</li>
+        </ul>
+        <p><b>Batch Add:</b> Drag multiple files to open the Batch Editor.</p>
         """
         QMessageBox.information(self, "Help", msg.strip())
 
@@ -138,21 +140,51 @@ class MainWindow(QMainWindow):
         has_title = bool(self.meta_panel.title_edit.text().strip())
         has_artist = bool(self.meta_panel.artist_edit.text().strip())
         has_out = bool(self.out_panel.dir_edit.text().strip())
+        has_queue = bool(self.song_queue)
 
+        # 1. Main Generate Button (Single Song)
         self.btn_generate.setEnabled((not running) and has_audio and has_title and has_artist and has_out)
         self.btn_cancel.setEnabled(running)
+
+        # 2. Batch Run Button
+        can_batch = (not running) and (has_queue or has_audio) and has_out
+        self.btn_run_queue.setEnabled(can_batch)
+
+        # Tooltip Feedback
+        if not has_out:
+            self.btn_run_queue.setToolTip("Select Output Folder to enable.")
+        elif not (has_queue or has_audio):
+            self.btn_run_queue.setToolTip("Add songs to the queue to enable.")
+        else:
+            total_count = len(self.song_queue) + (1 if has_audio else 0)
+            self.btn_run_queue.setToolTip(f"Process {total_count} song(s) in sequence.")
+
         self.out_panel.btn_open_folder.setEnabled(has_out)
         self.out_panel.btn_open_song.setEnabled(self.last_out_song is not None and self.last_out_song.exists())
 
     def run_generate(self):
+        """Standard Generation - ONE SONG ONLY"""
+        self._is_batch_running = False
+        self._start_generation_process()
+
+    def run_batch_queue(self):
+        """Batch Generation - Process Current + Loop Queue"""
+        if not self.audio_path and self.song_queue:
+            self._pop_next_song()
+
+        self._is_batch_running = True
+        self._start_generation_process()
+
+    def _start_generation_process(self):
         cfg = self.build_cfg()
         if not cfg: return
 
         self.log_window.clear()
         self.btn_generate.setText("Generating....")
         self.btn_generate.setEnabled(False)
+        self.btn_run_queue.setEnabled(False)
+
         self.progress_bar.setVisible(True)
-        # Ensure it is bouncing (indeterminate)
         self.progress_bar.setRange(0, 0)
         self.status_label.setText("Working...")
 
@@ -171,42 +203,61 @@ class MainWindow(QMainWindow):
             self.worker.cancel()
             self.reset_ui_after_run()
             self.status_label.setText("Cancelled")
+            self._is_batch_running = False
 
     def on_worker_finished(self, success: bool, out_song: Path):
         self.reset_ui_after_run()
         if not success:
             self.status_label.setText("Failed")
+            self._is_batch_running = False
             QMessageBox.critical(self, "Process Failed", "Check logs for details.")
             return
 
         self.last_out_song = out_song
 
-        # Copy Art
         if self.cover_path and self.cover_path.exists():
             try:
                 (out_song / "album.png").write_bytes(self.cover_path.read_bytes())
                 self.log_window.append_text("Cover copied.")
             except: pass
 
-        # Run Validation
         self.status_label.setText("Validating...")
         self.run_health_check(out_song)
 
-        # Handle Queue
-        if self.song_queue:
-            next_s = self.song_queue.pop(0)
-            self._clear_song_info()
-            self.load_audio(next_s)
-            self._update_queue_display()
-            self.status_label.setText(f"Done! Next: {next_s.name}")
+        # AUTO-QUEUE LOGIC
+        if self._is_batch_running and self.song_queue:
+            self._pop_next_song()
+            self.status_label.setText(f"Batch: Starting {self.audio_path.name}...")
+            QTimer.singleShot(1000, self._start_generation_process)
         else:
-            self._clear_song_info()
-            self.audio_path = None
-            self.audio_label.setText("Drag Audio Files Here")
-            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+            self._is_batch_running = False
             self.status_label.setText("Finished")
+            if not self.song_queue:
+                self._clear_song_info()
+                self.audio_path = None
+                self.audio_label.setText("Drag Audio Files Here")
+                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
 
         self._update_state()
+
+    def _pop_next_song(self):
+        if not self.song_queue: return
+
+        next_s_data = self.song_queue.pop(0)
+        self._clear_song_info()
+
+        if isinstance(next_s_data, dict):
+            self.load_audio(next_s_data["path"])
+            self.meta_panel.title_edit.setText(next_s_data.get("title", ""))
+            self.meta_panel.artist_edit.setText(next_s_data.get("artist", ""))
+            self.meta_panel.album_edit.setText(next_s_data.get("album", ""))
+            self.meta_panel.genre_edit.setText(next_s_data.get("genre", ""))
+            if next_s_data.get("charter"):
+                self.meta_panel.charter_edit.setText(next_s_data["charter"])
+        else:
+            self.load_audio(next_s_data)
+
+        self._update_queue_display()
 
     def reset_ui_after_run(self):
         self.btn_generate.setText("  GENERATE  ")
@@ -265,12 +316,9 @@ class MainWindow(QMainWindow):
     def clear_audio(self):
         self._clear_song_info()
 
-        # Check queue
         if self.song_queue:
-            next_song = self.song_queue.pop(0)
-            self._update_queue_display()
-            self.load_audio(next_song)
-            self.status_label.setText(f"Queue: Loaded {next_song.name}")
+            self._pop_next_song()
+            self.status_label.setText(f"Queue: Loaded {self.audio_path.name}")
         else:
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
@@ -289,22 +337,32 @@ class MainWindow(QMainWindow):
         files, _ = QFileDialog.getOpenFileNames(self, "Add Audio", "", "Audio (*.mp3 *.wav *.ogg *.flac)")
         if not files: return
         paths = [Path(f) for f in files]
+
+        # If nothing loaded, load first
         if not self.audio_path and paths:
             self.load_audio(paths.pop(0))
+
         self.song_queue.extend(paths)
         self._update_queue_display()
 
     def _update_queue_display(self):
         self.queue_list.clear()
         self.btn_clear_queue.setEnabled(bool(self.song_queue))
-        for i, p in enumerate(self.song_queue):
+        for i, item_data in enumerate(self.song_queue):
             item = QListWidgetItem(self.queue_list)
             wid = QWidget()
             h = QHBoxLayout(wid)
             h.setContentsMargins(4,0,4,0)
 
-            lbl = QLabel(p.name)
-            lbl.setStyleSheet("background: transparent; font-size: 11pt;")
+            if isinstance(item_data, dict):
+                name = item_data["path"].name
+                if item_data.get("title"):
+                    name = f"{item_data['title']} - {item_data.get('artist', 'Unknown')}"
+            else:
+                name = item_data.name
+
+            lbl = QLabel(name)
+            lbl.setStyleSheet("background: transparent; font-size: 11px;")
             h.addWidget(lbl, 1)
 
             btn = QToolButton()
@@ -317,6 +375,9 @@ class MainWindow(QMainWindow):
             h.addWidget(btn, 0)
             item.setSizeHint(wid.sizeHint())
             self.queue_list.setItemWidget(item, wid)
+
+        # CRITICAL FIX: Ensure button state updates when list changes
+        self._update_state()
 
     def _remove_queue_item(self, idx):
         if 0 <= idx < len(self.song_queue):
@@ -368,18 +429,51 @@ class MainWindow(QMainWindow):
         urls = e.mimeData().urls()
         audio_ext = {".mp3", ".wav", ".ogg", ".flac"}
         img_ext = {".jpg", ".png", ".jpeg"}
-        new_s = []
+
+        new_songs = []
+        cover_found = None
+
         for u in urls:
             p = Path(u.toLocalFile())
-            if p.suffix.lower() in audio_ext: new_s.append(p)
-            elif p.suffix.lower() in img_ext: self.load_cover(p)
+            if p.is_dir():
+                for f in p.rglob("*"):
+                    if f.suffix.lower() in audio_ext:
+                        new_songs.append(f)
+            else:
+                if p.suffix.lower() in audio_ext:
+                    new_songs.append(p)
+                elif p.suffix.lower() in img_ext:
+                    cover_found = p
 
-        if new_s:
-            if not self.audio_path: self.load_audio(new_s.pop(0))
-            self.song_queue.extend(new_s)
-            self._update_queue_display()
+        if cover_found:
+            self.load_cover(cover_found)
 
-    # --- Health Check / Validation Popup Logic ---
+        if not new_songs:
+            return
+
+        if len(new_songs) > 1:
+            dlg = BatchEntryDialog(new_songs, self)
+            if dlg.exec():
+                batch_data = dlg.get_data()
+                first = batch_data.pop(0)
+
+                self.load_audio(first["path"])
+                self.meta_panel.title_edit.setText(first["title"])
+                self.meta_panel.artist_edit.setText(first["artist"])
+                self.meta_panel.album_edit.setText(first["album"])
+                self.meta_panel.genre_edit.setText(first["genre"])
+                if first["charter"]: self.meta_panel.charter_edit.setText(first["charter"])
+
+                self.song_queue.extend(batch_data)
+                self._update_queue_display()
+        else:
+            p = new_songs[0]
+            if not self.audio_path:
+                self.load_audio(p)
+            else:
+                self.song_queue.append(p)
+                self._update_queue_display()
+
     def run_health_check(self, song_dir: Path) -> None:
         from gui.utils import get_python_exec, is_frozen
 
@@ -414,10 +508,16 @@ class MainWindow(QMainWindow):
         self.append_log("\n--- VALIDATION REPORT ---")
         self.append_log(full_output)
 
-        if not self.song_queue:
+        is_middle_of_batch = self._is_batch_running and bool(self.song_queue)
+
+        if not is_middle_of_batch:
             self.status_label.setText("Ready")
 
-            msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
+            if self._is_batch_running and not self.song_queue:
+                msg = f"Batch processing complete!\n\nLast Chart:\n{song_dir}"
+            else:
+                msg = f"Chart generated successfully!\n\nLocation:\n{song_dir}"
+
             if warnings:
                 msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
                 if len(warnings) > 5: msg += "\n... (check logs for more)"
@@ -426,7 +526,7 @@ class MainWindow(QMainWindow):
             icon = QMessageBox.Information if not warnings else QMessageBox.Warning
 
             def show_box():
-                self.activateWindow() # Pull to front
+                self.activateWindow()
                 mbox = QMessageBox(icon, title, msg, QMessageBox.Ok, self)
                 mbox.setMinimumWidth(450)
                 mbox.setWindowModality(Qt.ApplicationModal)

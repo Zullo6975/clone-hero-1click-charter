@@ -1,12 +1,14 @@
 from __future__ import annotations
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
-                               QGroupBox, QLabel, QPushButton, QToolButton, QCheckBox,
-                               QProgressBar, QFrame, QScrollArea, QListWidget, QStyle)
+
+from gui.panels import MetadataWidget, OutputWidget, SettingsWidget
+from gui.utils import get_font, repo_root
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
+from PySide6.QtWidgets import (QCheckBox, QFrame, QGroupBox, QHBoxLayout,
+                               QLabel, QListWidget, QProgressBar, QPushButton,
+                               QScrollArea, QSplitter, QStyle, QToolButton,
+                               QVBoxLayout, QWidget)
 
-from gui.utils import repo_root, get_font
-from gui.panels import MetadataWidget, SettingsWidget, OutputWidget
 
 class UiBuilder:
     def setup_ui(self, window):
@@ -126,11 +128,24 @@ class UiBuilder:
         # Queue
         window.grp_queue = QGroupBox("Pending Queue")
         v_q = QVBoxLayout(window.grp_queue)
+
         window.queue_list = QListWidget()
         window.queue_list.setMaximumHeight(90)
-        window.btn_clear_queue = QPushButton("Clear Queue")
+
+        # Queue Control Row
+        row_q_btns = QHBoxLayout()
+        window.btn_run_queue = QPushButton("▶ Run Queue")
+        window.btn_run_queue.setCursor(Qt.PointingHandCursor)
+        window.btn_run_queue.setToolTip("Process all songs in the queue automatically.")
+
+        window.btn_clear_queue = QPushButton("Clear")
+        window.btn_clear_queue.setCursor(Qt.PointingHandCursor)
+
+        row_q_btns.addWidget(window.btn_run_queue, 1)
+        row_q_btns.addWidget(window.btn_clear_queue, 0)
+
         v_q.addWidget(window.queue_list)
-        v_q.addWidget(window.btn_clear_queue)
+        v_q.addLayout(row_q_btns)
         layout.addWidget(window.grp_queue)
 
         # Art
@@ -196,6 +211,7 @@ class UiBuilder:
         window.btn_cancel = QPushButton("Cancel")
         window.btn_generate = QPushButton("  GENERATE  ")
         window.btn_generate.setObjectName("Primary")
+        window.btn_generate.setToolTip("Generate chart for the CURRENT song only.")
 
         lay.addWidget(window.btn_cancel)
         lay.addWidget(window.btn_generate)
