@@ -7,7 +7,7 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QCheckBox, QFrame, QGroupBox, QHBoxLayout,
                                QLabel, QListWidget, QProgressBar, QPushButton,
                                QScrollArea, QSplitter, QStyle, QToolButton,
-                               QVBoxLayout, QWidget)
+                               QVBoxLayout, QWidget, QSizePolicy)
 
 
 class UiBuilder:
@@ -18,12 +18,12 @@ class UiBuilder:
         central = QWidget()
         window.setCentralWidget(central)
 
-        # ROOT LAYOUT: Zero margins so lines touch edges
+        # ROOT LAYOUT: Zero margins so lines and splitter touch edges
         main_layout = QVBoxLayout(central)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Header (Now handles its own internal padding)
+        # Header
         self._build_header(window, main_layout)
 
         # Splitter Body
@@ -85,12 +85,11 @@ class UiBuilder:
         self._build_footer(window)
 
     def _build_header(self, window, layout):
-        # Header Container
-        w = QWidget()
-        # Header Internal Padding (Top/Left/Right=24, Bottom=12)
-        h = QHBoxLayout(w)
-        h.setContentsMargins(24, 24, 24, 12)
-        h.setAlignment(Qt.AlignCenter)
+        # 1. Content Container (with padding for text/icon)
+        content_widget = QWidget()
+        h_layout = QHBoxLayout(content_widget)
+        h_layout.setContentsMargins(24, 24, 24, 12)
+        h_layout.setAlignment(Qt.AlignCenter)
 
         icon_lbl = QLabel()
         icon_path = repo_root() / "icons" / "icon_og.png"
@@ -102,13 +101,12 @@ class UiBuilder:
         title_lbl = QLabel("CloneHero 1-Click Charter")
         title_lbl.setFont(get_font(32, True))
 
-        h.addWidget(icon_lbl)
-        h.addWidget(title_lbl)
-        layout.addWidget(w)
+        h_layout.addWidget(icon_lbl)
+        h_layout.addWidget(title_lbl)
+        layout.addWidget(content_widget)
 
-        # Header Separator Line (Full Width)
+        # 2. Separator Line (Direct child of root layout, no margins = touches edges)
         line = QFrame()
-        line.setObjectName("HeaderLine")
         line.setFixedHeight(1)
         line.setStyleSheet("background-color: #d0d0d0; border: none;")
         layout.addWidget(line)
@@ -186,19 +184,26 @@ class UiBuilder:
         # Since root layout has 0 margins, this touches left/right edges.
         window.statusBar().setStyleSheet("QStatusBar { border-top: 1px solid #d0d0d0; background: palette(window); }")
 
+        # Reset margins on the status bar itself to ensure no extra padding prevents touching
+        window.statusBar().setContentsMargins(0, 0, 0, 0)
+
         # We put the footer logic into the status bar area to keep it sticky at bottom
         footer_widget = QWidget()
         lay = QHBoxLayout(footer_widget)
-        lay.setContentsMargins(0, 5, 20, 5)
+
+        # UPDATED: Remove vertical margins (0, 0) so vertical lines touch top/bottom
+        lay.setContentsMargins(0, 0, 20, 0)
         lay.setSpacing(10)
 
         # Helper for vertical lines
         def vline():
             f = QFrame()
             f.setFrameShape(QFrame.VLine)
+            f.setFrameShadow(QFrame.Plain)
             f.setFixedWidth(1)
+            f.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
             # UPDATED: Light gray, no margins
-            f.setStyleSheet("background-color: #d0d0d0; border: none;")
+            f.setStyleSheet("background-color: #d0d0d0; border: none; margin: 0px;")
             return f
 
         # --- LEFT CONTROLS ---
