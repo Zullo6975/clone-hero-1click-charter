@@ -17,18 +17,20 @@ class UiBuilder:
         """
         central = QWidget()
         window.setCentralWidget(central)
-        main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(24, 24, 24, 24)
-        main_layout.setSpacing(24)
 
-        # Header
+        # ROOT LAYOUT: Zero margins so lines touch edges
+        main_layout = QVBoxLayout(central)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Header (Now handles its own internal padding)
         self._build_header(window, main_layout)
 
         # Splitter Body
         window.splitter = QSplitter(Qt.Horizontal)
         window.splitter.setHandleWidth(1)
         # Visual line for the splitter handle
-        # UPDATED: Light gray, no margins (touch)
+        # Light gray #d0d0d0, no margins
         window.splitter.setStyleSheet("""
             QSplitter::handle {
                 background-color: #d0d0d0;
@@ -42,16 +44,20 @@ class UiBuilder:
         window.sidebar_widget = QWidget()
         window.sidebar_widget.setMinimumWidth(340)
         window.sidebar_widget.setMaximumWidth(340)
+
+        # Sidebar Padding: Restored here since root has 0
         sidebar_layout = QVBoxLayout(window.sidebar_widget)
-        sidebar_layout.setContentsMargins(0, 0, 16, 0)
+        sidebar_layout.setContentsMargins(24, 24, 16, 24)
         sidebar_layout.setSpacing(20)
         self._build_sidebar_content(window, sidebar_layout)
 
         # MAIN PANEL (Meta, Config, Output)
         window.main_widget = QWidget()
         window.main_widget.setMinimumWidth(700)
+
+        # Main Panel Padding: Restored here
         main_inner = QVBoxLayout(window.main_widget)
-        main_inner.setContentsMargins(16, 0, 0, 0)
+        main_inner.setContentsMargins(16, 24, 24, 24)
         main_inner.setSpacing(24)
 
         window.meta_panel = MetadataWidget()
@@ -79,9 +85,11 @@ class UiBuilder:
         self._build_footer(window)
 
     def _build_header(self, window, layout):
+        # Header Container
         w = QWidget()
+        # Header Internal Padding (Top/Left/Right=24, Bottom=12)
         h = QHBoxLayout(w)
-        h.setContentsMargins(0, 0, 0, 10)
+        h.setContentsMargins(24, 24, 24, 12)
         h.setAlignment(Qt.AlignCenter)
 
         icon_lbl = QLabel()
@@ -98,11 +106,11 @@ class UiBuilder:
         h.addWidget(title_lbl)
         layout.addWidget(w)
 
-        # UPDATED: Header separator horiz (Light gray, no fixed width)
+        # Header Separator Line (Full Width)
         line = QFrame()
         line.setObjectName("HeaderLine")
         line.setFixedHeight(1)
-        line.setStyleSheet("background-color: #d0d0d0; border: none; margin: 0px;")
+        line.setStyleSheet("background-color: #d0d0d0; border: none;")
         layout.addWidget(line)
 
     def _build_sidebar_content(self, window, layout):
@@ -175,7 +183,8 @@ class UiBuilder:
 
     def _build_footer(self, window):
         # UPDATED: Footer Separator Horiz (Top border on status bar)
-        window.statusBar().setStyleSheet("QStatusBar { border-top: 1px solid #d0d0d0; }")
+        # Since root layout has 0 margins, this touches left/right edges.
+        window.statusBar().setStyleSheet("QStatusBar { border-top: 1px solid #d0d0d0; background: palette(window); }")
 
         # We put the footer logic into the status bar area to keep it sticky at bottom
         footer_widget = QWidget()
@@ -188,8 +197,8 @@ class UiBuilder:
             f = QFrame()
             f.setFrameShape(QFrame.VLine)
             f.setFixedWidth(1)
-            # UPDATED: Vertical divs in the footer (Light gray, no margins/touch)
-            f.setStyleSheet("background-color: #d0d0d0; border: none; margin: 0px;")
+            # UPDATED: Light gray, no margins
+            f.setStyleSheet("background-color: #d0d0d0; border: none;")
             return f
 
         # --- LEFT CONTROLS ---
