@@ -6,8 +6,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QCheckBox, QFrame, QGroupBox, QHBoxLayout,
                                QLabel, QListWidget, QProgressBar, QPushButton,
-                               QScrollArea, QSplitter, QStyle, QToolButton,
-                               QVBoxLayout, QWidget, QSizePolicy)
+                               QScrollArea, QSizePolicy, QSplitter, QStyle,
+                               QToolButton, QVBoxLayout, QWidget)
 
 
 class UiBuilder:
@@ -186,6 +186,8 @@ class UiBuilder:
 
         # Reset margins on the status bar itself to ensure no extra padding prevents touching
         window.statusBar().setContentsMargins(0, 0, 0, 0)
+
+        window.statusBar().setSizeGripEnabled(False)
 
         # We put the footer logic into the status bar area to keep it sticky at bottom
         footer_widget = QWidget()
