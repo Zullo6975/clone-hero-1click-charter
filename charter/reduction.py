@@ -97,8 +97,9 @@ def reduce_to_hard(expert_notes: list, min_gap_ms: int = 120) -> list:
 def reduce_to_medium(hard_notes: list, min_gap_ms: int = 220) -> list:
     """
     Hard -> Medium
-    - No Chords.
+    - Allow Chords (Max 2, Throttled).
     - Limits Orange notes to MAX 5.
+    - Enforces density drop from Hard.
     """
     base = _map_to_target(hard_notes, "Medium")
     if not base: return []
@@ -111,12 +112,61 @@ def reduce_to_medium(hard_notes: list, min_gap_ms: int = 220) -> list:
 
     # 1. Filter for time (density)
     for n in base:
-        if abs(n.start - last_start) < 0.05: continue # No chords
+        # Allow chords (same start time)
+        if abs(n.start - last_start) < 0.01:
+            filtered.append(n)
+            continue
+
         if n.start - last_start >= min_gap_sec:
             filtered.append(n)
             last_start = n.start
 
-    # 2. Orange Cap Logic & Scattering
+    # 2. Handle Chords (Max 2) & Throttle
+    # Group by time
+    chord_groups = {}
+    for n in filtered:
+        t_key = round(n.start, 3)
+        chord_groups.setdefault(t_key, []).append(n)
+
+    sorted_times = sorted(chord_groups.keys())
+    grouped_events = []
+    last_chord_time = -999.0
+
+    for t in sorted_times:
+        chord = chord_groups[t]
+        # Sort by pitch so if we drop one, we usually keep the lowest (melody/root)
+        chord.sort(key=lambda x: x.pitch)
+
+        if len(chord) > 2:
+            chord = chord[:2]
+
+        # Chord Throttling: Enforce 1.5s cooldown between chords
+        if len(chord) == 2:
+            if t - last_chord_time < 1.5:
+                # Downgrade to single note (lowest pitch)
+                chord = [chord[0]]
+            else:
+                last_chord_time = t
+
+        grouped_events.append(chord)
+
+    # 3. Density Check (Force Difference from Hard)
+    # Re-calc total note count
+    current_count = sum(len(c) for c in grouped_events)
+
+    if current_count > len(hard_notes) * 0.85:
+        # Too similar to Hard. Aggressively thin out events.
+        # Remove every 4th event (rhythmic gap)
+        thinned_events = []
+        for i, ev in enumerate(grouped_events):
+            if i % 4 != 0:
+                thinned_events.append(ev)
+        grouped_events = thinned_events
+
+    # Flatten back to list
+    filtered = [n for ev in grouped_events for n in ev]
+
+    # 4. Orange Cap Logic & Scattering
     orange_indices = []
     base_pitch = 72 # Medium starts at 72
 
@@ -125,7 +175,7 @@ def reduce_to_medium(hard_notes: list, min_gap_ms: int = 220) -> list:
         if lane == 4: # Orange
             orange_indices.append(i)
 
-    # Keep 5 random ones, scatter the rest to ANY lower lane (not just blue)
+    # Keep 5 random ones, scatter the rest to ANY lower lane
     if len(orange_indices) > 5:
         to_keep = set(random.sample(orange_indices, 5))
         for i in orange_indices:
@@ -140,7 +190,7 @@ def reduce_to_medium(hard_notes: list, min_gap_ms: int = 220) -> list:
 def reduce_to_easy(medium_notes: list, min_gap_ms: int = 450) -> list:
     """
     Medium -> Easy
-    - No Chords.
+    - Allow Chords (Max 2, Adjacent Only, Throttled).
     - Compresses 4 lanes to 3.
     """
     base = _map_to_target(medium_notes, "Easy")
@@ -153,12 +203,49 @@ def reduce_to_easy(medium_notes: list, min_gap_ms: int = 450) -> list:
     base.sort(key=lambda x: x.start)
 
     for n in base:
-        # No chords
-        if abs(n.start - last_start) < 0.05:
+        # Allow chords
+        if abs(n.start - last_start) < 0.01:
+            filtered.append(n)
             continue
 
         if n.start - last_start >= min_gap_sec:
             filtered.append(n)
             last_start = n.start
 
-    return filtered
+    # Handle Chords: Max 2, Adjacent Only, Throttled
+    chord_groups = {}
+    for n in filtered:
+        t_key = round(n.start, 3)
+        chord_groups.setdefault(t_key, []).append(n)
+
+    base_pitch = 60 # Easy base
+    final_notes = []
+
+    sorted_times = sorted(chord_groups.keys())
+    last_chord_time = -999.0
+
+    for t in sorted_times:
+        chord = chord_groups[t]
+        chord.sort(key=lambda x: x.pitch)
+
+        if len(chord) > 2:
+            chord = chord[:2]
+
+        # Check adjacency for 2-note chords
+        if len(chord) == 2:
+            l0 = chord[0].pitch - base_pitch
+            l1 = chord[1].pitch - base_pitch
+            # If gap > 1 (e.g. 0 and 2), keep only the lower note
+            if abs(l1 - l0) > 1:
+                chord = [chord[0]]
+
+        # Chord Throttling: Enforce 3.0s cooldown for Easy
+        if len(chord) == 2:
+            if t - last_chord_time < 3.0:
+                 chord = [chord[0]]
+            else:
+                 last_chord_time = t
+
+        final_notes.extend(chord)
+
+    return final_notes

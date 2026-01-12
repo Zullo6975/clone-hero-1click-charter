@@ -251,7 +251,6 @@ def _rename_sections_based_on_density(
     avg_nps = len(note_times) / total_duration if total_duration > 0 else 0.0
 
     # 1. Density Threshold: Only consider sections much faster than average
-    # FIXED: Tightened to avoid false positives (was 1.45/3.5)
     solo_nps_threshold = max(avg_nps * 1.3, 3.0)
 
     new_sections = []
@@ -275,17 +274,27 @@ def _rename_sections_based_on_density(
         pitch_std = np.std(sec_notes) if count > 1 else 0.0
 
         is_solo = False
+        is_bridge = (s.name == "Bridge")
 
         # Criteria:
-        # - Must be fast (High NPS)
-        # - Must move around (High Std Dev > 4.0 semitones)
-        # - Must not be super short (Duration > 10s)
-        # - Name shouldn't already be Intro/Outro
+        # - Must be fast (High NPS) OR be a Bridge with Moderate NPS
+        # - Must move around (High Std Dev)
+
+        # Standard Detection
         if (section_nps > solo_nps_threshold
             and pitch_std > 3.5
             and duration > 10.0
             and s.name not in ["Intro", "Outro"]):
             is_solo = True
+
+        # Bridge Rescue: Bridges are often melodic solos
+        # Lower thresholds if it's already identified structurally as a Bridge
+        if is_bridge:
+             # Just slightly above average is fine for a bridge solo
+             relaxed_nps = max(avg_nps * 1.15, 2.5)
+             # Allow more melodic playing (lower variance)
+             if section_nps > relaxed_nps and pitch_std > 2.5 and duration > 8.0:
+                 is_solo = True
 
         if is_solo:
             new_sections.append(asdict(s) | {"name": "Guitar Solo"})

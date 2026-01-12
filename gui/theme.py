@@ -143,6 +143,8 @@ class ThemeManager:
                 background-color: palette(button);
                 color: palette(text);
                 font-size: 11pt; /* Slightly smaller font */
+                min-width: 75px;
+                max-width: 75px;
             }}
             QPushButton#Primary:hover {{
                 border: 1px solid palette(text);

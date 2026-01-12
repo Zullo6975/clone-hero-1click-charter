@@ -239,7 +239,7 @@ class MainWindow(QMainWindow):
         if not cfg: return
 
         # UI Lock
-        self.btn_generate.setText("Generating....")
+        self.btn_generate.setText("Generating...")
         self.btn_generate.setEnabled(False)
         self.btn_run_queue.setEnabled(False)
         self.btn_cancel.setEnabled(True)
@@ -321,7 +321,7 @@ class MainWindow(QMainWindow):
         self._update_queue_display()
 
     def reset_ui_after_run(self):
-        self.btn_generate.setText("  GENERATE  ")
+        self.btn_generate.setText("GENERATE")
         self.progress_bar.setVisible(False)
         self._update_state()
 
@@ -460,6 +460,7 @@ class MainWindow(QMainWindow):
         self.cover_path = None
         self.cover_preview.setPixmap(QPixmap())
         self.cover_preview.setText("Drag Art Here")
+        self.cover_preview.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
 
     def pick_output_dir(self):
         p = QFileDialog.getExistingDirectory(self, "Output Folder")

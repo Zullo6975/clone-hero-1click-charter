@@ -70,7 +70,7 @@ class SettingsWidget(QGroupBox):
         main_layout = QVBoxLayout(self)
 
         self.chk_adv = QCheckBox("Show Tuning Controls")
-        self.chk_adv.setStyleSheet("font-weight: bold; margin-bottom: 6px;")
+        self.chk_adv.setStyleSheet("font-weight: bold; margin-bottom: 6px; font-size: 11pt;")
         self.chk_adv.setCursor(Qt.PointingHandCursor)
         self.chk_adv.toggled.connect(self.toggle_advanced)
         main_layout.addWidget(self.chk_adv)

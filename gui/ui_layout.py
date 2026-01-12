@@ -102,7 +102,7 @@ class UiBuilder:
         line = QFrame()
         line.setObjectName("HeaderLine")
         line.setFixedHeight(1)
-        line.setStyleSheet("background-color: #d0d0d0; border: none;")
+        line.setStyleSheet("background-color: #d0d0d0; border: none; margin: 0px;")
         layout.addWidget(line)
 
     def _build_sidebar_content(self, window, layout):
@@ -157,7 +157,7 @@ class UiBuilder:
         window.cover_preview = QLabel("Drag Art Here")
         window.cover_preview.setAlignment(Qt.AlignCenter)
         window.cover_preview.setFixedSize(280, 280)
-        window.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic;")
+        window.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic; font-size: 11pt;")
 
         window.btn_pick_cover = QPushButton("Image...")
         window.btn_clear_cover = QToolButton()
@@ -196,6 +196,7 @@ class UiBuilder:
         lay.addWidget(vline())
 
         window.chk_dark = QCheckBox("Dark Mode")
+        window.chk_dark.setStyleSheet("font-size: 11pt;")
         window.chk_dark.setChecked(window.dark_mode)
         lay.addWidget(window.chk_dark)
 
@@ -216,7 +217,7 @@ class UiBuilder:
         lay.addWidget(vline())
 
         window.btn_cancel = QPushButton("Cancel")
-        window.btn_generate = QPushButton("  GENERATE  ")
+        window.btn_generate = QPushButton("GENERATE")
         window.btn_generate.setObjectName("Primary")
         window.btn_generate.setToolTip("Generate chart for the CURRENT song only.")
 
@@ -231,7 +232,7 @@ class UiBuilder:
         s_lay.setContentsMargins(20, 0, 0, 0)
 
         window.status_label = QLabel("Ready")
-        window.status_label.setStyleSheet("font-weight: bold;")
+        window.status_label.setStyleSheet("font-weight: bold; font-size: 11pt;")
 
         window.progress_bar = QProgressBar()
         window.progress_bar.setRange(0, 0)
