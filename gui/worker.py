@@ -100,7 +100,7 @@ class GenerationWorker(QObject):
         self._proc.start(full_cmd[0], full_cmd[1:])
 
     def _build_args(self, cfg: RunConfig, out_path: Path) -> list[str]:
-        return [
+        args = [
             "--audio", str(cfg.audio), "--out", str(out_path),
             "--title", cfg.title, "--artist", cfg.artist,
             "--album", cfg.album, "--genre", cfg.genre,
@@ -116,6 +116,10 @@ class GenerationWorker(QObject):
             "--easy-gap-ms", str(cfg.easy_gap_ms),
             "--fetch-metadata" if cfg.fetch_metadata else ""
         ]
+        if cfg.write_chart:
+            args.append("--write-chart")
+
+        return args
 
     def _on_stdout(self):
         if self._proc:

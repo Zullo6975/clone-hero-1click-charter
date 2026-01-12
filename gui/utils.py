@@ -1,11 +1,13 @@
 from __future__ import annotations
+
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtWidgets import QLabel, QApplication
-from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import QApplication, QLabel
+
 
 def is_frozen() -> bool:
     return getattr(sys, 'frozen', False)
@@ -28,6 +30,7 @@ def form_label(text: str, required: bool = False, align=Qt.AlignCenter | Qt.Alig
     lbl = QLabel(txt)
     lbl.setAlignment(align)
     lbl.setMinimumWidth(110)
+    lbl.setFont(get_font(11))
     return lbl
 
 def get_font(size: int = 11, bold: bool = False) -> QFont:
@@ -62,6 +65,8 @@ class RunConfig:
     hard_gap_ms: int
     med_gap_ms: int
     easy_gap_ms: int
+
+    write_chart: bool = False
 
     charter: str = "Zullo7569"
     fetch_metadata: bool = True

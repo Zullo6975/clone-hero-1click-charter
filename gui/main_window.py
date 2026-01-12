@@ -359,6 +359,8 @@ class MainWindow(QMainWindow):
             hard_gap_ms=sp.spin_hard_gap.value(),
             med_gap_ms=sp.spin_med_gap.value(),
             easy_gap_ms=sp.spin_easy_gap.value(),
+            write_chart=sp.chk_export_chart.isChecked(),
+
             fetch_metadata=True
         )
 
@@ -369,7 +371,7 @@ class MainWindow(QMainWindow):
     def load_audio(self, path: Path):
         self.audio_path = path
         self.audio_label.setText(path.name)
-        self.audio_label.setStyleSheet("color: palette(text); font-weight: bold;")
+        self.audio_label.setStyleSheet("color: palette(text); font-weight: bold; font-size: 11pt;")
         if not self._title_user_edited and not self.meta_panel.title_edit.text().strip():
             self.meta_panel.title_edit.setText(path.stem)
         self._update_state()
