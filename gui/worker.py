@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QProcess, Signal
 
-from gui.utils import get_python_exec, repo_root, RunConfig
+from gui.utils import get_python_exec, repo_root, RunConfig, is_frozen
 
 class GenerationWorker(QObject):
     """
@@ -66,7 +66,8 @@ class GenerationWorker(QObject):
     def validate(self, song_dir: Path):
         """Runs the validator tool independently"""
         py_exec = get_python_exec()
-        if "frozen" in sys.argv[0]:
+
+        if is_frozen():
              cmd_base = [str(py_exec), "--internal-cli"]
         else:
              cmd_base = [str(py_exec), "-m", "charter.cli"]
@@ -79,7 +80,8 @@ class GenerationWorker(QObject):
 
     def _run_process(self, args: list[str]):
         py_exec = get_python_exec()
-        if "frozen" in sys.argv[0]:
+
+        if is_frozen():
             cmd = [str(py_exec), "--internal-cli"]
         else:
             cmd = [str(py_exec), "-m", "charter.cli"]
@@ -88,7 +90,8 @@ class GenerationWorker(QObject):
 
         self._proc = QProcess(self)
         self._proc.setProcessChannelMode(QProcess.SeparateChannels)
-        if "frozen" not in sys.argv[0]:
+
+        if not is_frozen():
             self._proc.setWorkingDirectory(str(repo_root()))
 
         self._proc.readyReadStandardOutput.connect(self._on_stdout)

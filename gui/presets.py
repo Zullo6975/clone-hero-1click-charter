@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+# "Standard" is now much harder to serve as a proper Expert baseline.
 DEFAULT_PRESETS: dict[str, dict[str, float | int]] = {
     "1) Casual": {
         "max_nps": 9.0, "min_gap_ms": 75, "sustain": 40, "chord": 15,
@@ -27,14 +28,19 @@ def get_user_preset_path() -> Path:
     return p
 
 def load_all_presets() -> dict[str, dict[str, float | int]]:
+    # Start with defaults
     merged = DEFAULT_PRESETS.copy()
+
     user_path = get_user_preset_path()
     if user_path.exists():
         try:
             user_data = json.loads(user_path.read_text(encoding="utf-8"))
-            merged.update(user_data)
+            # Filter out any user presets that try to overwrite defaults
+            clean_user_data = {k: v for k, v in user_data.items() if k not in DEFAULT_PRESETS}
+            merged.update(clean_user_data)
         except Exception:
             pass # Ignore corrupted file
+
     return merged
 
 def save_user_preset(name: str, data: dict[str, float | int]) -> None:

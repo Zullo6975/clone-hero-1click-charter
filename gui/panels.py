@@ -159,16 +159,19 @@ class SettingsWidget(QGroupBox):
         self.max_nps_spin.setSingleStep(0.1)
         self.max_nps_spin.setValue(13.0)
         self.max_nps_spin.setSuffix(" NPS")
+        self.max_nps_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.PlusMinus) # Arrows Enabled
 
         self.min_gap_spin = SafeSpinBox()
         self.min_gap_spin.setRange(10, 1000)
         self.min_gap_spin.setSingleStep(10)
         self.min_gap_spin.setValue(55)
         self.min_gap_spin.setSuffix(" ms")
+        self.min_gap_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.PlusMinus) # Arrows Enabled
 
         self.seed_spin = SafeSpinBox()
         self.seed_spin.setRange(0, 999999)
         self.seed_spin.setValue(0)
+        self.seed_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.PlusMinus) # Arrows Enabled
 
         self.chord_slider = SafeSlider(Qt.Horizontal)
         self.chord_slider.setRange(0, 50)
@@ -183,12 +186,14 @@ class SettingsWidget(QGroupBox):
         self.sustain_gap_spin.setSingleStep(0.1)
         self.sustain_gap_spin.setValue(0.2)
         self.sustain_gap_spin.setSuffix(" s")
+        self.sustain_gap_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.PlusMinus) # Arrows Enabled
 
         self.sustain_buffer_spin = SafeDoubleSpinBox()
         self.sustain_buffer_spin.setRange(0.05, 0.5)
         self.sustain_buffer_spin.setSingleStep(0.05)
         self.sustain_buffer_spin.setValue(0.15)
         self.sustain_buffer_spin.setSuffix(" s")
+        self.sustain_buffer_spin.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.PlusMinus) # Arrows Enabled
 
         form.addRow(form_label("Generation Mode"), row_mode)
         form.addRow(form_label("Max Notes/Sec"), self.max_nps_spin)
@@ -222,8 +227,8 @@ class SettingsWidget(QGroupBox):
 
         # Helper to force arrows and set props
         def config_spin(w_ms, w_nps):
-            w_ms.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
-            w_nps.setButtonSymbols(QAbstractSpinBox.UpDownArrows)
+            w_ms.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.PlusMinus) # Arrows Enabled
+            w_nps.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.PlusMinus) # Arrows Enabled
             w_nps.setToolTip("Approximate max notes per second")
             self._wire_sync(w_ms, w_nps)
 

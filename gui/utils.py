@@ -19,7 +19,11 @@ def get_python_exec() -> str | Path:
     if is_frozen(): return sys.executable
     return repo_root() / ".venv" / "bin" / "python"
 
-def form_label(text: str, required: bool = False, align=Qt.AlignRight | Qt.AlignVCenter) -> QLabel:
+def form_label(text: str, required: bool = False, align=Qt.AlignCenter | Qt.AlignVCenter) -> QLabel:
+    """
+    Creates a standardized label for forms.
+    UPDATED: Default alignment is now Center (was Right).
+    """
     txt = f"{text} <span style='color:#ff4444;'>*</span>" if required else text
     lbl = QLabel(txt)
     lbl.setAlignment(align)

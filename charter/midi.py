@@ -23,7 +23,8 @@ from charter.reduction import reduce_to_hard, reduce_to_medium, reduce_to_easy
 def _filter_onsets(candidates: list, duration: float, cfg: ChartConfig) -> list:
     """Selects onsets based on density settings."""
     window = 4.0
-    min_gap = max(0.05, cfg.min_gap_ms / 1000.0)
+    # FIXED: Lowered floor from 0.05 (50ms) to 0.02 (20ms) to allow bursts up to 50 NPS
+    min_gap = max(0.02, cfg.min_gap_ms / 1000.0)
 
     selected = []
     buckets = {}
@@ -99,7 +100,9 @@ def _assign_lane(
 
     weights = []
     for lane in options:
-        base_w = 0.05 if lane == 4 else 1.0
+        # FIXED: Increased Orange weight from 0.05 to 0.20 for more Expert feel
+        base_w = 0.20 if lane == 4 else 1.0
+
         dist = abs(lane - prev_lane)
         if dist == 0: w = 2.0 * (1.0 - cfg.movement_bias)
         elif dist == 1: w = 2.0

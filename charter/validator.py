@@ -11,10 +11,19 @@ import mido  # type: ignore
 
 # ---- Your chart conventions ----
 TRACK_NAME = "PART GUITAR"
-# We only validate against Expert ranges now for the baseline
-LANE_PITCHES = {96, 97, 98, 99, 100}
+
+# Define ranges for all difficulties
+ALL_DIFFS = {
+    "Expert": range(96, 101), # 96-100
+    "Hard":   range(84, 89),  # 84-88
+    "Medium": range(72, 77),  # 72-76
+    "Easy":   range(60, 65)   # 60-64
+}
+
+# Legacy for validation checks (defaults to Expert)
+LANE_PITCHES = set(ALL_DIFFS["Expert"])
 ORANGE_PITCH = 100
-DEFAULT_MIN_NOTE_START = 0.5 # Relaxed from 1.0
+DEFAULT_MIN_NOTE_START = 0.5
 DEFAULT_SP_PITCH = 116
 
 
@@ -232,7 +241,7 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
         warnings.append(f"No Star Power notes found (expected SP pitch={sp_pitch}).")
 
     if orange_notes > 0:
-        warnings.append(f"{orange_notes} orange notes found!")
+        pass # Warning removed, seeing orange notes is now expected/good!
 
     sections, track_loc = _parse_sections(notes_mid, pm)
     if not sections:
@@ -261,60 +270,68 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
         print('No "PART GUITAR" found to summarize.')
         return
 
-    lane_note_starts: list[float] = []
+    # Gather data per difficulty
+    stats_by_diff = {
+        name: {"notes": 0, "chords": 0, "lanes": {0:0, 1:0, 2:0, 3:0, 4:0}}
+        for name in ALL_DIFFS
+    }
+
+    # Pre-calc chords per diff
+    starts_by_diff = {name: [] for name in ALL_DIFFS}
+
     sp_starts: list[float] = []
     sp_ends: list[float] = []
 
-    # Map for Expert Difficulty (96-100)
-    lane_pitch_counts = {96: 0, 97: 0, 98: 0, 99: 0, 100: 0}
-
     for n in guitar.notes:
-        if n.pitch in LANE_PITCHES:
-            lane_note_starts.append(float(n.start))
-            if n.pitch in lane_pitch_counts:
-                lane_pitch_counts[n.pitch] += 1
-        elif n.pitch == sp_pitch:
+        p = int(n.pitch)
+
+        # Check Star Power
+        if p == sp_pitch:
             sp_starts.append(float(n.start))
             sp_ends.append(float(n.end))
+            continue
 
-    chords_est = _estimate_chords(lane_note_starts)
-    total_lane = len(lane_note_starts)
+        # Check Difficulties
+        for name, r in ALL_DIFFS.items():
+            if p in r:
+                stats = stats_by_diff[name]
+                stats["notes"] += 1
+                lane_idx = p - r.start # 96->0, 97->1, etc
+                if lane_idx in stats["lanes"]:
+                    stats["lanes"][lane_idx] += 1
+                starts_by_diff[name].append(float(n.start))
+                break
+
+    # Calculate chords for each
+    for name in ALL_DIFFS:
+        stats_by_diff[name]["chords"] = _estimate_chords(starts_by_diff[name])
+
+    print("\n--- CHART SUMMARY ---")
+    print(f"Folder: {song_dir}")
+    print("\nPART GUITAR Stats:")
+
+    # Print table header
+    print(f"  {'Difficulty':<10} | {'Notes':<6} | {'Chords':<6} | {'G':<4} {'R':<4} {'Y':<4} {'B':<4} {'O':<4}")
+    print("  " + "-"*55)
+
+    # Print rows (Expert -> Hard -> Med -> Easy)
+    for name in ["Expert", "Hard", "Medium", "Easy"]:
+        s = stats_by_diff[name]
+        l = s["lanes"]
+        print(f"  {name:<10} | {s['notes']:<6} | {s['chords']:<6} | {l[0]:<4} {l[1]:<4} {l[2]:<4} {l[3]:<4} {l[4]:<4}")
+
+    sp_phrases = _group_sp_phrases(sp_starts, sp_ends, gap_join_sec=0.45)
+    print(f"\nSTAR POWER: {len(sp_phrases)} phrases")
+    if sp_phrases:
+        for i, (s, e) in enumerate(sp_phrases, 1):
+            print(f"    {i:02d}. {s:7.2f}s -> {e:7.2f}s  (len {e - s:5.2f}s)")
 
     sections, track_loc = _parse_sections(notes_mid, pm)
-    sp_phrases = _group_sp_phrases(sp_starts, sp_ends, gap_join_sec=0.45)
+    print(f"\nSECTIONS:   {len(sections)} markers (in {track_loc})")
 
-    print("\n--- SUMMARY (Expert Difficulty) ---")
-    print(f"Folder: {song_dir}")
-    print("\nPART GUITAR:")
-    print(f"  Lane notes: {total_lane}")
-    print(f"  Chords (est): {chords_est}")
-    print("  Lane counts:")
-    print(f"    Green(96):  {lane_pitch_counts[96]}")
-    print(f"    Red(97):    {lane_pitch_counts[97]}")
-    print(f"    Yellow(98): {lane_pitch_counts[98]}")
-    print(f"    Blue(99):   {lane_pitch_counts[99]}")
-    print(f"    Orange(100): {lane_pitch_counts[100]}")
-
-    print("\nSTAR POWER:")
-    print(f"  Phrases:  {len(sp_phrases)}")
-    if sp_phrases:
-        for i, (s, e) in enumerate(sp_phrases[:12], 1):
-            print(f"    {i:02d}. {s:7.2f}s -> {e:7.2f}s  (len {e - s:5.2f}s)")
-        if len(sp_phrases) > 12:
-            print(f"    ...and {len(sp_phrases) - 12} more")
-
-    print(f"\nSECTIONS (Found in {track_loc}):")
-    print(f"  Markers: {len(sections)}")
     if sections:
-        for i, (name, t) in enumerate(sections[:18], 1):
+        for i, (name, t) in enumerate(sections, 1):
             print(f"    {i:02d}. {t:7.2f}s  {name}")
-        if len(sections) > 18:
-            print(f"    ...and {len(sections) - 18} more")
-
-    if lane_note_starts:
-        starts = sorted(lane_note_starts)
-        print("\nTIMELINE (lane note starts):")
-        print(f"  First: {starts[0]:.2f}s   Median: {starts[len(starts)//2]:.2f}s   Last: {starts[-1]:.2f}s")
 
 
 def validate_chart_file(song_dir: Path, summary_only: bool = False):

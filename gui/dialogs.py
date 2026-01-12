@@ -131,12 +131,12 @@ class SupportDialog(QDialog):
 
         lbl = QLabel("Having trouble with a chart? Found a bug?")
         lbl.setWordWrap(True)
-        lbl.setStyleSheet("font-size: 11pt; font-weight: bold;")
+        lbl.setStyleSheet("font-size: 12pt; font-weight: bold;")
         lbl.setAlignment(Qt.AlignCenter)
 
         sub = QLabel("We're happy to help. Please check the docs or send us a message.")
         sub.setWordWrap(True)
-        sub.setStyleSheet("color: palette(disabled-text);")
+        sub.setStyleSheet("color: palette(disabled-text); font-size: 11pt;")
         sub.setAlignment(Qt.AlignCenter)
 
         # Center buttons and limit width
@@ -182,7 +182,7 @@ class SupportDialog(QDialog):
         )
         txt.setWordWrap(True)
         txt.setAlignment(Qt.AlignCenter)
-        txt.setStyleSheet("line-height: 1.4;")
+        txt.setStyleSheet("line-height: 1.4; font-size: 11pt;")
 
         btn_venmo = QPushButton("💙 Tip with Venmo")
         btn_venmo.setCursor(Qt.PointingHandCursor)

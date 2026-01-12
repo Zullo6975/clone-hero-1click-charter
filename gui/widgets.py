@@ -45,11 +45,12 @@ class LogWindow(QWidget):
         super().__init__()
         self.setWindowTitle("Logs")
         self.resize(700, 350)
+        self.setFixedWidth(700)
         layout = QVBoxLayout(self)
 
         self.text_edit = QTextEdit()
         self.text_edit.setReadOnly(True)
-        self.text_edit.setMinimumSize(700, 350)
+        self.text_edit.setFixedWidth(676)
 
         mono_font = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         mono_font.setPointSize(11)

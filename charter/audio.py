@@ -1,100 +1,99 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 
-import librosa  # type: ignore
-import numpy as np  # type: ignore
-from pydub import AudioSegment # type: ignore
+import librosa # type: ignore
+import numpy as np # type: ignore
 
+from gui.utils import repo_root, is_frozen
 
-@dataclass(frozen=True)
-class OnsetCandidate:
-    t: float          # seconds
-    strength: float   # relative strength
+# We bundle ffmpeg/ffprobe in the 'bin' folder for standalone builds
+def get_bin_path(tool_name: str) -> str:
+    if is_frozen():
+        base = Path(sys._MEIPASS)
+    else:
+        # Dev mode: look in /bin relative to this file
+        base = Path(__file__).resolve().parents[1]
 
+    bin_dir = base / "bin"
+    ext = ".exe" if sys.platform == "win32" else ""
+    exe = bin_dir / (tool_name + ext)
 
-def detect_onsets(audio_path: Path, *, hop_length: int = 512) -> list[OnsetCandidate]:
-    """
-    Detect onset candidates with relative strength using librosa.
-    """
-    y, sr = librosa.load(str(audio_path), sr=None, mono=True)
+    if exe.exists():
+        return str(exe)
 
-    oenv = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop_length)
-    frames = librosa.onset.onset_detect(
-        onset_envelope=oenv,
-        sr=sr,
-        hop_length=hop_length,
-        units="frames",
-        backtrack=False,
-    )
+    # Fallback to system path
+    return tool_name
 
-    times = librosa.frames_to_time(frames, sr=sr, hop_length=hop_length)
+FFMPEG_BIN = get_bin_path("ffmpeg")
+FFPROBE_BIN = get_bin_path("ffprobe")
 
-    strengths = []
-    for f in frames:
-        strengths.append(float(oenv[f]) if 0 <= f < len(oenv) else 0.0)
+@dataclass
+class Onset:
+    t: float
+    strength: float
 
-    return [OnsetCandidate(t=float(t), strength=s) for t, s in zip(times, strengths)]
-
-
-def estimate_pitches(audio_path: Path, times: list[float]) -> list[float | None]:
-    """
-    Estimates pitch only in the guitar frequency range (E2 to C6).
-    """
-    if not times:
-        return []
-
-    y, sr = librosa.load(str(audio_path), sr=None, mono=True)
-
-    f0, _, _ = librosa.pyin(
-        y,
-        fmin=librosa.note_to_hz('E2'), # was C1
-        fmax=librosa.note_to_hz('C6'), # was C7
-        sr=sr,
-        frame_length=4096
-    )
-
-    frame_indices = librosa.time_to_frames(times, sr=sr, hop_length=1024)
-
-    pitches = []
-    for idx in frame_indices:
-        if 0 <= idx < len(f0):
-            val = f0[idx]
-            if np.isnan(val):
-                pitches.append(None)
-            else:
-                pitches.append(float(val))
-        else:
-            pitches.append(None)
-
-    return pitches
-
-def normalize_and_save(src: Path, dst: Path, target_dbfs: float = -14.0) -> None:
-    """
-    Normalizes audio to a target average loudness (dBFS) and saves as MP3.
-    Includes a peak limiter to prevent clipping.
-    """
+def check_ffmpeg() -> bool:
     try:
-        # Load audio (pydub auto-detects format)
-        audio = AudioSegment.from_file(str(src))
-        
-        # Calculate gain needed to hit target average
-        change_needed = target_dbfs - audio.dBFS
-        normalized = audio.apply_gain(change_needed)
-        
-        # Safety Check: If peak is > -0.5 dB, limit it down
-        # (This prevents clipping on loud tracks)
-        if normalized.max_dBFS > -0.5:
-            safety_reduction = -0.5 - normalized.max_dBFS
-            normalized = normalized.apply_gain(safety_reduction)
+        subprocess.run([FFMPEG_BIN, "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except Exception:
+        return False
 
-        # Export as standard 192k MP3 for Clone Hero
-        normalized.export(str(dst), format="mp3", bitrate="192k")
-        
-    except Exception as e:
-        print(f"WARNING: Audio normalization failed ({e}). Using raw copy.")
-        # Fallback to simple copy if user doesn't have ffmpeg installed
-        if src.resolve() != dst.resolve():
-            shutil.copy2(src, dst)
+def normalize_and_save(src: Path, dest: Path) -> None:
+    # 1. Loudness Normalization (EBU R128 target -14 LUFS)
+    # 2. Convert to MP3
+    cmd = [
+        FFMPEG_BIN, "-y", "-i", str(src),
+        "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+        "-codec:a", "libmp3lame", "-qscale:a", "2",
+        str(dest)
+    ]
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+def detect_onsets(audio_path: Path) -> list[Onset]:
+    y, sr = librosa.load(str(audio_path), sr=None, mono=True)
+
+    # FIXED: Increased sensitivity (lower delta = more notes) to fix "Expert feels slow"
+    # delta 0.06 -> 0.03 catches roughly 2x more rhythmic events
+    onsets = librosa.onset.onset_detect(
+        y=y, sr=sr, units='time', delta=0.03, wait=1, pre_max=3, post_max=3, post_avg=3
+    )
+
+    onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+    times = librosa.times_like(onset_env, sr=sr)
+
+    res = []
+    for t in onsets:
+        idx = np.searchsorted(times, t)
+        if idx < len(onset_env):
+            res.append(Onset(t=float(t), strength=float(onset_env[idx])))
+
+    return res
+
+def estimate_pitches(audio_path: Path, times: list[float]) -> list[float]:
+    if not times: return []
+    y, sr = librosa.load(str(audio_path), sr=None, mono=True)
+    pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
+
+    out = []
+    t_map = librosa.times_like(pitches, sr=sr)
+
+    for t in times:
+        idx = np.searchsorted(t_map, t)
+        if idx >= len(t_map): idx = len(t_map) - 1
+
+        col = pitches[:, idx]
+        mags = magnitudes[:, idx]
+        best_idx = mags.argmax()
+
+        p = col[best_idx]
+        if p > 0:
+            out.append(float(p))
+        else:
+            out.append(0.0)
+
+    return out
