@@ -141,6 +141,8 @@ run-dist:
 	@dist/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)
 
 # ---- convenience ----
+full: package run-dist
+
 open-out:
 	open "$(dir $(OUT))" 2>/dev/null || true
 
