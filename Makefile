@@ -1,66 +1,75 @@
-.PHONY: venv deps install reinstall help run run-real run-dummy gui doctor test lint clean open-out build distcheck pipx-install package icons run-dist
+.PHONY: venv deps install reinstall help run run-real run-dummy gui doctor test lint clean clean-all build distcheck pipx-install package icons run-dist full
 
-# ---- Python selection (macOS-friendly) ----
-PY ?= python3
-VENV := .venv
-BIN := $(VENV)/bin
-PIP := $(BIN)/pip
-PYTHON := $(BIN)/python
-
-# ---- Packaging Config ----
-APP_NAME := 1ClickCharter
+# -----------------------------------------------------------------------------
+# 1. PROJECT CONFIGURATION
+# -----------------------------------------------------------------------------
+APP_NAME     := 1ClickCharter
 ENTRY_SCRIPT := wrapper.py
+ASSETS_DIR   := assets
+SCRIPTS_DIR  := scripts
+BIN_DIR      := bin
 
-# ---- Defaults for CLI ----
-AUDIO ?= samples/test.mp3
-OUT ?= output/TestSong
-TITLE ?= Test Song
-ARTIST ?= Me
-ALBUM ?=
-GENRE ?=
-YEAR ?=
-CHARTER ?= Zullo7569
-DELAY_MS ?= 0
+# Python Environment
+PY           ?= python3
+VENV         := .venv
+VENV_BIN     := $(VENV)/bin
+PIP          := $(VENV_BIN)/pip
+PYTHON       := $(VENV_BIN)/python
 
-MODE ?= real
-MIN_GAP_MS ?= 140
-MAX_NPS ?= 2.8
-SEED ?= 42
+# OS Detection for Path Separators (Win uses ';', Unix uses ':')
+SEP := $(if $(filter Windows_NT,$(OS)),;,:)
 
+# -----------------------------------------------------------------------------
+# 2. CLI DEFAULT ARGUMENTS
+# -----------------------------------------------------------------------------
+AUDIO          ?= samples/test.mp3
+OUT            ?= output/TestSong
+TITLE          ?= Test Song
+ARTIST         ?= Me
+ALBUM          ?=
+GENRE          ?=
+YEAR           ?=
+CHARTER        ?= Zullo7569
+DELAY_MS       ?= 0
+MODE           ?= real
+MIN_GAP_MS     ?= 140
+MAX_NPS        ?= 2.8
+SEED           ?= 42
 FETCH_METADATA ?= 1
-USER_AGENT ?= 1clickcharter/0.1 (Zullo7569)
+USER_AGENT     ?= 1clickcharter/0.1 (Zullo7569)
 
-# ---- venv / deps ----
+# -----------------------------------------------------------------------------
+# 3. ENVIRONMENT & DEPENDENCIES
+# -----------------------------------------------------------------------------
 venv:
 	$(PY) -m venv $(VENV)
 
 deps: venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -e ".[dev,gui]"
-	# Ensure packaging tools are present
 	$(PIP) install pyinstaller Pillow
 
 install: deps
 
-reinstall:
-	rm -rf $(VENV)
-	$(MAKE) install
+reinstall: clean-all install
 
-# ---- sanity checks ----
 doctor:
 	@echo "PY (builder):     $(PY)"
 	@echo "VENV python:      $$($(PYTHON) -c 'import sys; print(sys.executable)')"
 	@echo "VENV version:     $$($(PYTHON) -V)"
-	@echo "VENV pip:         $$($(PIP) -V)"
 	@echo "Qt (PySide6):     $$($(PYTHON) -c 'import PySide6; print(\"✅ PySide6 OK\")' 2>/dev/null || echo '❌ PySide6 missing')"
-	@echo "1clickcharter:    $$($(BIN)/1clickcharter --help >/dev/null 2>&1 && echo '✅ installed' || echo '❌ not installed')"
+	@echo "FFmpeg (Bin):     $$(ls $(BIN_DIR)/ffmpeg >/dev/null 2>&1 && echo '✅ Found in $(BIN_DIR)' || echo '❌ Missing')"
 
-# ---- CLI ----
+# -----------------------------------------------------------------------------
+# 4. RUNNING (CLI & GUI)
+# -----------------------------------------------------------------------------
+# Main CLI Help
 help:
-	$(BIN)/1clickcharter --help
+	$(VENV_BIN)/1clickcharter --help
 
+# Run CLI with arguments
 run:
-	PATH="$(CURDIR)/bin:$$PATH" $(BIN)/1clickcharter \
+	PATH="$(CURDIR)/$(BIN_DIR):$$PATH" $(VENV_BIN)/1clickcharter \
 	  --audio "$(AUDIO)" \
 	  --out "$(OUT)" \
 	  --title "$(TITLE)" \
@@ -83,49 +92,51 @@ run-real:
 run-dummy:
 	$(MAKE) run MODE=dummy
 
-# ---- GUI ----
+# Run GUI
 gui: install
-	PATH="$(CURDIR)/bin:$$PATH" $(BIN)/1clickcharter-gui
+	PATH="$(CURDIR)/$(BIN_DIR):$$PATH" $(VENV_BIN)/1clickcharter-gui
 
-# ---- dev ----
+# -----------------------------------------------------------------------------
+# 5. DEVELOPMENT TOOLS
+# -----------------------------------------------------------------------------
 test:
 	$(PYTHON) -m pytest
 
 lint:
 	$(PYTHON) -m ruff check .
 
-# ---- packaging (PyPI / Wheel) ----
+# Opens the output folder on macOS/Linux
+open-out:
+	open "$(dir $(OUT))" 2>/dev/null || xdg-open "$(dir $(OUT))" 2>/dev/null || true
+
+# -----------------------------------------------------------------------------
+# 6. BUILDING & PACKAGING
+# -----------------------------------------------------------------------------
+# Build Python Wheel / Source Dist
 build: install
 	$(PYTHON) -m build
 
 distcheck: build
 	$(PYTHON) -m twine check dist/*
 
-# Installs into pipx for personal usage (recommended)
-pipx-install: build
-	@WHEEL="$$(ls -1 dist/*.whl | tail -n 1)"; \
-	echo "Installing $$WHEEL with pipx..."; \
-	pipx install --python python3.12 --force "$$WHEEL"
-
-# ---- PACKAGING (Standalone App) ----
-
-# Generates icons by running the script inside the 'scripts' folder
+# Generate Icons using the script
 icons:
-	@chmod +x scripts/make_icons.sh
+	@chmod +x $(SCRIPTS_DIR)/make_icons.sh
 	@echo "🎨 Generating icons..."
-	@./scripts/make_icons.sh
+	@./$(SCRIPTS_DIR)/make_icons.sh
 
-# Builds the macOS .app bundle
+# Build Standalone Application (PyInstaller)
+# Note: Maps 'assets' folder to 'assets' in bundle
 package: install icons
 	@echo "🚀 Packaging $(APP_NAME)..."
 	@rm -rf dist build
-	@$(VENV)/bin/pyinstaller --noconfirm --clean \
+	@$(VENV_BIN)/pyinstaller --noconfirm --clean \
 		--name "$(APP_NAME)" \
 		--windowed \
-		--icon "assets/icons/AppIcon.icns" \
-		--add-data "assets:assets" \
-		--add-binary "bin/ffmpeg:." \
-		--add-binary "bin/ffprobe:." \
+		--icon "$(ASSETS_DIR)/icons/AppIcon.icns" \
+		--add-data "$(ASSETS_DIR)$(SEP)$(ASSETS_DIR)" \
+		--add-binary "$(BIN_DIR)/ffmpeg$(SEP)." \
+		--add-binary "$(BIN_DIR)/ffprobe$(SEP)." \
 		--paths "." \
 		--hidden-import "charter.cli" \
 		--hidden-import "gui.qt_app" \
@@ -133,15 +144,23 @@ package: install icons
 		$(ENTRY_SCRIPT)
 	@echo "✅ Build complete! App is in dist/$(APP_NAME).app"
 
-# Helper to run the packaged app directly for testing
+# Run the packaged app (macOS specific path)
 run-dist:
 	@dist/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)
 
-# ---- convenience ----
+# Full loop: Package then Run
 full: package run-dist
 
-open-out:
-	open "$(dir $(OUT))" 2>/dev/null || true
-
+# -----------------------------------------------------------------------------
+# 7. CLEANUP
+# -----------------------------------------------------------------------------
+# Standard clean: Removes build artifacts but keeps virtual env
 clean:
-	rm -rf $(VENV) output .pytest_cache .ruff_cache .cache dist build *.egg-info *.spec
+	rm -rf dist build output *.spec *.egg-info
+	find . -type d -name "__pycache__" -exec rm -rf {} +
+	find . -type d -name ".pytest_cache" -exec rm -rf {} +
+	find . -type d -name ".ruff_cache" -exec rm -rf {} +
+
+# Deep clean: Removes everything including venv
+clean-all: clean
+	rm -rf $(VENV)
