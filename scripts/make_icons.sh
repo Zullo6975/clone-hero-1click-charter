@@ -1,15 +1,16 @@
 #!/bin/bash
 
-# Configuration
-INPUT_FILE="icons/icon_og.png"
-ICONSET_NAME="icons/AppIcon.iconset"
-OUTPUT_ICNS="icons/AppIcon.icns"
-OUTPUT_ICO="icons/AppIcon.ico"
-OUTPUT_LINUX="icons/AppIcon.png" 
+# Configuration (UPDATED PATHS)
+INPUT_FILE="assets/icons/icon_og.png"
+ICONSET_NAME="assets/icons/AppIcon.iconset"
+OUTPUT_ICNS="assets/icons/AppIcon.icns"
+OUTPUT_ICO="assets/icons/AppIcon.ico"
+OUTPUT_LINUX="assets/icons/AppIcon.png"
 
 # Check input
 if [ ! -f "$INPUT_FILE" ]; then
     echo "❌ Error: $INPUT_FILE not found."
+    echo "   (Make sure you run this script from the repository root!)"
     exit 1
 fi
 
@@ -24,7 +25,7 @@ echo "🎨 Processing $INPUT_FILE..."
 # ---------------------------------------------------------
 if python3 -c "import PIL" 2>/dev/null; then
     echo "⚡ Using Python (Pillow) for optimized resizing..."
-    
+
     python3 - <<END
 import os
 from PIL import Image
@@ -62,7 +63,7 @@ img.save("$OUTPUT_ICO", format='ICO', sizes=ico_sizes)
 linux_img = img.resize((512, 512), Image.Resampling.LANCZOS)
 linux_img.save("$OUTPUT_LINUX", format="PNG", optimize=True, compress_level=9)
 END
-    
+
     echo "🎉 Created Windows icon: $OUTPUT_ICO"
     echo "🎉 Created Linux icon:   $OUTPUT_LINUX"
 
@@ -71,7 +72,7 @@ END
 # ---------------------------------------------------------
 else
     echo "⚠️  Python Pillow not found. Falling back to 'sips'."
-    
+
     # Generate macOS sizes
     sips -z 16 16     "$INPUT_FILE" --out "${ICONSET_NAME}/icon_16x16.png" > /dev/null
     sips -z 32 32     "$INPUT_FILE" --out "${ICONSET_NAME}/icon_16x16@2x.png" > /dev/null
@@ -86,7 +87,7 @@ else
 
     # Generate Linux single file
     sips -z 512 512   "$INPUT_FILE" --out "$OUTPUT_LINUX" > /dev/null
-    
+
     echo "🎉 Created Linux icon: $OUTPUT_LINUX"
     echo "ℹ️  Skipped Windows .ico (requires Python Pillow)."
 fi
