@@ -92,7 +92,7 @@ class UiBuilder:
         h_layout.setAlignment(Qt.AlignCenter)
 
         icon_lbl = QLabel()
-        icon_path = repo_root() / "icons" / "icon_og.png"
+        icon_path = repo_root() / "assets" / "icons" / "icon_og.png"
         if icon_path.exists():
             pix = QPixmap(str(icon_path))
             if not pix.isNull():

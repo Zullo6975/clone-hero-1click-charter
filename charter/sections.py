@@ -7,53 +7,68 @@ class Section:
     name: str
     start: float
 
-def generate_sections(audio_path: str, duration: float) -> list[Section]:
+def find_sections(density_profile: list[float], duration: float) -> list[Section]:
     """
-    Generates a list of sections based on song duration.
+    Analyzes note density to create section markers.
+    Replaces the old random 'generate_sections' logic.
     """
-    # Standard structure templates based on duration
-    # Short (< 2 min): Intro -> Verse -> Chorus -> Outro
-    # Medium (2-4 min): Intro -> Verse 1 -> Chorus 1 -> Verse 2 -> Chorus 2 -> Bridge -> Outro
-    # Long (> 4 min): Expanded structure
 
     sections = []
-    cursor = 0.0
 
-    # Always start with Intro
+    # Standard Structure Heuristic
+    # 1. Intro (0 - ~30s or low density)
+    # 2. Verse / Chorus (Cyclic peaks)
+    # 3. Solo (Sustained high density usually past middle)
+    # 4. Outro (Last ~30s)
+
+    if not density_profile:
+        # Fallback if no density data
+        return [Section("Song", 0.0)]
+
+    step = duration / len(density_profile)
+
+    # Thresholds
+    # We calculate the average density
+    avg_density = sum(density_profile) / len(density_profile)
+    peak_density = max(density_profile)
+
+    # Threshold for "Intense" (Chorus/Solo)
+    high_threshold = avg_density * 1.5
+
+    current_state = "Intro"
     sections.append(Section("Intro", 0.0))
-    cursor += random.uniform(8.0, 15.0) # Short intro
 
-    # Loop to fill duration
-    verse_count = 1
-    chorus_count = 1
+    # We want to avoid spamming sections, so we enforce a minimum duration
+    min_sec_len = 15.0 # seconds
+    last_sec_time = 0.0
 
-    while cursor < duration - 20.0: # Leave room for Outro
-        # Add Verse
-        sections.append(Section(f"Verse {verse_count}", cursor))
-        cursor += random.uniform(30.0, 45.0)
-        verse_count += 1
+    # Naive state machine
+    for i, dens in enumerate(density_profile):
+        t = i * step
 
-        if cursor >= duration - 20.0: break
+        if t - last_sec_time < min_sec_len:
+            continue
 
-        # Add Chorus
-        sections.append(Section(f"Chorus {chorus_count}", cursor))
-        cursor += random.uniform(25.0, 40.0)
-        chorus_count += 1
-
-        if cursor >= duration - 20.0: break
-
-        # Occasionally add a Bridge or Solo after 2nd Chorus
-        if chorus_count == 3 and cursor < duration - 45.0:
-            if random.random() > 0.5:
-                sections.append(Section("Bridge", cursor))
+        # Determine likely state
+        if t > duration - 20:
+            new_state = "Outro"
+        elif dens > high_threshold:
+            # Is it a solo?
+            # Solos usually happen 60-80% into the song and are VERY dense
+            # v2.1.2: Widened window to 40%-90% and lowered peak req to 65% to catch more solos
+            if 0.40 < (t / duration) < 0.90 and dens > (peak_density * 0.65):
+                new_state = "Guitar Solo"
             else:
-                sections.append(Section("Solo", cursor))
-            cursor += random.uniform(20.0, 30.0)
+                new_state = "Chorus"
+        elif dens < avg_density * 0.8:
+            new_state = "Verse"
+        else:
+            new_state = "Bridge"
 
-    # Final Section: Outro
-    # Ensure it doesn't start *after* the song ends
-    if cursor < duration:
-        sections.append(Section("Outro", cursor))
+        if new_state != current_state:
+            sections.append(Section(new_state, t))
+            current_state = new_state
+            last_sec_time = t
 
     return sections
 
