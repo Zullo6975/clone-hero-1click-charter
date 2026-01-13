@@ -37,16 +37,16 @@ jobs:
 
       - name: Generate Icons
         run: |
-          chmod +x tools/make_icons.sh
-          ./tools/make_icons.sh
+          chmod +x scripts/make_icons.sh
+          ./scripts/make_icons.sh
 
       - name: Build .app with PyInstaller
         run: |
           pyinstaller --noconfirm --clean \
             --name "1ClickCharter" \
             --windowed \
-            --icon "icons/AppIcon.icns" \
-            --add-data "icons/icon_og.png:icons" \
+            --icon "assets/icons/AppIcon.icns" \
+            --add-data "assets:assets" \
             --add-binary "bin/ffmpeg:." \
             --add-binary "bin/ffprobe:." \
             --paths "." \
@@ -57,7 +57,7 @@ jobs:
 
       - name: Zip Application
         run: |
-          cp USER_GUIDE.md dist/
+          cp docs/USER_GUIDE.md dist/
           cd dist
           zip -r ../1ClickCharter-macOS.zip 1ClickCharter.app USER_GUIDE.md
 
@@ -98,7 +98,7 @@ jobs:
 
       - name: Generate Icons (Python Fallback)
         run: |
-          python -c "from PIL import Image; img = Image.open('icons/icon_og.png'); img.save('icons/AppIcon.ico', format='ICO', sizes=[(256,256), (128,128), (64,64), (48,48), (32,32), (16,16)])"
+          python -c "from PIL import Image; img = Image.open('assets/icons/icon_og.png'); img.save('assets/icons/AppIcon.ico', format='ICO', sizes=[(256,256), (128,128), (64,64), (48,48), (32,32), (16,16)])"
 
       - name: Build .exe with PyInstaller
         # Note: Windows uses ';' as separator for binaries
@@ -107,8 +107,8 @@ jobs:
             --name "1ClickCharter" `
             --windowed `
             --onefile `
-            --icon "icons/AppIcon.ico" `
-            --add-data "icons/icon_og.png;icons" `
+            --icon "assets/icons/AppIcon.ico" `
+            --add-data "assets;assets" `
             --add-binary "bin\ffmpeg.exe;." `
             --add-binary "bin\ffprobe.exe;." `
             --paths "." `
@@ -119,7 +119,7 @@ jobs:
 
       - name: Zip Executable
         run: |
-          Compress-Archive -Path dist\1ClickCharter.exe, USER_GUIDE.md -DestinationPath 1ClickCharter-Windows.zip
+          Compress-Archive -Path dist\1ClickCharter.exe, docs/USER_GUIDE.md -DestinationPath 1ClickCharter-Windows.zip
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

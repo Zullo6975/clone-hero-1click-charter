@@ -40,7 +40,7 @@ package-dir = {"" = "."}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["charter*", "gui*"]
+include = ["charter*", "gui*", "assets*"]
 
 [tool.ruff]
 line-length = 100
