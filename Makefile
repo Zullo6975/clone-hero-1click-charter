@@ -149,7 +149,7 @@ run-dist:
 	@dist/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)
 
 # Full loop: Package then Run
-full: package run-dist
+app: package run-dist
 
 # -----------------------------------------------------------------------------
 # 7. CLEANUP
