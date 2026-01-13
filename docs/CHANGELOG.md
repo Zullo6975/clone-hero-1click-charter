@@ -2,11 +2,22 @@
 
 <!-- markdownlint-disable md024 -->
 
+## [2.1.2] - 2026-01-13
+
+### 🐛 Bug Fixes
+
+- **Medium Difficulty Tuning:** Enforced stricter chord gap rules for Medium difficulty.
+  - Chords are now limited to **adjacent notes** (Lane Diff 1) and **1-fret gaps** (Lane Diff 2).
+  - Spans larger than 1 fret (e.g., Green+Blue, Diff 3) are now reduced to single notes to prevent awkward stretches.
+- **Solo Detection:** Relaxed the thresholds for detecting "Guitar Solos".
+  - Time window widened to 40%-90% of the song duration.
+  - Density Requirement lowered to 65% of the song's peak (was 80%), helping to catch solos in less dense tracks.
+
 ## [2.1.1] - 2026-01-12
 
 ### 🩹 Batch Workflow Hotfix
 
-- **Consistent Autofill:** The "Run Queue" command now forces metadata autofill (Title/Artist) for the _entire_ batch, including the currently loaded song. This overrides manual text entry in the main window to ensure that large batches processed from folders utilize the correct metadata from the file tags every time.
+- **Consistent Autofill:** The "Run Queue" command now forces metadata autofill (Title/Artist) for the *entire* batch, including the currently loaded song. This overrides manual text entry in the main window to ensure that large batches processed from folders utilize the correct metadata from the file tags every time.
 
 ## [2.1.0] - 2026-01-12
 

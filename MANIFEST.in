@@ -1,7 +1,10 @@
 include README.md
-include CHANGELOG.md
-include TODO.md
-include SETUP.md
-recursive-include samples *
+include LICENSE
+include requirements.txt
+include pyproject.toml
+recursive-include docs *
+recursive-include assets *
 recursive-include gui *.py
 recursive-include charter *.py
+recursive-include scripts *
+recursive-include bin *

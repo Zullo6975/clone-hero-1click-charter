@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import copy
 import random
+
 from charter.config import DIFFICULTY_PITCHES
 
 # Lane indices
@@ -140,9 +142,19 @@ def reduce_to_medium(hard_notes: list, min_gap_ms: int = 220) -> list:
         if len(chord) > 2:
             chord = chord[:2]
 
-        # Chord Throttling: Enforce 1.5s cooldown between chords
         if len(chord) == 2:
-            if t - last_chord_time < 1.5:
+            # v2.1.2 Fix: Strict enforcement of "1 fret gap" max.
+            # Lane indices: G=0, R=1, Y=2, B=3 (Medium Base Pitch 72)
+            # Diff 1 = Adjacent (e.g. 0,1) -> OK
+            # Diff 2 = 1 Gap (e.g. 0,2) -> OK
+            # Diff 3 = 2 Gap (e.g. 0,3) -> BAD
+            gap = (chord[1].pitch - 72) - (chord[0].pitch - 72)
+
+            if gap > 2:
+                 # Gap is too wide (e.g. Green+Blue), drop the higher note
+                 chord = [chord[0]]
+            # Chord Throttling: Enforce 1.5s cooldown between chords
+            elif t - last_chord_time < 1.5:
                 # Downgrade to single note (lowest pitch)
                 chord = [chord[0]]
             else:
