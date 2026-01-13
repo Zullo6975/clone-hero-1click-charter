@@ -7,3 +7,4 @@ recursive-include assets *
 recursive-include gui *.py
 recursive-include charter *.py
 recursive-include scripts *
+recursive-include bin *

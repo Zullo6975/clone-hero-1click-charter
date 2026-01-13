@@ -103,7 +103,7 @@ If this tool saved you time, consider buying me a coffee (or a beer) to keep the
 
 ## 🤝 Contributing
 
-See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for style guides and design philosophy.
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for style guides and design philosophy.
 
 ## 📄 License
 
