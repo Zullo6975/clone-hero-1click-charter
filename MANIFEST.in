@@ -1,11 +1,9 @@
 include README.md
-include docs/CHANGELOG.md
-include docs/TODO.md
-include docs/SETUP.md
-include docs/USER_GUIDE.md
-include docs/CODE_OF_CONDUCT.md
-include docs/CONTRIBUTING.md
-include docs/SECURITY.MD
-recursive-include samples *
+include LICENSE
+include requirements.txt
+include pyproject.toml
+recursive-include docs *
+recursive-include assets *
 recursive-include gui *.py
 recursive-include charter *.py
+recursive-include scripts *

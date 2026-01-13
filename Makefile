@@ -109,24 +109,21 @@ pipx-install: build
 
 # ---- PACKAGING (Standalone App) ----
 
-# Generates icons by running the script inside the 'icons' folder
+# Generates icons by running the script inside the 'scripts' folder
 icons:
-	@chmod +x tools/make_icons.sh
+	@chmod +x scripts/make_icons.sh
 	@echo "🎨 Generating icons..."
-	@# We enter 'icons' so the script finds 'icon.png' naturally
-	@./tools/make_icons.sh
+	@./scripts/make_icons.sh
 
 # Builds the macOS .app bundle
-# NOTE: Expects 'bin/ffmpeg' and 'bin/ffprobe' to exist!
 package: install icons
 	@echo "🚀 Packaging $(APP_NAME)..."
 	@rm -rf dist build
-	@# Note: --add-data 'src:dest'
 	@$(VENV)/bin/pyinstaller --noconfirm --clean \
 		--name "$(APP_NAME)" \
 		--windowed \
-		--icon "icons/AppIcon.icns" \
-		--add-data "icons/icon_og.png:icons" \
+		--icon "assets/icons/AppIcon.icns" \
+		--add-data "assets:assets" \
 		--add-binary "bin/ffmpeg:." \
 		--add-binary "bin/ffprobe:." \
 		--paths "." \
