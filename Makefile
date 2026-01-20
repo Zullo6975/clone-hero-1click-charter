@@ -50,7 +50,7 @@ deps: venv
 	$(PIP) install --upgrade pip
 	$(PIP) install -e ".[dev,gui]"
 	$(PIP) install pyinstaller Pillow
-	@echo "⚙️ Checking external tools..."
+	@echo "Checking external tools..."
 	$(PYTHON) $(SCRIPTS_DIR)/setup_ffmpeg.py
 
 install: deps
@@ -88,11 +88,11 @@ lint:
 	$(PYTHON) -m ruff check .
 
 icons:
-	@echo "🎨 Generating icons..."
+	@echo "Generating icons..."
 	$(PYTHON) $(SCRIPTS_DIR)/make_icons.py
 
 package: install icons
-	@echo "🚀 Packaging $(APP_NAME)..."
+	@echo "Packaging $(APP_NAME)..."
 	@$(PYTHON) -c "import shutil; shutil.rmtree('dist', ignore_errors=True); shutil.rmtree('build', ignore_errors=True)"
 	$(VENV_BIN)/pyinstaller --noconfirm --clean \
 		--name "$(APP_NAME)" \

@@ -14,7 +14,7 @@ TRACK_NAME = "PART GUITAR"
 
 # Define ranges for all difficulties
 ALL_DIFFS = {
-    "Expert": range(96, 101), # 96-100
+    "Expert": range(96, 101),  # 96-100
     "Hard":   range(84, 89),  # 84-88
     "Medium": range(72, 77),  # 72-76
     "Easy":   range(60, 65)   # 60-64
@@ -132,11 +132,13 @@ def _parse_sections(midi_path: Path, pm: pretty_midi.PrettyMIDI) -> tuple[list[t
                         clean_name = text[8:].strip()
                         is_sec = True
                     elif text.lower().startswith("[section "):
-                        clean_name = text.replace("[section ", "").replace("]", "").strip()
+                        clean_name = text.replace(
+                            "[section ", "").replace("]", "").strip()
                         is_sec = True
 
                     if is_sec:
-                        if found_in_track_name is None: found_in_track_name = track_name
+                        if found_in_track_name is None:
+                            found_in_track_name = track_name
                         seconds = pm.tick_to_time(abs_time)
                         out.append((clean_name, seconds))
 
@@ -178,9 +180,11 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
         return ValidationResult(False, errors, warnings)
 
     if not _find_song_ini(song_dir):
-        warnings.append("Missing song.ini (Clone Hero will usually require this).")
+        warnings.append(
+            "Missing song.ini (Clone Hero will usually require this).")
     if not _find_audio(song_dir):
-        warnings.append("No audio file found (expected song.ogg/mp3/wav/flac).")
+        warnings.append(
+            "No audio file found (expected song.ogg/mp3/wav/flac).")
 
     try:
         pm = pretty_midi.PrettyMIDI(str(notes_mid))
@@ -211,7 +215,8 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
         if n.end <= n.start:
             bad_dur += 1
         if n.start < 0:
-            errors.append(f"Note starts before 0.0s: pitch={n.pitch} start={n.start:.3f}")
+            errors.append(
+                f"Note starts before 0.0s: pitch={n.pitch} start={n.start:.3f}")
         if n.start < min_note_start - 1e-6:
             too_early += 1
 
@@ -226,7 +231,8 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
             sp_ends.append(float(n.end))
 
     if bad_dur:
-        errors.append(f"{bad_dur} notes have non-positive duration (end <= start).")
+        errors.append(
+            f"{bad_dur} notes have non-positive duration (end <= start).")
 
     if lane_notes == 0:
         errors.append("No lane notes found (checked Expert 96-100).")
@@ -238,21 +244,25 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
         )
 
     if sp_notes == 0:
-        warnings.append(f"No Star Power notes found (expected SP pitch={sp_pitch}).")
+        warnings.append(
+            f"No Star Power notes found (expected SP pitch={sp_pitch}).")
 
     if orange_notes > 0:
-        pass # Warning removed, seeing orange notes is now expected/good!
+        pass  # Warning removed, seeing orange notes is now expected/good!
 
     sections, track_loc = _parse_sections(notes_mid, pm)
     if not sections:
         warnings.append("No section markers found.")
     elif track_loc != "EVENTS":
-        warnings.append(f"Sections found in '{track_loc}', but expected 'EVENTS' track.")
+        warnings.append(
+            f"Sections found in '{track_loc}', but expected 'EVENTS' track.")
 
     # EXPERT TUNING: 16.0 NPS threshold
-    spikes = _count_density_spikes(lane_note_starts, window_sec=1.0, nps_warn=16.0)
+    spikes = _count_density_spikes(
+        lane_note_starts, window_sec=1.0, nps_warn=16.0)
     if spikes > 0:
-        warnings.append(f"Extreme density spikes detected (>= 16 NPS): {spikes}")
+        warnings.append(
+            f"Extreme density spikes detected (>= 16 NPS): {spikes}")
 
     ok = len(errors) == 0
     return ValidationResult(ok, errors, warnings)
@@ -272,7 +282,8 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
 
     # Gather data per difficulty
     stats_by_diff = {
-        name: {"notes": 0, "chords": 0, "lanes": {0:0, 1:0, 2:0, 3:0, 4:0}}
+        name: {"notes": 0, "chords": 0, "lanes": {
+            0: 0, 1: 0, 2: 0, 3: 0, 4: 0}}
         for name in ALL_DIFFS
     }
 
@@ -296,7 +307,7 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
             if p in r:
                 stats = stats_by_diff[name]
                 stats["notes"] += 1
-                lane_idx = p - r.start # 96->0, 97->1, etc
+                lane_idx = p - r.start  # 96->0, 97->1, etc
                 if lane_idx in stats["lanes"]:
                     stats["lanes"][lane_idx] += 1
                 starts_by_diff[name].append(float(n.start))
@@ -318,7 +329,8 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
     for name in ["Expert", "Hard", "Medium", "Easy"]:
         s = stats_by_diff[name]
         l = s["lanes"]
-        print(f"  {name:<10} | {s['notes']:<6} | {s['chords']:<6} | {l[0]:<4} {l[1]:<4} {l[2]:<4} {l[3]:<4} {l[4]:<4}")
+        print(
+            f"  {name:<10} | {s['notes']:<6} | {s['chords']:<6} | {l[0]:<4} {l[1]:<4} {l[2]:<4} {l[3]:<4} {l[4]:<4}")
 
     sp_phrases = _group_sp_phrases(sp_starts, sp_ends, gap_join_sec=0.45)
     print(f"\nSTAR POWER: {len(sp_phrases)} phrases")
@@ -346,17 +358,22 @@ def validate_chart_file(song_dir: Path, summary_only: bool = False):
             print(f"Warning: {w}")
 
     if res.ok and not res.warnings:
-        print("\n✅ Chart passed basic health check.")
+        # FIXED: Replaced checkmark with [OK]
+        print("\n[OK] Chart passed basic health check.")
 
     if summary_only or True:
         summarize(song_dir, sp_pitch=DEFAULT_SP_PITCH)
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Sanity-check a Clone Hero output folder.")
-    ap.add_argument("song_dir", type=str, help="Path to the output song folder.")
-    ap.add_argument("--sp-pitch", type=int, default=DEFAULT_SP_PITCH, help="Star Power MIDI pitch.")
-    ap.add_argument("--min-note-start", type=float, default=DEFAULT_MIN_NOTE_START, help="Warn if notes start too early.")
+    ap = argparse.ArgumentParser(
+        description="Sanity-check a Clone Hero output folder.")
+    ap.add_argument("song_dir", type=str,
+                    help="Path to the output song folder.")
+    ap.add_argument("--sp-pitch", type=int,
+                    default=DEFAULT_SP_PITCH, help="Star Power MIDI pitch.")
+    ap.add_argument("--min-note-start", type=float,
+                    default=DEFAULT_MIN_NOTE_START, help="Warn if notes start too early.")
     ap.add_argument("--summary", action="store_true", help="Print summary.")
     args = ap.parse_args()
 
