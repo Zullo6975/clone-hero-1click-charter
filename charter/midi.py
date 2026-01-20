@@ -5,20 +5,22 @@ import random
 import json
 import math
 
-import pretty_midi # type: ignore
-import librosa # type: ignore
-import numpy as np # type: ignore
-import mido # type: ignore
+import pretty_midi  # type: ignore
+import librosa  # type: ignore
+import numpy as np  # type: ignore
+import mido  # type: ignore
 
 from charter.config import ChartConfig, LANE_PITCHES, TRACK_NAME, SP_PITCH
 from charter.audio import detect_onsets, estimate_pitches
-from charter.sections import generate_sections, compute_section_stats, Section
+# FIX: 'generate_sections' replaced with 'find_sections'
+from charter.sections import find_sections, compute_section_stats, Section
 from charter.star_power import generate_star_power_phrases
 from charter.reduction import reduce_to_hard, reduce_to_medium, reduce_to_easy
 
 # -------------------------------------------------------------------------
 # 1. ANALYSIS HELPERS
 # -------------------------------------------------------------------------
+
 
 def _filter_onsets(candidates: list, duration: float, cfg: ChartConfig) -> list:
     """Selects onsets based on density settings."""
@@ -38,7 +40,8 @@ def _filter_onsets(candidates: list, duration: float, cfg: ChartConfig) -> list:
 
         count = 0
         for c in items:
-            if count >= quota: break
+            if count >= quota:
+                break
             if any(abs(c.t - s.t) < min_gap for s in selected):
                 continue
             selected.append(c)
@@ -47,9 +50,12 @@ def _filter_onsets(candidates: list, duration: float, cfg: ChartConfig) -> list:
     selected.sort(key=lambda x: x.t)
     return selected
 
+
 def _pitch_diff_semitones(p1: float | None, p2: float | None) -> float:
-    if p1 is None or p2 is None or p1 <= 0 or p2 <= 0: return 0.0
+    if p1 is None or p2 is None or p1 <= 0 or p2 <= 0:
+        return 0.0
     return 12 * math.log2(p2 / p1)
+
 
 def _quantize_to_measure(time: float, beat_times: list[float]) -> tuple[int, float]:
     """Returns (measure_index, offset_from_measure_start)"""
@@ -70,6 +76,7 @@ def _quantize_to_measure(time: float, beat_times: list[float]) -> tuple[int, flo
 
     return measure_idx, quantized_offset
 
+
 def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
     points = []
     step = 0.5
@@ -86,6 +93,7 @@ def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
 # -------------------------------------------------------------------------
 # 2. NOTE GENERATION LOGIC
 # -------------------------------------------------------------------------
+
 
 def _assign_lane(
     prev_lane: int,
@@ -104,22 +112,30 @@ def _assign_lane(
         base_w = 0.20 if lane == 4 else 1.0
 
         dist = abs(lane - prev_lane)
-        if dist == 0: w = 2.0 * (1.0 - cfg.movement_bias)
-        elif dist == 1: w = 2.0
-        elif dist == 2: w = 1.3 + (cfg.movement_bias * 0.5)
-        else: w = 0.3 + (cfg.movement_bias * 0.8)
+        if dist == 0:
+            w = 2.0 * (1.0 - cfg.movement_bias)
+        elif dist == 1:
+            w = 2.0
+        elif dist == 2:
+            w = 1.3 + (cfg.movement_bias * 0.5)
+        else:
+            w = 0.3 + (cfg.movement_bias * 0.8)
         weights.append(max(0.01, w * base_w))
 
     semitone_diff = _pitch_diff_semitones(prev_pitch, curr_pitch)
 
     if abs(semitone_diff) > 0.5:
         for i, lane in enumerate(options):
-            if semitone_diff > 0: # Up
-                if lane > prev_lane: weights[i] *= 4.0
-                elif lane < prev_lane: weights[i] *= 0.1
-            elif semitone_diff < 0: # Down
-                if lane < prev_lane: weights[i] *= 4.0
-                elif lane > prev_lane: weights[i] *= 0.1
+            if semitone_diff > 0:  # Up
+                if lane > prev_lane:
+                    weights[i] *= 4.0
+                elif lane < prev_lane:
+                    weights[i] *= 0.1
+            elif semitone_diff < 0:  # Down
+                if lane < prev_lane:
+                    weights[i] *= 4.0
+                elif lane > prev_lane:
+                    weights[i] *= 0.1
     else:
         for i, lane in enumerate(options):
             if abs(lane - prev_lane) >= 2:
@@ -128,6 +144,7 @@ def _assign_lane(
     total = sum(weights)
     weights = [w / total for w in weights]
     return rng.choices(options, weights=weights, k=1)[0]
+
 
 def generate_expert_notes(
     times: list[float],
@@ -210,7 +227,8 @@ def generate_expert_notes(
         lanes = [lane]
         if is_chord:
             opts = [l for l in [lane-1, lane+1] if 0 <= l <= 4]
-            if not cfg.allow_orange: opts = [l for l in opts if l != 4]
+            if not cfg.allow_orange:
+                opts = [l for l in opts if l != 4]
             if opts:
                 l2 = rng.choice(opts)
                 lanes.append(l2)
@@ -228,6 +246,7 @@ def generate_expert_notes(
 # -------------------------------------------------------------------------
 # 3. SECTION & FILE IO
 # -------------------------------------------------------------------------
+
 
 def _rename_sections_based_on_density(
     sections: list,
@@ -260,7 +279,8 @@ def _rename_sections_based_on_density(
 
     for i, s in enumerate(sections):
         start = float(s.start)
-        end = float(sections[i+1].start) if i+1 < len(sections) else total_duration
+        end = float(sections[i+1].start) if i + \
+            1 < len(sections) else total_duration
         duration = end - start
 
         # Gather notes in this section
@@ -284,17 +304,17 @@ def _rename_sections_based_on_density(
         if (section_nps > solo_nps_threshold
             and pitch_std > 3.5
             and duration > 10.0
-            and s.name not in ["Intro", "Outro"]):
+                and s.name not in ["Intro", "Outro"]):
             is_solo = True
 
         # Bridge Rescue: Bridges are often melodic solos
         # Lower thresholds if it's already identified structurally as a Bridge
         if is_bridge:
-             # Just slightly above average is fine for a bridge solo
-             relaxed_nps = max(avg_nps * 1.15, 2.5)
-             # Allow more melodic playing (lower variance)
-             if section_nps > relaxed_nps and pitch_std > 2.5 and duration > 8.0:
-                 is_solo = True
+            # Just slightly above average is fine for a bridge solo
+            relaxed_nps = max(avg_nps * 1.15, 2.5)
+            # Allow more melodic playing (lower variance)
+            if section_nps > relaxed_nps and pitch_std > 2.5 and duration > 8.0:
+                is_solo = True
 
         if is_solo:
             new_sections.append(asdict(s) | {"name": "Guitar Solo"})
@@ -302,6 +322,7 @@ def _rename_sections_based_on_density(
             new_sections.append(asdict(s))
 
     return new_sections
+
 
 def _inject_sections_mido(midi_path: Path, sections: list, pm: pretty_midi.PrettyMIDI):
     """
@@ -315,7 +336,8 @@ def _inject_sections_mido(midi_path: Path, sections: list, pm: pretty_midi.Prett
         events_track = mido.MidiTrack()
 
         # Name it "EVENTS" (Crucial for Clone Hero)
-        events_track.append(mido.MetaMessage('track_name', name='EVENTS', time=0))
+        events_track.append(mido.MetaMessage(
+            'track_name', name='EVENTS', time=0))
 
         abs_events = []
         for s in sections:
@@ -326,7 +348,8 @@ def _inject_sections_mido(midi_path: Path, sections: list, pm: pretty_midi.Prett
             start_ticks = pm.time_to_tick(start_sec)
 
             # Create Text event WITH brackets: [section Name]
-            text_msg = mido.MetaMessage('text', text=f"[section {name}]", time=0)
+            text_msg = mido.MetaMessage(
+                'text', text=f"[section {name}]", time=0)
             abs_events.append((int(start_ticks), text_msg))
 
         abs_events.sort(key=lambda x: x[0])
@@ -349,6 +372,7 @@ def _inject_sections_mido(midi_path: Path, sections: list, pm: pretty_midi.Prett
 # -------------------------------------------------------------------------
 # 4. MAIN PIPELINE
 # -------------------------------------------------------------------------
+
 
 def write_real_notes_mid(
     *,
@@ -417,6 +441,10 @@ def write_real_notes_mid(
     shift_seconds = 0.0
     if times and times[0] < 3.0:
         shift_seconds = 3.0 - times[0]
+
+    # Keep track of original duration before shifting
+    original_duration = duration
+
     times = [t + shift_seconds for t in times]
     duration += shift_seconds
     shifted_beat_times = [b + shift_seconds for b in beat_times]
@@ -432,30 +460,46 @@ def write_real_notes_mid(
     easy_notes = []
 
     if expert_notes:
-        hard_notes = reduce_to_hard(expert_notes, min_gap_ms=cfg.hard_min_gap_ms)
-        medium_notes = reduce_to_medium(hard_notes, min_gap_ms=cfg.medium_min_gap_ms)
-        easy_notes = reduce_to_easy(medium_notes, min_gap_ms=cfg.easy_min_gap_ms)
+        hard_notes = reduce_to_hard(
+            expert_notes, min_gap_ms=cfg.hard_min_gap_ms)
+        medium_notes = reduce_to_medium(
+            hard_notes, min_gap_ms=cfg.medium_min_gap_ms)
+        easy_notes = reduce_to_easy(
+            medium_notes, min_gap_ms=cfg.easy_min_gap_ms)
 
     # --- STEP 3: SECTIONS ---
     final_sections = []
     if override_sections:
         final_sections = override_sections
     elif cfg.add_sections:
-        raw_sections = generate_sections(str(audio_path), duration - shift_seconds)
+        # FIX: Calculate density profile from unshifted times to match original audio analysis
+        # unshifted_times = raw_times from onsets (approximately)
+        # But we must be careful: 'times' has been snapped and filtered.
+        # Recover unshifted times from current 'times':
+        unshifted_note_times = [t - shift_seconds for t in times]
+
+        # Calculate density profile for find_sections
+        d_profile = _compute_rolling_density(
+            unshifted_note_times, original_duration)
+        nps_values = [p['nps'] for p in d_profile]
+
+        # Call the new find_sections
+        raw_sections = find_sections(nps_values, original_duration)
 
         shifted_sections = []
         for s in raw_sections:
             shifted_start = s.start + shift_seconds
             shifted_sections.append(asdict(s) | {"start": shifted_start})
 
-        obj_sections = [Section(s["name"], s["start"]) for s in shifted_sections]
+        obj_sections = [Section(s["name"], s["start"])
+                        for s in shifted_sections]
 
         # Use actual charted notes (times & pitches) for better solo detection
         final_sections = _rename_sections_based_on_density(
             obj_sections,
-            times,    # Charted note times
+            times,    # Charted note times (already shifted)
             pitches,  # Charted note pitches
-            duration
+            duration  # Total duration (shifted)
         )
 
     # --- STEP 4: WRITE MIDI (UNIFIED) ---
@@ -470,25 +514,30 @@ def write_real_notes_mid(
 
         # Add Star Power
         if cfg.add_star_power:
-            phrases = generate_star_power_phrases(note_times=times, duration_sec=duration)
+            phrases = generate_star_power_phrases(
+                note_times=times, duration_sec=duration)
             for p in phrases:
-                guitar.notes.append(pretty_midi.Note(100, SP_PITCH, p.start, p.end))
+                guitar.notes.append(pretty_midi.Note(
+                    100, SP_PITCH, p.start, p.end))
 
         # Add Solo Markers (Note 103)
         if final_sections:
             for i, sec in enumerate(final_sections):
                 s_name = sec["name"] if isinstance(sec, dict) else sec.name
                 if s_name == "Guitar Solo":
-                    s_start = float(sec["start"] if isinstance(sec, dict) else sec.start)
+                    s_start = float(sec["start"] if isinstance(
+                        sec, dict) else sec.start)
                     # Determine end time based on next section
                     if i + 1 < len(final_sections):
                         next_s = final_sections[i+1]
-                        s_end = float(next_s["start"] if isinstance(next_s, dict) else next_s.start)
+                        s_end = float(next_s["start"] if isinstance(
+                            next_s, dict) else next_s.start)
                     else:
                         s_end = duration
 
                     # 103 is the standard Solo Marker pitch in Clone Hero
-                    guitar.notes.append(pretty_midi.Note(100, 103, s_start, s_end))
+                    guitar.notes.append(
+                        pretty_midi.Note(100, 103, s_start, s_end))
 
         pm.instruments.append(guitar)
         out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -524,10 +573,11 @@ def write_real_notes_mid(
             note_starts=times, chord_starts=chord_starts,
             sections=sec_objs, duration_sec=duration
         )
-        data = { "stats": [asdict(s) for s in stats] }
+        data = {"stats": [asdict(s) for s in stats]}
         stats_out_path.write_text(json.dumps(data, indent=2))
 
     return shift_seconds, final_sections, density_data
+
 
 def write_dummy_notes_mid(out_path: Path, bpm: float, bars: int, density: float) -> float:
     pm = pretty_midi.PrettyMIDI(initial_tempo=bpm)

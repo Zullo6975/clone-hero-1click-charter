@@ -55,8 +55,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--no-stats", action="store_true")
 
     # Manual Overrides (v1.2)
-    p.add_argument("--analyze-only", action="store_true", help="Analyze audio and output sections, no chart generation.")
-    p.add_argument("--section-overrides", help="Path to JSON file with section definitions.")
+    p.add_argument("--analyze-only", action="store_true",
+                   help="Analyze audio and output sections, no chart generation.")
+    p.add_argument("--section-overrides",
+                   help="Path to JSON file with section definitions.")
 
     # Dummy params
     p.add_argument("--bpm", type=float, default=120.0)
@@ -64,7 +66,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--density", type=float, default=0.5)
 
     # Validation
-    p.add_argument("--validate", help="Path to a song folder to validate (Health Check).")
+    p.add_argument(
+        "--validate", help="Path to a song folder to validate (Health Check).")
 
     # Difficulty Scaling
     p.add_argument("--hard-gap-ms", type=int, default=120)
@@ -72,9 +75,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--easy-gap-ms", type=int, default=450)
 
     # Interoperability
-    p.add_argument("--write-chart", action="store_true", help="Export .chart file for Moonscraper.") # <--- Added Arg
+    p.add_argument("--write-chart", action="store_true",
+                   help="Export .chart file for Moonscraper.")  # <--- Added Arg
 
     return p.parse_args()
+
 
 def main():
     args = parse_args()
@@ -92,7 +97,8 @@ def main():
     # --- ENFORCE REQUIREMENTS FOR GENERATION ---
     if not args.audio or not args.out:
         print("Error: --audio and --out are required for chart generation.")
-        print("usage: 1ClickCharter [--validate ...] | --audio AUDIO --out OUT ...")
+        print(
+            "usage: 1ClickCharter [--validate ...] | --audio AUDIO --out OUT ...")
         return 1
     # -------------------------------------------
 
@@ -137,8 +143,10 @@ def main():
             )
             if enriched.cover_bytes:
                 (out_dir / "album.png").write_bytes(enriched.cover_bytes)
-            if not args.album and enriched.album: args.album = enriched.album
-            if not args.year and enriched.year: args.year = enriched.year
+            if not args.album and enriched.album:
+                args.album = enriched.album
+            if not args.year and enriched.year:
+                args.year = enriched.year
         except Exception as e:
             print(f"Metadata fetch failed: {e}")
 
@@ -149,7 +157,8 @@ def main():
             src = Path(args.section_overrides)
             if src.exists():
                 data = json.loads(src.read_text(encoding='utf-8'))
-                loaded_sections = data.get("sections", data) if isinstance(data, dict) else data
+                loaded_sections = data.get(
+                    "sections", data) if isinstance(data, dict) else data
         except Exception as e:
             print(f"Warning: Failed to load section overrides: {e}")
 
@@ -162,7 +171,8 @@ def main():
     density_data = []
 
     if args.mode == "dummy":
-        shift_seconds = write_dummy_notes_mid(notes_mid, args.bpm, args.bars, args.density)
+        shift_seconds = write_dummy_notes_mid(
+            notes_mid, args.bpm, args.bars, args.density)
     else:
         # Note: write_real_notes_mid returns shift_seconds used to align audio
         shift_seconds, final_sections, density_data = write_real_notes_mid(
@@ -202,8 +212,8 @@ def main():
                 bpm=tempo,
                 notes=guitar_notes,
                 sections=final_sections,
-                offset_seconds=0.0 # MIDI is already shifted, so no offset needed relative to audio start?
-                                   # Actually, .chart defines Offset=0 and SyncTrack starts at 0.
+                offset_seconds=0.0  # MIDI is already shifted, so no offset needed relative to audio start?
+                # Actually, .chart defines Offset=0 and SyncTrack starts at 0.
                                    # If audio is padded by shift_seconds, the notes align naturally.
             )
         except Exception as e:
@@ -214,15 +224,19 @@ def main():
 
         serializable_sections = []
         for s in final_sections:
-             if hasattr(s, "__dict__"): serializable_sections.append(asdict(s))
-             elif isinstance(s, dict): serializable_sections.append(s)
-             else: serializable_sections.append(s)
+            if hasattr(s, "__dict__"):
+                 serializable_sections.append(asdict(s))
+            elif isinstance(s, dict):
+                serializable_sections.append(s)
+            else:
+                serializable_sections.append(s)
 
         out_json.write_text(json.dumps({
             "sections": serializable_sections,
             "density": density_data
         }, indent=2))
-        print(f"✅ Analysis Complete. Data written to: {out_json}")
+        # FIXED: Replaced unicode checkmark with [OK] to avoid Windows cp1252 errors
+        print(f"[OK] Analysis Complete. Data written to: {out_json}")
         return
 
     final_delay = args.delay_ms + int(shift_seconds * 1000)
@@ -254,12 +268,14 @@ def main():
         year=args.year,
         charter=args.charter,
         delay_ms=final_delay,
-        diff_guitar=complexity_tier # Pass it here
+        diff_guitar=complexity_tier  # Pass it here
     )
 
-    print(f"✅ Generated: {title}")
+    # FIXED: Replaced unicode checkmark with [OK]
+    print(f"[OK] Generated: {title}")
     if shift_seconds > 0:
         print(f"   (Auto-delayed by {shift_seconds:.2f}s for playability)")
+
 
 if __name__ == "__main__":
     main()
