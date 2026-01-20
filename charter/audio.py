@@ -10,14 +10,11 @@ import numpy as np  # type: ignore
 
 from gui.utils import repo_root, is_frozen
 
-# We bundle ffmpeg/ffprobe in the 'bin' folder for standalone builds
-
 
 def get_bin_path(tool_name: str) -> str:
     if is_frozen():
         base = Path(sys._MEIPASS)
     else:
-        # Dev mode: look in /bin relative to this file
         base = Path(__file__).resolve().parents[1]
 
     bin_dir = base / "bin"
@@ -27,7 +24,6 @@ def get_bin_path(tool_name: str) -> str:
     if exe.exists():
         return str(exe)
 
-    # Fallback to system path
     return tool_name
 
 
@@ -51,23 +47,28 @@ def check_ffmpeg() -> bool:
 
 
 def normalize_and_save(src: Path, dest: Path) -> None:
-    # 1. Loudness Normalization (EBU R128 target -14 LUFS)
-    # 2. Convert to MP3
     cmd = [
         FFMPEG_BIN, "-y", "-i", str(src),
         "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
         "-codec:a", "libmp3lame", "-qscale:a", "2",
         str(dest)
     ]
-    # FIX: Do not suppress stderr. If FFmpeg fails, we want to see why in the worker logs.
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+    try:
+        # FIX: Catch the FileNotFoundError to give a readable error
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+    except FileNotFoundError:
+        # This catches WinError 2
+        print(f"❌ Error: FFmpeg binary not found at '{FFMPEG_BIN}'.")
+        print("   Please run 'make deps' to download it automatically.")
+        raise RuntimeError("FFmpeg missing")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error: FFmpeg failed to process audio (Code {e.returncode})")
+        raise
 
 
 def detect_onsets(audio_path: Path) -> list[Onset]:
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
 
-    # FIXED: Increased sensitivity (lower delta = more notes) to fix "Expert feels slow"
-    # delta 0.06 -> 0.03 catches roughly 2x more rhythmic events
     onsets = librosa.onset.onset_detect(
         y=y, sr=sr, units='time', delta=0.03, wait=1, pre_max=3, post_max=3, post_avg=3
     )
