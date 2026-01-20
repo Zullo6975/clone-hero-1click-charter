@@ -48,16 +48,18 @@ def check_ffmpeg() -> bool:
 
 def normalize_and_save(src: Path, dest: Path) -> None:
     cmd = [
-        FFMPEG_BIN, "-y", "-i", str(src),
+        FFMPEG_BIN, "-y",
+        # FIX: Quiet mode. Hides the version info and progress bars.
+        "-hide_banner", "-loglevel", "error",
+        "-i", str(src),
         "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
         "-codec:a", "libmp3lame", "-qscale:a", "2",
         str(dest)
     ]
     try:
-        # FIX: Catch the FileNotFoundError to give a readable error
+        # We keep stderr visible (don't send to DEVNULL) so 'loglevel error' can still print actual issues.
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
     except FileNotFoundError:
-        # This catches WinError 2
         print(f"❌ Error: FFmpeg binary not found at '{FFMPEG_BIN}'.")
         print("   Please run 'make deps' to download it automatically.")
         raise RuntimeError("FFmpeg missing")
