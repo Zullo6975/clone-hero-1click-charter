@@ -106,7 +106,7 @@ package: install icons
 		--hidden-import "gui.qt_app" \
 		--collect-all "charter" \
 		$(ENTRY_SCRIPT)
-	@echo "✅ Build complete!"
+	@echo "Build complete!"
 
 # -----------------------------------------------------------------------------
 # 6. CLEANUP
