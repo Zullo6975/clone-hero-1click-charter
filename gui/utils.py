@@ -12,14 +12,37 @@ from PySide6.QtWidgets import QApplication, QLabel
 def is_frozen() -> bool:
     return getattr(sys, 'frozen', False)
 
+
 def repo_root() -> Path:
-    if is_frozen(): return Path(sys._MEIPASS)
+    if is_frozen():
+        return Path(sys._MEIPASS)
     # Assumes this file is in /gui/utils.py, so parents[1] is the repo root
     return Path(__file__).resolve().parents[1]
 
+
 def get_python_exec() -> str | Path:
-    if is_frozen(): return sys.executable
-    return repo_root() / ".venv" / "bin" / "python"
+    """
+    Returns the path to the Python executable.
+    Handles Frozen (PyInstaller), Windows (.venv/Scripts), and Unix (.venv/bin).
+    """
+    if is_frozen():
+        return sys.executable
+
+    root = repo_root()
+
+    # 1. Check for Windows Virtual Environment
+    win_python = root / ".venv" / "Scripts" / "python.exe"
+    if win_python.exists():
+        return win_python
+
+    # 2. Check for Unix/Mac Virtual Environment
+    unix_python = root / ".venv" / "bin" / "python"
+    if unix_python.exists():
+        return unix_python
+
+    # 3. Fallback to system python (should rarely happen if venv is set up)
+    return sys.executable
+
 
 def form_label(text: str, required: bool = False, align=Qt.AlignCenter | Qt.AlignVCenter) -> QLabel:
     """
@@ -33,11 +56,13 @@ def form_label(text: str, required: bool = False, align=Qt.AlignCenter | Qt.Alig
     lbl.setFont(get_font(11))
     return lbl
 
+
 def get_font(size: int = 11, bold: bool = False) -> QFont:
     f = QApplication.font()
     f.setPointSize(size)
     f.setBold(bold)
     return f
+
 
 @dataclass
 class RunConfig:

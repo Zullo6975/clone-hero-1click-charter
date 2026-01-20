@@ -35,10 +35,9 @@ jobs:
           chmod +x bin/ffmpeg bin/ffprobe
           echo "✅ FFmpeg installed to bin/"
 
-      - name: Generate Icons
+      - name: Generate Icons (Python)
         run: |
-          chmod +x scripts/make_icons.sh
-          ./scripts/make_icons.sh
+          python scripts/make_icons.py
 
       - name: Build .app with PyInstaller
         run: |
@@ -96,9 +95,9 @@ jobs:
           Move-Item -Path $ffprobePath.FullName -Destination "bin\"
           Write-Host "✅ FFmpeg installed to bin/"
 
-      - name: Generate Icons (Python Fallback)
+      - name: Generate Icons (Python)
         run: |
-          python -c "from PIL import Image; img = Image.open('assets/icons/icon_og.png'); img.save('assets/icons/AppIcon.ico', format='ICO', sizes=[(256,256), (128,128), (64,64), (48,48), (32,32), (16,16)])"
+          python scripts/make_icons.py
 
       - name: Build .exe with PyInstaller
         # Note: Windows uses ';' as separator for binaries
