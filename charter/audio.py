@@ -5,12 +5,14 @@ import shutil
 import subprocess
 import sys
 
-import librosa # type: ignore
-import numpy as np # type: ignore
+import librosa  # type: ignore
+import numpy as np  # type: ignore
 
 from gui.utils import repo_root, is_frozen
 
 # We bundle ffmpeg/ffprobe in the 'bin' folder for standalone builds
+
+
 def get_bin_path(tool_name: str) -> str:
     if is_frozen():
         base = Path(sys._MEIPASS)
@@ -28,20 +30,25 @@ def get_bin_path(tool_name: str) -> str:
     # Fallback to system path
     return tool_name
 
+
 FFMPEG_BIN = get_bin_path("ffmpeg")
 FFPROBE_BIN = get_bin_path("ffprobe")
+
 
 @dataclass
 class Onset:
     t: float
     strength: float
 
+
 def check_ffmpeg() -> bool:
     try:
-        subprocess.run([FFMPEG_BIN, "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run([FFMPEG_BIN, "-version"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
     except Exception:
         return False
+
 
 def normalize_and_save(src: Path, dest: Path) -> None:
     # 1. Loudness Normalization (EBU R128 target -14 LUFS)
@@ -52,7 +59,9 @@ def normalize_and_save(src: Path, dest: Path) -> None:
         "-codec:a", "libmp3lame", "-qscale:a", "2",
         str(dest)
     ]
-    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    # FIX: Do not suppress stderr. If FFmpeg fails, we want to see why in the worker logs.
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+
 
 def detect_onsets(audio_path: Path) -> list[Onset]:
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
@@ -74,8 +83,10 @@ def detect_onsets(audio_path: Path) -> list[Onset]:
 
     return res
 
+
 def estimate_pitches(audio_path: Path, times: list[float]) -> list[float]:
-    if not times: return []
+    if not times:
+        return []
     y, sr = librosa.load(str(audio_path), sr=None, mono=True)
     pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
 
@@ -84,7 +95,8 @@ def estimate_pitches(audio_path: Path, times: list[float]) -> list[float]:
 
     for t in times:
         idx = np.searchsorted(t_map, t)
-        if idx >= len(t_map): idx = len(t_map) - 1
+        if idx >= len(t_map):
+            idx = len(t_map) - 1
 
         col = pitches[:, idx]
         mags = magnitudes[:, idx]

@@ -2,77 +2,83 @@ from __future__ import annotations
 from dataclasses import dataclass
 import random
 
+
 @dataclass
 class Section:
     name: str
     start: float
 
+
 def find_sections(density_profile: list[float], duration: float) -> list[Section]:
     """
     Analyzes note density to create section markers.
-    Replaces the old random 'generate_sections' logic.
     """
-
     sections = []
 
-    # Standard Structure Heuristic
-    # 1. Intro (0 - ~30s or low density)
-    # 2. Verse / Chorus (Cyclic peaks)
-    # 3. Solo (Sustained high density usually past middle)
-    # 4. Outro (Last ~30s)
-
+    # If no data, return basic Song section
     if not density_profile:
-        # Fallback if no density data
         return [Section("Song", 0.0)]
 
     step = duration / len(density_profile)
 
-    # Thresholds
-    # We calculate the average density
+    # Calculate Stats
     avg_density = sum(density_profile) / len(density_profile)
-    peak_density = max(density_profile)
+    peak_density = max(density_profile) if density_profile else 0.0
 
-    # Threshold for "Intense" (Chorus/Solo)
-    high_threshold = avg_density * 1.5
+    # Thresholds (Tuned for v2.1.2)
+    # 1.35x average is a good baseline for a Chorus
+    chorus_threshold = avg_density * 1.35
 
     current_state = "Intro"
     sections.append(Section("Intro", 0.0))
 
-    # We want to avoid spamming sections, so we enforce a minimum duration
-    min_sec_len = 15.0 # seconds
+    # Min duration to prevent "flickering" between sections
+    min_sec_len = 12.0
     last_sec_time = 0.0
 
-    # Naive state machine
     for i, dens in enumerate(density_profile):
         t = i * step
 
+        # Lock section for a minimum time
         if t - last_sec_time < min_sec_len:
             continue
 
-        # Determine likely state
-        if t > duration - 20:
+        # Force Outro in last 15s
+        if t > duration - 15.0:
             new_state = "Outro"
-        elif dens > high_threshold:
-            # Is it a solo?
-            # Solos usually happen 60-80% into the song and are VERY dense
-            # v2.1.2: Widened window to 40%-90% and lowered peak req to 65% to catch more solos
-            if 0.40 < (t / duration) < 0.90 and dens > (peak_density * 0.65):
+
+        elif dens > chorus_threshold:
+            # High Density Logic
+            # Solos are usually late in the song (45%-90%) and VERY dense
+            if 0.45 < (t / duration) < 0.90 and dens > (peak_density * 0.70):
                 new_state = "Guitar Solo"
             else:
                 new_state = "Chorus"
-        elif dens < avg_density * 0.8:
-            new_state = "Verse"
-        else:
-            new_state = "Bridge"
 
+        else:
+            # Low/Med Density Logic
+            # Default to "Verse" instead of "Bridge" to avoid confusion
+            # Only identify "Breakdown" if it's super quiet (but not silent)
+            if dens < avg_density * 0.4 and dens > 0.1:
+                new_state = "Breakdown"
+            else:
+                new_state = "Verse"
+
+        # Apply State Change
         if new_state != current_state:
+            # Don't switch INTO Intro (only start there)
+            if new_state == "Intro":
+                continue
+
             sections.append(Section(new_state, t))
             current_state = new_state
             last_sec_time = t
 
     return sections
 
-# --- Stats logic ---
+# --- Stats logic (Unchanged) ---
+
+
 @dataclass(frozen=True)
 class SectionStats:
     name: str
@@ -82,6 +88,7 @@ class SectionStats:
     chords: int
     avg_nps: float
     max_nps_1s: float
+
 
 def compute_section_stats(
     *,

@@ -7,6 +7,7 @@ from PySide6.QtCore import QObject, QProcess, Signal
 
 from gui.utils import get_python_exec, repo_root, RunConfig, is_frozen
 
+
 class GenerationWorker(QObject):
     """
     Handles the background execution of the CLI for analysis, generation, and validation.
@@ -68,14 +69,15 @@ class GenerationWorker(QObject):
         py_exec = get_python_exec()
 
         if is_frozen():
-             cmd_base = [str(py_exec), "--internal-cli"]
+            cmd_base = [str(py_exec), "--internal-cli"]
         else:
-             cmd_base = [str(py_exec), "-m", "charter.cli"]
+            cmd_base = [str(py_exec), "-m", "charter.cli"]
 
         args = cmd_base + ["--validate", str(song_dir)]
 
         validator = QProcess(self)
-        validator.finished.connect(lambda c, s: self._on_validation_finished(validator, song_dir))
+        validator.finished.connect(
+            lambda c, s: self._on_validation_finished(validator, song_dir))
         validator.start(args[0], args[1:])
 
     def _run_process(self, args: list[str]):
@@ -105,7 +107,8 @@ class GenerationWorker(QObject):
             "--title", cfg.title, "--artist", cfg.artist,
             "--album", cfg.album, "--genre", cfg.genre,
             "--charter", cfg.charter, "--mode", cfg.mode,
-            "--min-gap-ms", str(cfg.min_gap_ms), "--max-nps", f"{cfg.max_nps:.2f}",
+            "--min-gap-ms", str(
+                cfg.min_gap_ms), "--max-nps", f"{cfg.max_nps:.2f}",
             "--seed", str(cfg.seed),
             "--chord-prob", str(cfg.chord_prob),
             "--sustain-len", str(cfg.sustain_len),
@@ -114,8 +117,13 @@ class GenerationWorker(QObject):
             "--hard-gap-ms", str(cfg.hard_gap_ms),
             "--med-gap-ms", str(cfg.med_gap_ms),
             "--easy-gap-ms", str(cfg.easy_gap_ms),
-            "--fetch-metadata" if cfg.fetch_metadata else ""
         ]
+
+        # FIX: Only append flags if true.
+        # Prevents passing empty strings [""] which crashes argparse on Windows.
+        if cfg.fetch_metadata:
+            args.append("--fetch-metadata")
+
         if cfg.write_chart:
             args.append("--write-chart")
 
@@ -123,12 +131,14 @@ class GenerationWorker(QObject):
 
     def _on_stdout(self):
         if self._proc:
-            data = bytes(self._proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+            data = bytes(self._proc.readAllStandardOutput()
+                         ).decode("utf-8", errors="replace")
             self.log_message.emit(data)
 
     def _on_stderr(self):
         if self._proc:
-            data = bytes(self._proc.readAllStandardError()).decode("utf-8", errors="replace")
+            data = bytes(self._proc.readAllStandardError()
+                         ).decode("utf-8", errors="replace")
             self.log_message.emit(data)
 
     def _on_process_finished(self, code: int, status: QProcess.ExitStatus):
@@ -146,12 +156,14 @@ class GenerationWorker(QObject):
                 try:
                     data = json.loads(json_path.read_text(encoding='utf-8'))
                     # Ensure we pass the 'density' field which is now a DICT, not a list
-                    self.analysis_ready.emit(data.get("sections", []), data.get("density", {}))
+                    self.analysis_ready.emit(
+                        data.get("sections", []), data.get("density", {}))
                 except Exception as e:
                     self.log_message.emit(f"Error parsing analysis: {e}")
                     self.finished.emit(False, self._out_song)
             else:
-                self.log_message.emit("Analysis failed: sections.json missing.")
+                self.log_message.emit(
+                    "Analysis failed: sections.json missing.")
                 self.finished.emit(False, self._out_song)
         else:
             self.finished.emit(True, self._out_song)
@@ -159,7 +171,9 @@ class GenerationWorker(QObject):
         self._proc = None
 
     def _on_validation_finished(self, proc: QProcess, song_dir: Path):
-        stdout = bytes(proc.readAllStandardOutput()).decode("utf-8", errors="replace")
-        stderr = bytes(proc.readAllStandardError()).decode("utf-8", errors="replace")
+        stdout = bytes(proc.readAllStandardOutput()).decode(
+            "utf-8", errors="replace")
+        stderr = bytes(proc.readAllStandardError()).decode(
+            "utf-8", errors="replace")
         report = "\n--- VALIDATION REPORT ---\n" + stdout + stderr
         self.log_message.emit(report)
