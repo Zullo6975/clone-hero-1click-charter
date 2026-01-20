@@ -1,7 +1,7 @@
-.PHONY: venv deps install reinstall help run run-real run-dummy gui doctor test lint clean clean-all build distcheck pipx-install package icons run-dist full
+.PHONY: venv deps install reinstall help run run-real run-dummy gui doctor test lint clean clean-all build distcheck package icons run-dist
 
 # -----------------------------------------------------------------------------
-# 1. PROJECT CONFIGURATION
+# 1. PLATFORM DETECTION & CONFIG
 # -----------------------------------------------------------------------------
 APP_NAME     := 1ClickCharter
 ENTRY_SCRIPT := wrapper.py
@@ -9,15 +9,29 @@ ASSETS_DIR   := assets
 SCRIPTS_DIR  := scripts
 BIN_DIR      := bin
 
-# Python Environment
-PY           ?= python3
-VENV         := .venv
-VENV_BIN     := $(VENV)/bin
-PIP          := $(VENV_BIN)/pip
-PYTHON       := $(VENV_BIN)/python
+# Detect Windows vs Unix
+ifeq ($(OS),Windows_NT)
+    # Windows Configuration
+    SEP        := ;
+    VENV_DIR   := Scripts
+    PYTHON_EXE := python.exe
+    # Windows usually installs as 'python', not 'python3'
+    PY         ?= python
+else
+    # macOS/Linux Configuration
+    SEP        := :
+    VENV_DIR   := bin
+    PYTHON_EXE := python
+    PY         ?= python3
+endif
 
-# OS Detection for Path Separators (Win uses ';', Unix uses ':')
-SEP := $(if $(filter Windows_NT,$(OS)),;,:)
+# Python Environment
+VENV         := .venv
+# Dynamically set bin/ or Scripts/ based on OS
+VENV_BIN     := $(VENV)/$(VENV_DIR)
+# Path to the python executable INSIDE the venv
+PYTHON       := $(VENV_BIN)/$(PYTHON_EXE)
+PIP          := $(VENV_BIN)/pip
 
 # -----------------------------------------------------------------------------
 # 2. CLI DEFAULT ARGUMENTS
@@ -26,17 +40,10 @@ AUDIO          ?= samples/test.mp3
 OUT            ?= output/TestSong
 TITLE          ?= Test Song
 ARTIST         ?= Me
-ALBUM          ?=
-GENRE          ?=
-YEAR           ?=
 CHARTER        ?= Zullo7569
-DELAY_MS       ?= 0
 MODE           ?= real
-MIN_GAP_MS     ?= 140
 MAX_NPS        ?= 2.8
 SEED           ?= 42
-FETCH_METADATA ?= 1
-USER_AGENT     ?= 1clickcharter/0.1 (Zullo7569)
 
 # -----------------------------------------------------------------------------
 # 3. ENVIRONMENT & DEPENDENCIES
@@ -54,50 +61,29 @@ install: deps
 reinstall: clean-all install
 
 doctor:
-	@echo "PY (builder):     $(PY)"
-	@echo "VENV python:      $$($(PYTHON) -c 'import sys; print(sys.executable)')"
-	@echo "VENV version:     $$($(PYTHON) -V)"
-	@echo "Qt (PySide6):     $$($(PYTHON) -c 'import PySide6; print(\"✅ PySide6 OK\")' 2>/dev/null || echo '❌ PySide6 missing')"
-	@echo "FFmpeg (Bin):     $$(ls $(BIN_DIR)/ffmpeg >/dev/null 2>&1 && echo '✅ Found in $(BIN_DIR)' || echo '❌ Missing')"
+	@echo "OS Detected:      $(if $(filter Windows_NT,$(OS)),Windows,Unix/Mac)"
+	@echo "System Python:    $(PY)"
+	@echo "VENV Dir:         $(VENV_BIN)"
+	@echo "VENV Python:      $(PYTHON)"
+	@echo "Checking PySide6..."
+	@$(PYTHON) -c "import PySide6; print('✅ PySide6 OK')"
+	@echo "Checking FFmpeg..."
+	@$(PYTHON) -c "import sys, pathlib; p = pathlib.Path('$(BIN_DIR)') / ('ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'); print('✅ Found local ffmpeg' if p.exists() else '❌ Missing local ffmpeg (Extract to /bin for dev)')"
 
 # -----------------------------------------------------------------------------
 # 4. RUNNING (CLI & GUI)
 # -----------------------------------------------------------------------------
-# Main CLI Help
 help:
-	$(VENV_BIN)/1clickcharter --help
+	$(PYTHON) -m charter.cli --help
 
-# Run CLI with arguments
 run:
-	PATH="$(CURDIR)/$(BIN_DIR):$$PATH" $(VENV_BIN)/1clickcharter \
-	  --audio "$(AUDIO)" \
-	  --out "$(OUT)" \
-	  --title "$(TITLE)" \
-	  --artist "$(ARTIST)" \
-	  --album "$(ALBUM)" \
-	  --genre "$(GENRE)" \
-	  --year "$(YEAR)" \
-	  --charter "$(CHARTER)" \
-	  --delay-ms "$(DELAY_MS)" \
-	  --mode "$(MODE)" \
-	  --min-gap-ms "$(MIN_GAP_MS)" \
-	  --max-nps "$(MAX_NPS)" \
-	  --seed "$(SEED)" \
-	  $(if $(filter 1,$(FETCH_METADATA)),--fetch-metadata,) \
-	  --user-agent "$(USER_AGENT)"
+	$(PYTHON) wrapper.py
 
-run-real:
-	$(MAKE) run MODE=real
-
-run-dummy:
-	$(MAKE) run MODE=dummy
-
-# Run GUI
 gui: install
-	PATH="$(CURDIR)/$(BIN_DIR):$$PATH" $(VENV_BIN)/1clickcharter-gui
+	$(PYTHON) wrapper.py
 
 # -----------------------------------------------------------------------------
-# 5. DEVELOPMENT TOOLS
+# 5. UTILS & BUILD
 # -----------------------------------------------------------------------------
 test:
 	$(PYTHON) -m pytest
@@ -105,62 +91,35 @@ test:
 lint:
 	$(PYTHON) -m ruff check .
 
-# Opens the output folder on macOS/Linux
-open-out:
-	open "$(dir $(OUT))" 2>/dev/null || xdg-open "$(dir $(OUT))" 2>/dev/null || true
-
-# -----------------------------------------------------------------------------
-# 6. BUILDING & PACKAGING
-# -----------------------------------------------------------------------------
-# Build Python Wheel / Source Dist
-build: install
-	$(PYTHON) -m build
-
-distcheck: build
-	$(PYTHON) -m twine check dist/*
-
-# Generate Icons using the script
+# Cross-platform icon generation using Python (We will create this script next)
 icons:
-	@chmod +x $(SCRIPTS_DIR)/make_icons.sh
 	@echo "🎨 Generating icons..."
-	@./$(SCRIPTS_DIR)/make_icons.sh
+	$(PYTHON) $(SCRIPTS_DIR)/make_icons.py
 
-# Build Standalone Application (PyInstaller)
-# Note: Maps 'assets' folder to 'assets' in bundle
+# Build Standalone (Cross Platform)
 package: install icons
 	@echo "🚀 Packaging $(APP_NAME)..."
-	@rm -rf dist build
-	@$(VENV_BIN)/pyinstaller --noconfirm --clean \
+	@$(PYTHON) -c "import shutil; shutil.rmtree('dist', ignore_errors=True); shutil.rmtree('build', ignore_errors=True)"
+	$(VENV_BIN)/pyinstaller --noconfirm --clean \
 		--name "$(APP_NAME)" \
 		--windowed \
 		--icon "$(ASSETS_DIR)/icons/AppIcon.icns" \
 		--add-data "$(ASSETS_DIR)$(SEP)$(ASSETS_DIR)" \
-		--add-binary "$(BIN_DIR)/ffmpeg$(SEP)." \
-		--add-binary "$(BIN_DIR)/ffprobe$(SEP)." \
+		--add-binary "$(BIN_DIR)/ffmpeg$(if $(filter Windows_NT,$(OS)),.exe,)$(SEP)." \
+		--add-binary "$(BIN_DIR)/ffprobe$(if $(filter Windows_NT,$(OS)),.exe,)$(SEP)." \
 		--paths "." \
 		--hidden-import "charter.cli" \
 		--hidden-import "gui.qt_app" \
 		--collect-all "charter" \
 		$(ENTRY_SCRIPT)
-	@echo "✅ Build complete! App is in dist/$(APP_NAME).app"
-
-# Run the packaged app (macOS specific path)
-run-dist:
-	@dist/$(APP_NAME).app/Contents/MacOS/$(APP_NAME)
-
-# Full loop: Package then Run
-app: package run-dist
+	@echo "✅ Build complete!"
 
 # -----------------------------------------------------------------------------
-# 7. CLEANUP
+# 6. CLEANUP
 # -----------------------------------------------------------------------------
-# Standard clean: Removes build artifacts but keeps virtual env
+# Use Python for cross-platform cleanup to avoid 'rm -rf' failures on Windows
 clean:
-	rm -rf dist build output *.spec *.egg-info
-	find . -type d -name "__pycache__" -exec rm -rf {} +
-	find . -type d -name ".pytest_cache" -exec rm -rf {} +
-	find . -type d -name ".ruff_cache" -exec rm -rf {} +
+	$(PY) -c "import shutil, pathlib; [shutil.rmtree(p) for p in pathlib.Path('.').glob('dist')]; [shutil.rmtree(p) for p in pathlib.Path('.').glob('build')]; [shutil.rmtree(p) for p in pathlib.Path('.').glob('output')];"
 
-# Deep clean: Removes everything including venv
 clean-all: clean
-	rm -rf $(VENV)
+	$(PY) -c "import shutil; shutil.rmtree('$(VENV)', ignore_errors=True)"
