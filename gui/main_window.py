@@ -20,6 +20,7 @@ from gui.updater import UpdateWorker
 # Import the UI Builder
 from gui.ui_layout import UiBuilder
 
+
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -55,7 +56,8 @@ class MainWindow(QMainWindow):
 
         # --- AUTO UPDATE CHECK ---
         self.update_thread = UpdateWorker(self)
-        self.update_thread.checker.update_available.connect(self.on_update_available)
+        self.update_thread.checker.update_available.connect(
+            self.on_update_available)
         # Delay check by 2 seconds to allow UI to render first
         QTimer.singleShot(2000, self.update_thread.start)
         # -------------------------
@@ -70,7 +72,8 @@ class MainWindow(QMainWindow):
         else:
             self.settings_panel.preset_combo.setCurrentText("2) Standard")
 
-        self.settings_panel.apply_preset(self.settings_panel.preset_combo.currentText())
+        self.settings_panel.apply_preset(
+            self.settings_panel.preset_combo.currentText())
 
         self._update_queue_display()
         # Initial State Update will happen via QTimer to ensure UI is ready
@@ -100,7 +103,8 @@ class MainWindow(QMainWindow):
             }
         """)
 
-        self.btn_update.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(url)))
+        self.btn_update.clicked.connect(
+            lambda: QDesktopServices.openUrl(QUrl(url)))
 
         # Insert into footer layout next to Support button
         if hasattr(self, "btn_support") and self.btn_support.parentWidget():
@@ -117,7 +121,8 @@ class MainWindow(QMainWindow):
         c_val = self.meta_panel.charter_edit.text().strip() or "Zullo7569"
         self.settings.setValue("charter", c_val)
         self.settings.setValue("out_dir", self.out_panel.dir_edit.text())
-        self.settings.setValue("preset", self.settings_panel.preset_combo.currentText())
+        self.settings.setValue(
+            "preset", self.settings_panel.preset_combo.currentText())
         self.settings.setValue("geometry", self.saveGeometry())
         super().closeEvent(event)
 
@@ -131,7 +136,8 @@ class MainWindow(QMainWindow):
         self.out_panel.dir_edit.setText(saved_out)
 
         geom = self.settings.value("geometry")
-        if geom: self.restoreGeometry(geom)
+        if geom:
+            self.restoreGeometry(geom)
 
     def _wire(self):
         # Sidebar
@@ -189,7 +195,8 @@ class MainWindow(QMainWindow):
         has_queue = bool(self.song_queue)
 
         # 1. Main Generate Button (Single Song)
-        self.btn_generate.setEnabled((not running) and has_audio and has_title and has_artist and has_out)
+        self.btn_generate.setEnabled(
+            (not running) and has_audio and has_title and has_artist and has_out)
         self.btn_cancel.setEnabled(running)
 
         # 2. Batch Run Button Logic
@@ -209,7 +216,8 @@ class MainWindow(QMainWindow):
             self.btn_run_queue.setToolTip(msg)
 
         self.out_panel.btn_open_folder.setEnabled(has_out)
-        self.out_panel.btn_open_song.setEnabled(self.last_out_song is not None and self.last_out_song.exists())
+        self.out_panel.btn_open_song.setEnabled(
+            self.last_out_song is not None and self.last_out_song.exists())
 
     def _toggle_ui_state(self, enabled: bool):
         """Grays out or enables main forms during processing."""
@@ -231,12 +239,14 @@ class MainWindow(QMainWindow):
         has_queue = bool(self.song_queue)
 
         if not has_out:
-            QMessageBox.warning(self, "Setup Required", "Please select an <b>Output Folder</b> before starting the queue.")
+            QMessageBox.warning(
+                self, "Setup Required", "Please select an <b>Output Folder</b> before starting the queue.")
             self.out_panel.btn_browse.click()
             return
 
         if not has_queue:
-            QMessageBox.information(self, "Queue Empty", "Add more songs to start a batch run.")
+            QMessageBox.information(
+                self, "Queue Empty", "Add more songs to start a batch run.")
             return
 
         # 1. GATHER ALL ITEMS (Current + Queue)
@@ -282,7 +292,8 @@ class MainWindow(QMainWindow):
 
     def _start_generation_process(self):
         cfg = self.build_cfg()
-        if not cfg: return
+        if not cfg:
+            return
 
         # UI Lock
         self.btn_generate.setText("Generating...")
@@ -301,7 +312,8 @@ class MainWindow(QMainWindow):
         if self._is_batch_running:
             analyze = False
             if self.settings_panel.chk_review.isChecked():
-                self.append_log("ℹ️ Batch Mode: Skipping 'Review Sections' step.")
+                self.append_log(
+                    "ℹ️ Batch Mode: Skipping 'Review Sections' step.")
 
         self.worker.start(cfg, analyze_first=analyze)
 
@@ -336,10 +348,11 @@ class MainWindow(QMainWindow):
 
             # If in batch mode, we CONTINUE instead of stopping
             if self._is_batch_running and self.song_queue:
-                 self.status_label.setText(f"Failed: {current_title}. Moving to next...")
-                 # Short delay before next song to let UI breathe
-                 QTimer.singleShot(1000, self._pop_and_start_next)
-                 return
+                self.status_label.setText(
+                    f"Failed: {current_title}. Moving to next...")
+                # Short delay before next song to let UI breathe
+                QTimer.singleShot(1000, self._pop_and_start_next)
+                return
 
             # If single run or last item failed:
             self.status_label.setText("Failed")
@@ -352,7 +365,8 @@ class MainWindow(QMainWindow):
                 BatchResultDialog(self.batch_results, self).exec()
             else:
                 # Standard single error
-                QMessageBox.critical(self, "Process Failed", "Check logs for details.")
+                QMessageBox.critical(self, "Process Failed",
+                                     "Check logs for details.")
             return
 
         # 3. HANDLE SUCCESS
@@ -362,7 +376,8 @@ class MainWindow(QMainWindow):
             try:
                 (out_song / "album.png").write_bytes(self.cover_path.read_bytes())
                 self.log_window.append_text("Cover copied.")
-            except: pass
+            except:
+                pass
 
         self.status_label.setText("Validating...")
 
@@ -383,7 +398,8 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(1000, self._start_generation_process)
 
     def _pop_next_song(self):
-        if not self.song_queue: return
+        if not self.song_queue:
+            return
 
         next_s_data = self.song_queue.pop(0)
         self._clear_song_info()
@@ -407,7 +423,8 @@ class MainWindow(QMainWindow):
         self._update_state()
 
     def build_cfg(self) -> RunConfig | None:
-        if not self.audio_path: return None
+        if not self.audio_path:
+            return None
         out_txt = self.out_panel.dir_edit.text().strip()
         if not out_txt:
             QMessageBox.critical(self, "Error", "Output folder required.")
@@ -452,7 +469,8 @@ class MainWindow(QMainWindow):
     def load_audio(self, path: Path):
         self.audio_path = path
         self.audio_label.setText(path.name)
-        self.audio_label.setStyleSheet("color: palette(text); font-weight: bold; font-size: 11pt;")
+        self.audio_label.setStyleSheet(
+            "color: palette(text); font-weight: bold; font-size: 11pt;")
         if not self._title_user_edited and not self.meta_panel.title_edit.text().strip():
             self.meta_panel.title_edit.setText(path.stem)
         self._update_state()
@@ -466,7 +484,8 @@ class MainWindow(QMainWindow):
         else:
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
-            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+            self.audio_label.setStyleSheet(
+                "font-style: italic; color: palette(disabled-text); font-size: 11pt;")
             self.status_label.setText("Audio cleared")
             self._update_state()
             self.audio_label.adjustSize()
@@ -478,8 +497,10 @@ class MainWindow(QMainWindow):
         self._title_user_edited = False
 
     def add_to_queue_dialog(self):
-        files, _ = QFileDialog.getOpenFileNames(self, "Add Audio", "", "Audio (*.mp3 *.wav *.ogg *.flac)")
-        if not files: return
+        files, _ = QFileDialog.getOpenFileNames(
+            self, "Add Audio", "", "Audio (*.mp3 *.wav *.ogg *.flac)")
+        if not files:
+            return
         paths = [Path(f) for f in files]
 
         if not self.audio_path and paths:
@@ -495,7 +516,7 @@ class MainWindow(QMainWindow):
             item = QListWidgetItem(self.queue_list)
             wid = QWidget()
             h = QHBoxLayout(wid)
-            h.setContentsMargins(4,0,4,0)
+            h.setContentsMargins(4, 0, 4, 0)
 
             if isinstance(item_data, dict):
                 name = item_data["path"].name
@@ -514,7 +535,8 @@ class MainWindow(QMainWindow):
             btn.setCursor(Qt.PointingHandCursor)
             btn.setStyleSheet("border: none; background: transparent;")
 
-            btn.clicked.connect(lambda checked=False, idx=i: self._remove_queue_item(idx))
+            btn.clicked.connect(lambda checked=False,
+                                idx=i: self._remove_queue_item(idx))
             h.addWidget(btn, 0)
             item.setSizeHint(wid.sizeHint())
             self.queue_list.setItemWidget(item, wid)
@@ -531,42 +553,55 @@ class MainWindow(QMainWindow):
         self._update_queue_display()
 
     def pick_cover(self):
-        p, _ = QFileDialog.getOpenFileName(self, "Art", "", "Images (*.png *.jpg)")
-        if p: self.load_cover(Path(p))
+        p, _ = QFileDialog.getOpenFileName(
+            self, "Art", "", "Images (*.png *.jpg)")
+        if p:
+            self.load_cover(Path(p))
 
     def load_cover(self, p: Path):
         self.cover_path = p
-        self.cover_preview.setPixmap(QPixmap(str(p)).scaled(250, 250, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.cover_preview.setPixmap(QPixmap(str(p)).scaled(
+            250, 250, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         self.cover_preview.setText("")
 
     def clear_cover(self):
         self.cover_path = None
         self.cover_preview.setPixmap(QPixmap())
         self.cover_preview.setText("Drag Art Here")
-        self.cover_preview.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+        self.cover_preview.setStyleSheet(
+            "font-style: italic; color: palette(disabled-text); font-size: 11pt;")
 
     def pick_output_dir(self):
         p = QFileDialog.getExistingDirectory(self, "Output Folder")
-        if p: self.out_panel.dir_edit.setText(p)
+        if p:
+            self.out_panel.dir_edit.setText(p)
 
     def open_output_root(self):
         self._open(Path(self.out_panel.dir_edit.text()))
 
     def open_last_song(self):
-        if self.last_out_song: self._open(self.last_out_song)
+        if self.last_out_song:
+            self._open(self.last_out_song)
 
     def _open(self, p: Path):
-        QProcess.startDetached("open" if sys.platform=="darwin" else "explorer" if sys.platform=="win32" else "xdg-open", [str(p)])
+        QProcess.startDetached(
+            "open" if sys.platform == "darwin" else "explorer" if sys.platform == "win32" else "xdg-open", [str(p)])
 
     def on_dark_toggle(self, checked):
         ThemeManager.apply_style(QApplication.instance(), checked)
 
     def snap_to_content(self):
-        if self.centralWidget(): self.centralWidget().layout().activate()
-        self.resize(1000, 700)
+        if self.centralWidget():
+            self.centralWidget().layout().activate()
+        # FIX: Dynamic default window size for OS
+        if sys.platform == "win32":
+            self.resize(800, 600)
+        else:
+            self.resize(1000, 700)
 
     def dragEnterEvent(self, e: QDragEnterEvent):
-        if e.mimeData().hasUrls(): e.acceptProposedAction()
+        if e.mimeData().hasUrls():
+            e.acceptProposedAction()
 
     def dropEvent(self, e: QDropEvent):
         urls = e.mimeData().urls()
@@ -575,11 +610,14 @@ class MainWindow(QMainWindow):
         new_s = []
         for u in urls:
             p = Path(u.toLocalFile())
-            if p.suffix.lower() in audio_ext: new_s.append(p)
-            elif p.suffix.lower() in img_ext: self.load_cover(p)
+            if p.suffix.lower() in audio_ext:
+                new_s.append(p)
+            elif p.suffix.lower() in img_ext:
+                self.load_cover(p)
 
         if new_s:
-            if not self.audio_path: self.load_audio(new_s.pop(0))
+            if not self.audio_path:
+                self.load_audio(new_s.pop(0))
             self.song_queue.extend(new_s)
             self._update_queue_display()
 
@@ -596,12 +634,15 @@ class MainWindow(QMainWindow):
         cmd.extend(["--validate", str(song_dir)])
 
         self.validator_proc = QProcess(self)
-        self.validator_proc.finished.connect(lambda c, s: self._on_health_finished(c, s, song_dir, is_batch_intermediate))
+        self.validator_proc.finished.connect(
+            lambda c, s: self._on_health_finished(c, s, song_dir, is_batch_intermediate))
         self.validator_proc.start(cmd[0], cmd[1:])
 
     def _on_health_finished(self, code: int, status: QProcess.ExitStatus, song_dir: Path, is_batch_intermediate: bool) -> None:
-        stdout = bytes(self.validator_proc.readAllStandardOutput()).decode("utf-8", errors="replace")
-        stderr = bytes(self.validator_proc.readAllStandardError()).decode("utf-8", errors="replace")
+        stdout = bytes(self.validator_proc.readAllStandardOutput()
+                       ).decode("utf-8", errors="replace")
+        stderr = bytes(self.validator_proc.readAllStandardError()
+                       ).decode("utf-8", errors="replace")
 
         full_output = stdout + stderr
 
@@ -638,7 +679,8 @@ class MainWindow(QMainWindow):
                 self._clear_song_info()
                 self.audio_path = None
                 self.audio_label.setText("Drag Audio Files Here")
-                self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+                self.audio_label.setStyleSheet(
+                    "font-style: italic; color: palette(disabled-text); font-size: 11pt;")
 
             # Show Summary Dialog INSTEAD of standard popup
             BatchResultDialog(self.batch_results, self).exec()
@@ -658,11 +700,14 @@ class MainWindow(QMainWindow):
             self._clear_song_info()
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
-            self.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+            self.audio_label.setStyleSheet(
+                "font-style: italic; color: palette(disabled-text); font-size: 11pt;")
 
         if warnings:
-            msg += "\n\nWarnings/Errors:\n" + "\n".join(f"• {w[:80]}" for w in warnings[:5])
-            if len(warnings) > 5: msg += "\n... (check logs for more)"
+            msg += "\n\nWarnings/Errors:\n" + \
+                "\n".join(f"• {w[:80]}" for w in warnings[:5])
+            if len(warnings) > 5:
+                msg += "\n... (check logs for more)"
 
         title = "Generation Complete" if not warnings else "Complete (With Warnings)"
         icon = QMessageBox.Information if not warnings else QMessageBox.Warning

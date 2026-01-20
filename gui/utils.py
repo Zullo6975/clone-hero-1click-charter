@@ -40,28 +40,44 @@ def get_python_exec() -> str | Path:
     if unix_python.exists():
         return unix_python
 
-    # 3. Fallback to system python (should rarely happen if venv is set up)
+    # 3. Fallback to system python
     return sys.executable
+
+
+def get_base_font_size() -> int:
+    """Returns the native standard font size for the current OS."""
+    if sys.platform == "win32":
+        return 9  # Windows standard is smaller
+    elif sys.platform == "darwin":
+        return 11  # macOS standard is larger
+    return 10     # Linux
+
+
+def get_font(size: int | None = None, bold: bool = False) -> QFont:
+    """
+    Returns a QFont. If size is None, uses the OS default base size.
+    """
+    f = QApplication.font()
+
+    # If no specific size requested, use the OS native default
+    final_size = size if size is not None else get_base_font_size()
+
+    f.setPointSize(final_size)
+    f.setBold(bold)
+    return f
 
 
 def form_label(text: str, required: bool = False, align=Qt.AlignCenter | Qt.AlignVCenter) -> QLabel:
     """
     Creates a standardized label for forms.
-    UPDATED: Default alignment is now Center (was Right).
     """
     txt = f"{text} <span style='color:#ff4444;'>*</span>" if required else text
     lbl = QLabel(txt)
     lbl.setAlignment(align)
+    # Adjusted: Use slightly larger than base for form labels, but not huge
+    lbl.setFont(get_font(size=get_base_font_size() + 1))
     lbl.setMinimumWidth(110)
-    lbl.setFont(get_font(11))
     return lbl
-
-
-def get_font(size: int = 11, bold: bool = False) -> QFont:
-    f = QApplication.font()
-    f.setPointSize(size)
-    f.setBold(bold)
-    return f
 
 
 @dataclass
