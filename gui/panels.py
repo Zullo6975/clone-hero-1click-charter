@@ -23,7 +23,7 @@ class MetadataWidget(QGroupBox):
         layout = QFormLayout(self)
         layout.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         layout.setLabelAlignment(Qt.AlignVCenter)
-        layout.setVerticalSpacing(14)
+        layout.setVerticalSpacing(20)
 
         self.title_edit = QLineEdit()
         self.artist_edit = QLineEdit()

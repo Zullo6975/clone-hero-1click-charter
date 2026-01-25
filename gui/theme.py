@@ -73,129 +73,128 @@ class ThemeManager:
 
         # Stylesheet overrides
         app.setStyleSheet(f"""
-            QFrame#HeaderLine {{
-                background-color: {line_color};
+            QWidget {{
+                outline: none;
             }}
 
+            /* --- GROUP BOXES (Compact Modern) --- */
             QGroupBox {{
-                border: 1px solid palette(mid);
-                border-radius: 6px;
-                margin-top: 24px;
-                padding-top: 12px;
+                border: 1px solid {line_color};
+                border-radius: 8px;
+                margin-top: 1.2em; /* Reduced top margin */
+                padding: 12px;     /* Reduced internal padding (was 15) */
                 font-weight: bold;
-                font-size: 11pt;
-                max-width: 550px;
+                font-size: 10pt;
+                background-color: transparent;
             }}
-            QGroupBox::title {{ subcontrol-origin: margin; left: 10px; padding: 0 5px; }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 5px;
+                color: palette(highlight);
+            }}
 
+            /* --- INPUT FIELDS --- */
             QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QListWidget {{
-                padding: 5px;
-                border-radius: 4px;
+                padding: 6px; /* Reduced from 8px */
+                border-radius: 6px;
                 border: 1px solid palette(mid);
                 background-color: palette(base);
                 color: palette(text);
-                min-height: 18px;
-                max-width: 425px;
                 font-size: 11pt;
-            }}
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QDoubleSpinBox:focus, QTextEdit:focus, QListWidget:focus, QSlider:focus {{
-                border: 1px solid palette(highlight);
-            }}
-
-            /* Disabled Inputs */
-            QLineEdit:disabled, QComboBox:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled {{
-                background-color: palette(window);
-                color: palette(disabled-text);
-                border: 1px dashed palette(mid);
-            }}
-
-            QComboBox QAbstractItemView {{
-                background-color: palette(base);
-                color: palette(text);
                 selection-background-color: palette(highlight);
-                selection-color: palette(highlighted-text);
+            }}
+            QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{
+                border: 2px solid palette(highlight);
+                padding: 5px;
             }}
 
-            /* STANDARD BUTTONS - SCALED DOWN */
+            /* --- BUTTONS --- */
             QPushButton {{
-                padding: 5px 10px;
-                border-radius: 5px;
+                padding: 6px 16px; /* Reduced vertical padding */
+                border-radius: 6px;
                 border: 1px solid palette(mid);
                 background-color: palette(button);
                 color: palette(text);
-                font-size: 11pt; /* Slightly smaller font */
+                font-size: 11pt;
+                font-weight: 500;
             }}
             QPushButton:hover {{
                 background-color: palette(midlight);
-                border: 1px solid palette(dark);
+                border-color: palette(dark);
             }}
-            QPushButton:disabled {{
-                background-color: palette(window);
-                color: palette(disabled-text);
-                border: 1px solid palette(mid);
+            QPushButton:pressed {{
+                background-color: palette(dark);
             }}
 
             /* PRIMARY BUTTON (GENERATE) */
             QPushButton#Primary {{
-                padding: 6px 12px;
-                border-radius: 5px;
-                border: 1px solid palette(mid);
-                background-color: palette(button);
-                color: palette(text);
-                font-size: 11pt; /* Slightly smaller font */
-                min-width: 75px;
-                max-width: 75px;
+                background-color: palette(highlight);
+                color: white;
+                border: 1px solid palette(highlight);
+                font-weight: bold;
+                padding: 8px 24px;
             }}
             QPushButton#Primary:hover {{
-                border: 1px solid palette(text);
-                background-color: palette(highlight);
+                background-color: #3a86ff;
             }}
-            QPushButton#Primary:disabled {{
-                background-color: palette(mid);
-                color: palette(disabled-text);
+
+            /* --- SCROLL BARS (Fix Visibility) --- */
+            QScrollBar:vertical {{
+                border: none;
+                background: {line_color}; /* Subtle background track */
+                width: 12px; /* Slightly wider */
+                margin: 0;
+                border-radius: 6px;
+            }}
+            QScrollBar::handle:vertical {{
+                background: palette(mid); /* Ensure this contrasts */
+                min-height: 20px;
+                border-radius: 6px;
+                border: 2px solid transparent; /* Creates padding effect */
+                background-clip: content-box;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: palette(text);
+                border: 2px solid transparent;
+                background-clip: content-box;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0px;
+            }}
+
+            /* --- TABS --- */
+            QTabWidget::pane {{
                 border: 1px solid palette(mid);
+                border-radius: 6px;
+                background: palette(base);
+            }}
+            QTabBar::tab {{
+                background: transparent;
+                padding: 6px 16px;
+                margin-bottom: -1px;
+                border-bottom: 2px solid transparent;
+                color: palette(disabled-text);
+                font-weight: 500;
+            }}
+            QTabBar::tab:selected {{
+                color: palette(highlight);
+                border-bottom: 2px solid palette(highlight);
             }}
 
-            QCheckBox {{ spacing: 8px; }}
-
-            /* STATUS BAR */
+            /* --- STATUS BAR --- */
             QStatusBar {{
                 background: palette(window);
                 border-top: 1px solid palette(mid);
-                min-height: 50px;
-                max-height: 50px;
             }}
-            QStatusBar::item {{ border: none; }}
-
             QProgressBar {{
-                border: 1px solid palette(mid);
+                border: none;
+                background-color: palette(mid);
                 border-radius: 4px;
-                text-align: center;
-                color: palette(text);
-                background: palette(base);
+                height: 8px;
             }}
             QProgressBar::chunk {{
                 background-color: palette(highlight);
-            }}
-
-            /* TABS */
-            QTabWidget::pane {{
-                border: 1px solid palette(mid);
                 border-radius: 4px;
-                top: -1px;
-            }}
-            QTabBar::tab {{
-                background: palette(button);
-                border: 1px solid palette(mid);
-                border-bottom-color: palette(mid);
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                padding: 6px 12px;
-                margin-right: 2px;
-            }}
-            QTabBar::tab:selected {{
-                background: palette(base);
-                border-bottom-color: palette(base);
-                font-weight: bold;
             }}
         """)

@@ -593,11 +593,7 @@ class MainWindow(QMainWindow):
     def snap_to_content(self):
         if self.centralWidget():
             self.centralWidget().layout().activate()
-        # FIX: Dynamic default window size for OS
-        if sys.platform == "win32":
-            self.resize(800, 600)
-        else:
-            self.resize(1000, 700)
+        self.resize(1100, 850)  # Taller default
 
     def dragEnterEvent(self, e: QDragEnterEvent):
         if e.mimeData().hasUrls():

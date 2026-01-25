@@ -115,6 +115,7 @@ class UiBuilder:
         # Audio
         grp_audio = QGroupBox("Input Audio (REQUIRED)")
         v = QVBoxLayout(grp_audio)
+        v.setSpacing(10) # Tighter inside the box
         window.audio_label = QLabel("Drag Audio Files Here")
         window.audio_label.setAlignment(Qt.AlignCenter)
         window.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
@@ -135,10 +136,10 @@ class UiBuilder:
         # Queue
         window.grp_queue = QGroupBox("Pending Queue")
         v_q = QVBoxLayout(window.grp_queue)
+        v_q.setSpacing(10) # Tighter
 
         window.queue_list = QListWidget()
         window.queue_list.setMaximumHeight(90)
-        # Disable horizontal scrolling
         window.queue_list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
         # Queue Control Row
@@ -162,7 +163,7 @@ class UiBuilder:
         v_a = QVBoxLayout(grp_art)
         window.cover_preview = QLabel("Drag Art Here")
         window.cover_preview.setAlignment(Qt.AlignCenter)
-        window.cover_preview.setFixedSize(280, 280)
+        window.cover_preview.setFixedSize(250, 250)
         window.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic; font-size: 11pt;")
 
         window.btn_pick_cover = QPushButton("Image...")

@@ -21,6 +21,7 @@ wheels/
 *.egg
 .venv/
 venv/
+bin/
 
 # Project Specific
 output/
