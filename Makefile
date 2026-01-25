@@ -62,9 +62,9 @@ doctor:
 	@echo "System Python:    $(PY)"
 	@echo "VENV Python:      $(PYTHON)"
 	@echo "Checking PySide6..."
-	@$(PYTHON) -c "import PySide6; print('✅ PySide6 OK')"
+	@$(PYTHON) -c "import PySide6; print('[OK] PySide6 OK')"
 	@echo "Checking FFmpeg..."
-	@$(PYTHON) -c "import sys, pathlib; p = pathlib.Path('$(BIN_DIR)') / ('ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'); print('✅ Found local' if p.exists() else '❌ Missing (Run make deps)')"
+	@$(PYTHON) -c "import sys, pathlib; p = pathlib.Path('$(BIN_DIR)') / ('ffmpeg.exe' if sys.platform == 'win32' else 'ffmpeg'); print('[OK] Found local' if p.exists() else '[MISSING] Missing (Run make deps)')"
 
 # -----------------------------------------------------------------------------
 # 4. RUNNING (CLI & GUI)

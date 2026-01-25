@@ -8,7 +8,7 @@ from pathlib import Path
 def report_progress(block_num, block_size, total_size):
     if total_size > 0:
         percent = int(block_num * block_size * 100 / total_size)
-        sys.stdout.write(f"\r⬇️  Downloading FFmpeg... {percent}%")
+        sys.stdout.write(f"\r... Downloading FFmpeg... {percent}%")
         sys.stdout.flush()
 
 
@@ -23,10 +23,10 @@ def setup_ffmpeg():
         ("ffprobe.exe" if sys.platform == "win32" else "ffprobe")
 
     if ffmpeg_exe.exists() and ffprobe_exe.exists():
-        print(f"✅ FFmpeg found in {bin_dir}")
+        print(f"[OK] FFmpeg found in {bin_dir}")
         return
 
-    print(f"⚙️  FFmpeg not found. Downloading for {sys.platform}...")
+    print(f"[INFO] FFmpeg not found. Downloading for {sys.platform}...")
 
     try:
         if sys.platform == "win32":
@@ -34,7 +34,7 @@ def setup_ffmpeg():
             url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
             zip_path = bin_dir / "ffmpeg.zip"
             urllib.request.urlretrieve(url, zip_path, report_progress)
-            print("\n📦 Extracting...")
+            print("\n[INFO] Extracting...")
 
             with zipfile.ZipFile(zip_path, 'r') as z:
                 # Flatten: Find exe inside nested folders and copy to /bin
@@ -53,7 +53,7 @@ def setup_ffmpeg():
             # 1. FFmpeg
             urllib.request.urlretrieve(
                 "https://evermeet.cx/ffmpeg/getrelease/zip", bin_dir / "ffmpeg.zip", report_progress)
-            print("\n📦 Extracting ffmpeg...")
+            print("\n[INFO] Extracting ffmpeg...")
             with zipfile.ZipFile(bin_dir / "ffmpeg.zip", 'r') as z:
                 with z.open("ffmpeg") as src, open(ffmpeg_exe, "wb") as dst:
                     shutil.copyfileobj(src, dst)
@@ -62,7 +62,7 @@ def setup_ffmpeg():
             # 2. FFprobe
             urllib.request.urlretrieve(
                 "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip", bin_dir / "ffprobe.zip", report_progress)
-            print("\n📦 Extracting ffprobe...")
+            print("\n[INFO] Extracting ffprobe...")
             with zipfile.ZipFile(bin_dir / "ffprobe.zip", 'r') as z:
                 with z.open("ffprobe") as src, open(ffprobe_exe, "wb") as dst:
                     shutil.copyfileobj(src, dst)
@@ -73,13 +73,13 @@ def setup_ffmpeg():
             ffprobe_exe.chmod(0o755)
 
         else:
-            print("\n⚠️  Linux detected: Please install ffmpeg via your package manager (e.g., sudo apt install ffmpeg).")
+            print("\n[WARNING] Linux detected: Please install ffmpeg via your package manager (e.g., sudo apt install ffmpeg).")
             return
 
-        print(f"\n✅ FFmpeg setup complete: {bin_dir}")
+        print(f"\n[OK] FFmpeg setup complete: {bin_dir}")
 
     except Exception as e:
-        print(f"\n❌ Failed to setup FFmpeg: {e}")
+        print(f"\n[ERROR] Failed to setup FFmpeg: {e}")
 
 
 if __name__ == "__main__":
