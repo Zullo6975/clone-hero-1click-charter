@@ -1,11 +1,12 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
-import librosa
-import numpy as np
+import librosa  # type: ignore
+import numpy as np  # type: ignore
 
 from gui.utils import repo_root, is_frozen
 
@@ -59,11 +60,11 @@ def normalize_and_save(src: Path, dest: Path) -> None:
         # We keep stderr visible (don't send to DEVNULL) so 'loglevel error' can still print actual issues.
         subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
     except FileNotFoundError:
-        print(f"❌ Error: FFmpeg binary not found at '{FFMPEG_BIN}'.")
+        print(f"[ERROR] FFmpeg binary not found at '{FFMPEG_BIN}'.")
         print("   Please run 'make deps' to download it automatically.")
         raise RuntimeError("FFmpeg missing")
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error: FFmpeg failed to process audio (Code {e.returncode})")
+        print(f"[ERROR] FFmpeg failed to process audio (Code {e.returncode})")
         raise
 
 

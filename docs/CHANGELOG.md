@@ -15,6 +15,10 @@
   - **Sidebar:** Optimized the "Album Art" preview size (reduced to 200px) to prevent vertical overflow.
   - **Spacing:** Tuned the whitespace between the Sidebar and Main Panel to let the UI breathe without pushing content off-screen.
 
+### 🐛 Bug Fixes
+
+- **Windows Console Safety:** Replaced all emoji characters in CLI scripts (`audio.py`, `make_icons.py`, `setup_ffmpeg.py`, `Makefile`) with text-based equivalents (e.g., `[OK]`, `[ERROR]`). This resolves `UnicodeEncodeError` crashes on Windows systems using legacy console encodings like cp1252.
+
 ## [2.1.2] - 2026-01-13
 
 ### 🐛 Bug Fixes
