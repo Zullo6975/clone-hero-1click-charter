@@ -14,10 +14,10 @@ from PySide6.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox,
 
 # Try to import mutagen for metadata reading
 try:
-    import mutagen  # type: ignore
-    from mutagen.easyid3 import EasyID3  # type: ignore
-    from mutagen.flac import FLAC  # type: ignore
-    from mutagen.oggvorbis import OggVorbis  # type: ignore
+    import mutagen
+    from mutagen.easyid3 import EasyID3
+    from mutagen.flac import FLAC
+    from mutagen.oggvorbis import OggVorbis
     HAS_MUTAGEN = True
 except ImportError:
     HAS_MUTAGEN = False

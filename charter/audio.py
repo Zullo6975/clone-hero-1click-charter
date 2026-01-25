@@ -1,12 +1,11 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 
-import librosa  # type: ignore
-import numpy as np  # type: ignore
+import librosa
+import numpy as np
 
 from gui.utils import repo_root, is_frozen
 

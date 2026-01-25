@@ -1,8 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
-import math
 
-import pretty_midi # type: ignore
+import pretty_midi
 from charter.config import DIFFICULTY_PITCHES, SP_PITCH
 
 RESOLUTION = 192  # Standard .chart ticks per quarter note

@@ -5,8 +5,8 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
 
-import pretty_midi  # type: ignore
-import mido  # type: ignore
+import pretty_midi
+import mido
 
 
 # Clone Hero lead guitar track name we generate

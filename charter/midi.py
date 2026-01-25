@@ -5,10 +5,10 @@ import random
 import json
 import math
 
-import pretty_midi  # type: ignore
-import librosa  # type: ignore
-import numpy as np  # type: ignore
-import mido  # type: ignore
+import pretty_midi
+import librosa
+import numpy as np
+import mido
 
 from charter.config import ChartConfig, LANE_PITCHES, TRACK_NAME, SP_PITCH
 from charter.audio import detect_onsets, estimate_pitches

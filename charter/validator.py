@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Tuple
 
-import pretty_midi  # type: ignore
-import mido  # type: ignore
+import pretty_midi
+import mido
 
 # ---- Your chart conventions ----
 TRACK_NAME = "PART GUITAR"
