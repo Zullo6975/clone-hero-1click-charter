@@ -12,15 +12,15 @@ def main():
     icon_dir = root / "assets" / "icons"
 
     if not src.exists():
-        print(f"❌ Error: Source icon not found at {src}")
+        print(f"[ERROR] Source icon not found at {src}")
         sys.exit(1)
 
-    print(f"🎨 Processing icons from: {src.name}")
+    print(f"Processing icons from: {src.name}")
 
     try:
         img = Image.open(src)
     except Exception as e:
-        print(f"❌ Error opening source image: {e}")
+        print(f"[ERROR] Error opening source image: {e}")
         sys.exit(1)
 
     # 1. Generate ICO (Windows)
@@ -29,18 +29,18 @@ def main():
     try:
         img.save(ico_dest, format="ICO", sizes=[
                  (256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])
-        print(f"✅ Created: {ico_dest.name}")
+        print(f"[OK] Created: {ico_dest.name}")
     except Exception as e:
-        print(f"⚠️ Failed to create ICO: {e}")
+        print(f"[WARNING] Failed to create ICO: {e}")
 
     # 2. Generate ICNS (macOS)
     # Pillow supports writing ICNS. Best results when source is 512x512 or 1024x1024.
     icns_dest = icon_dir / "AppIcon.icns"
     try:
         img.save(icns_dest, format="ICNS")
-        print(f"✅ Created: {icns_dest.name}")
+        print(f"[OK] Created: {icns_dest.name}")
     except Exception as e:
-        print(f"⚠️ Failed to create ICNS: {e}")
+        print(f"[WARNING] Failed to create ICNS: {e}")
 
 
 if __name__ == "__main__":
