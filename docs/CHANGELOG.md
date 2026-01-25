@@ -2,6 +2,19 @@
 
 <!-- markdownlint-disable md024 -->
 
+## [2.1.3] - 2026-01-25
+
+### 💅 GUI Polish
+
+- **Modern Windows Theme:** Overhauled the application stylesheet for a cleaner, modern look on Windows 11.
+  - Added rounded corners to buttons, inputs, and group boxes.
+  - Refined internal padding and margins to reduce the "cramped" feel of the Fusion style.
+  - Updated scrollbar and status bar styling for a seamless look.
+- **Layout Adjustments:**
+  - **Window Size:** Increased default window height to ensure all controls are visible on launch.
+  - **Sidebar:** Optimized the "Album Art" preview size (reduced to 200px) to prevent vertical overflow.
+  - **Spacing:** Tuned the whitespace between the Sidebar and Main Panel to let the UI breathe without pushing content off-screen.
+
 ## [2.1.2] - 2026-01-13
 
 ### 🐛 Bug Fixes
@@ -17,7 +30,7 @@
 
 ### 🩹 Batch Workflow Hotfix
 
-- **Consistent Autofill:** The "Run Queue" command now forces metadata autofill (Title/Artist) for the *entire* batch, including the currently loaded song. This overrides manual text entry in the main window to ensure that large batches processed from folders utilize the correct metadata from the file tags every time.
+- **Consistent Autofill:** The "Run Queue" command now forces metadata autofill (Title/Artist) for the _entire_ batch, including the currently loaded song. This overrides manual text entry in the main window to ensure that large batches processed from folders utilize the correct metadata from the file tags every time.
 
 ## [2.1.0] - 2026-01-12
 
