@@ -5,7 +5,7 @@ from packaging import version
 from PySide6.QtCore import QObject, QThread, Signal
 
 # Current App Version
-CURRENT_VERSION = "2.1.3"
+CURRENT_VERSION = "2.1.4"
 
 class UpdateChecker(QObject):
     update_available = Signal(str, str) # version_tag, url

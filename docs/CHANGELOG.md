@@ -2,6 +2,14 @@
 
 <!-- markdownlint-disable md024 -->
 
+## [2.1.4] - 2026-01-31
+
+### 🐛 Bug Fixes
+
+- **Windows Console Crash Fix:** Resolved persistent `UnicodeEncodeError` crashes on Windows environments (GitHub Actions/CP1252 consoles).
+  - Systematically removed all emoji characters (`❌`, `✅`, `📦`, `🎨`, etc.) from the entire codebase, including `charter/audio.py`, `scripts/archiver.py`, `scripts/make_icons.py`, and `scripts/setup_ffmpeg.py`.
+  - Replaced emojis with standard text log tags (e.g., `[OK]`, `[ERROR]`, `[INFO]`) to ensure 100% compatibility with legacy Windows command prompts.
+
 ## [2.1.3] - 2026-01-25
 
 ### 💅 GUI Polish

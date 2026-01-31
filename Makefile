@@ -47,7 +47,7 @@ venv:
 
 # ADDED: setup-ffmpeg call
 deps: venv
-	$(PIP) install --upgrade pip
+	$(PYTHON) -m pip install --upgrade pip
 	$(PIP) install -e ".[dev,gui]"
 	$(PIP) install pyinstaller Pillow
 	@echo "Checking external tools..."

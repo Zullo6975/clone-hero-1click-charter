@@ -301,13 +301,15 @@ class SupportDialog(QDialog):
         btn_email = QPushButton("📧 Email Support")
         btn_email.setCursor(Qt.PointingHandCursor)
         btn_email.setMinimumHeight(40)
-        btn_email.setFixedWidth(150)
+        # FIX: Increased width from 150 to 200 to fit text
+        btn_email.setFixedWidth(200)
         btn_email.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"mailto:{SUPPORT_EMAIL}")))
 
         btn_issue = QPushButton("🐞 Report on GitHub")
         btn_issue.setCursor(Qt.PointingHandCursor)
         btn_issue.setMinimumHeight(40)
-        btn_issue.setFixedWidth(150)
+        # FIX: Increased width from 150 to 200 to fit text
+        btn_issue.setFixedWidth(200)
         btn_issue.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f"{REPO_URL}/issues")))
 
         btn_layout.addWidget(btn_email)
@@ -342,7 +344,9 @@ class SupportDialog(QDialog):
         btn_venmo = QPushButton("💙 Tip with Venmo")
         btn_venmo.setCursor(Qt.PointingHandCursor)
         btn_venmo.setMinimumHeight(45)
-        btn_venmo.setFixedWidth(150)
+
+        # FIX: Increased width from 150 to 200
+        btn_venmo.setFixedWidth(200)
         btn_venmo.setStyleSheet("""
             QPushButton {
                 background-color: #008CFF;
