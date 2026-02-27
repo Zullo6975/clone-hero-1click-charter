@@ -48,12 +48,26 @@
 
 ---
 
-## 🟡 v2.2: Lyric Support (NEXT)
+## � v2.2: Under the Hood (COMPLETE)
+
+**Focus:** Code quality, cross-platform polish, CI hardening, and performance — no new features.
+
+- [x] **Dead Code Removal:** Strip deprecated CLI flags, unused imports, vestigial no-ops, and dead config fields.
+- [x] **Version Consolidation:** Single source of truth in `charter/__init__.py`; pyproject, updater, and archiver all read from it.
+- [x] **Determinism Fix:** Explicit seeded `random.Random` in the reduction pipeline for reproducible charts.
+- [x] **Cross-Platform GUI:** OS-aware font sizing, palette-aware separators, `QDesktopServices` folder opening, screen-relative window sizing.
+- [x] **CI Pipeline:** Quality gate, Linux build, brew-based macOS FFmpeg, SHA-256 checksums.
+- [x] **DRY Cleanup:** Extracted helpers, consolidated constants, eliminated repeated conditions.
+- [x] **Performance:** Bisect-based rolling density and window bucketing.
+
+---
+
+## 🟡 v2.3: Lyric Support (NEXT)
 
 **Focus:** Adding vocal engagement to the charts.
 
-- [ ] **v2.2.0 (Basic):** Retrieve lyrics from metadata services and implement basic `PART VOCALS` track structure.
-- [ ] **v2.2.1 (Smart):** Intelligent syllable alignment and rhythmic placement of lyric events.
+- [ ] **v2.3.0 (Basic):** Retrieve lyrics from metadata services and implement basic `PART VOCALS` track structure.
+- [ ] **v2.3.1 (Smart):** Intelligent syllable alignment and rhythmic placement of lyric events.
 
 ---
 

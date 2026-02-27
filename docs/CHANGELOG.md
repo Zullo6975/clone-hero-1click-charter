@@ -2,6 +2,57 @@
 
 <!-- markdownlint-disable md024 -->
 
+## [2.2.0] - 2026-02-27
+
+### The "Under the Hood" Update
+
+A comprehensive code-quality, cross-platform, and performance release. No new features — every change makes the existing app leaner, more portable, and easier to maintain.
+
+### 🧹 Dead Code & Cleanup
+
+- Removed deprecated CLI flags (`--no-orange`, `--grid-snap`, `--no-rhythmic-glue`) and their dead config fields.
+- Removed vestigial `if orange_notes > 0: pass` no-op and `if summary_only or True:` always-true guard in `validator.py`.
+- Removed unused `import shutil` from `audio.py`.
+- Removed dead `setup_ffmpeg_env()` wrapper; replaced with minimal `setup_frozen_env()`.
+- Stripped `pydub` from project dependencies (was never imported at runtime).
+
+### 🔗 Version Consolidation
+
+- Single source of truth for the version: `charter/__init__.py`.
+- `pyproject.toml`, `updater.py`, and `archiver.py` all read from `charter.__version__` instead of maintaining separate copies.
+
+### 🎲 Determinism Fix
+
+- `reduction.py` functions now accept an explicit `rng: random.Random` parameter instead of using the global RNG, ensuring seeded runs produce identical charts every time.
+
+### 🖥 Cross-Platform GUI Polish
+
+- OS-aware base font sizing (`get_base_font_size()`) — no more hardcoded `11pt` in stylesheets.
+- All separator colors changed from `#d0d0d0` to `palette(mid)` for proper dark/light theme support.
+- `_open()` now uses `QDesktopServices.openUrl()` for reliable cross-platform folder opening.
+- `snap_to_content()` is now screen-relative, preventing the window from exceeding 85% of the display.
+- Fixed `get_font(weight="bold")` bug (was passing a string to a bool parameter).
+
+### ⚙ CI / Build Pipeline
+
+- Added a **quality gate** job (lint + test) that must pass before any platform build runs.
+- Added **Linux** build job (Ubuntu 22.04, AppImage output).
+- macOS FFmpeg sourcing switched from fragile `evermeet.cx` curl to `brew install ffmpeg`.
+- All release artifacts now include **SHA-256 checksums**.
+- `Makefile` now auto-selects `.ico` vs `.icns` icon based on platform.
+- `setup_ffmpeg.py` extended with Linux support (copies system `ffmpeg` or shows package-manager instructions).
+
+### 🏗 Code Quality / DRY
+
+- Extracted `_reset_audio_label()` helper — the "Drag Audio Files Here" reset was copy-pasted 3 times across `main_window.py`.
+- `TRACK_NAME` and `SP_PITCH` constants in `validator.py` and `stats.py` now import from `config.py` instead of being redefined locally.
+- Extracted `has_rhythm = len(beat_times) > 4` variable in `midi.py` to replace 3 identical condition checks.
+
+### 🚀 Performance Optimizations
+
+- `_compute_rolling_density()` in `midi.py` now uses `bisect` for O(m log n) note counting instead of a linear scan per time step.
+- Window bucketing in `stats.py` now uses `bisect_left`/slice instead of filtering all notes per window, reducing per-window cost from O(n) to O(log n).
+
 ## [2.1.4] - 2026-01-31
 
 ### 🐛 Bug Fixes

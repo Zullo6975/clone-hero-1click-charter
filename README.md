@@ -84,10 +84,17 @@ Grab the latest version for **Windows** or **macOS** from the [Releases Page](..
 - [x] **Auto-Update:** In-app notification for new GitHub Releases.
 - [x] **Batch Workflow Fix:** Consistent metadata autofill for all queued songs.
 
+### v2.2: Under the Hood (Completed)
+
+- [x] **Dead Code Removal:** Stripped deprecated flags, unused imports, and vestigial logic.
+- [x] **Cross-Platform GUI:** OS-aware fonts, palette-aware colors, reliable folder opening on all OSes.
+- [x] **CI Pipeline:** Quality gate, Linux build, SHA-256 checksums, brew-based macOS FFmpeg.
+- [x] **Performance:** Bisect-optimized density computation and window bucketing.
+
 ### Future Goals
 
-- [ ] **v2.2.0:** Basic Lyric support (Metadata fetching & Track scaffolding).
-- [ ] **v2.2.1:** Smart Lyric support (Rhythmic alignment).
+- [ ] **v2.3.0:** Basic Lyric support (Metadata fetching & Track scaffolding).
+- [ ] **v2.3.1:** Smart Lyric support (Rhythmic alignment).
 - [ ] **v3.0.0:** Full Band support (Bass, Rhythm).
 
 ---
