@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from bisect import bisect_left, bisect_right
+from bisect import bisect_left
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any

@@ -82,8 +82,8 @@ def write_chart_file(
     lines.append(f'  Artist = "{artist_name}"')
     lines.append(f'  Charter = "{charter_name}"')
     lines.append(f'  Resolution = {RESOLUTION}')
-    lines.append(f'  Offset = 0')
-    lines.append(f'  MusicStream = "song.mp3"')
+    lines.append('  Offset = 0')
+    lines.append('  MusicStream = "song.mp3"')
     lines.append("}")
 
     # --- [SyncTrack] ---
@@ -123,10 +123,12 @@ def write_chart_file(
     }
 
     for diff_name, events in layers.items():
-        if not events: continue
+        if not events:
+            continue
 
         header = chart_headers.get(diff_name)
-        if not header: continue
+        if not header:
+            continue
 
         lines.append(f"[{header}]")
         lines.append("{")

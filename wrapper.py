@@ -12,7 +12,7 @@ def setup_frozen_env():
 
 setup_frozen_env()
 
-from gui import qt_app
+from gui import qt_app  # noqa: E402
 
 if __name__ == "__main__":
     qt_app.main()

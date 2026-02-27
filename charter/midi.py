@@ -197,15 +197,15 @@ def generate_expert_notes(times: list[float], pitches: list[float], beat_times: 
 
         lanes = [lane]
         if is_chord:
-            opts = [l for l in [lane-1, lane+1] if 0 <= l <= 4]
+            opts = [ln for ln in [lane-1, lane+1] if 0 <= ln <= 4]
             if opts:
                 l2 = rng.choice(opts)
                 lanes.append(l2)
                 chord_starts.append(t)
 
-        for l in lanes:
+        for ln in lanes:
             generated_notes.append(pretty_midi.Note(
-                velocity=100, pitch=LANE_PITCHES[l], start=t, end=t+dur))
+                velocity=100, pitch=LANE_PITCHES[ln], start=t, end=t+dur))
 
     return generated_notes, chord_starts
 

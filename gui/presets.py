@@ -57,7 +57,8 @@ def save_user_preset(name: str, data: dict[str, float | int]) -> None:
 
 def delete_user_preset(name: str) -> None:
     user_path = get_user_preset_path()
-    if not user_path.exists(): return
+    if not user_path.exists():
+        return
 
     try:
         current = json.loads(user_path.read_text(encoding="utf-8"))

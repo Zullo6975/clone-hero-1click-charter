@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Tuple
+from typing import Iterable
 
 import pretty_midi
 import mido
@@ -323,9 +323,9 @@ def summarize(song_dir: Path, *, sp_pitch: int) -> None:
     # Print rows (Expert -> Hard -> Med -> Easy)
     for name in ["Expert", "Hard", "Medium", "Easy"]:
         s = stats_by_diff[name]
-        l = s["lanes"]
+        lanes = s["lanes"]
         print(
-            f"  {name:<10} | {s['notes']:<6} | {s['chords']:<6} | {l[0]:<4} {l[1]:<4} {l[2]:<4} {l[3]:<4} {l[4]:<4}")
+            f"  {name:<10} | {s['notes']:<6} | {s['chords']:<6} | {lanes[0]:<4} {lanes[1]:<4} {lanes[2]:<4} {lanes[3]:<4} {lanes[4]:<4}")
 
     sp_phrases = _group_sp_phrases(sp_starts, sp_ends, gap_join_sec=0.45)
     print(f"\nSTAR POWER: {len(sp_phrases)} phrases")

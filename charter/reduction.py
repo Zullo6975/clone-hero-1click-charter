@@ -18,14 +18,18 @@ def _map_to_target(notes: list, target_diff: str, rng: random.Random) -> list:
     target_map = DIFFICULTY_PITCHES[target_diff]
     max_lane = max(target_map.keys()) # e.g. 4 for Medium
 
-    if not notes: return []
+    if not notes:
+        return []
 
     # Identify source difficulty base pitch (Expert=96, Hard=84, etc)
     first_p = notes[0].pitch
     base_pitch = 96
-    if 84 <= first_p <= 88: base_pitch = 84
-    elif 72 <= first_p <= 76: base_pitch = 72
-    elif 60 <= first_p <= 64: base_pitch = 60
+    if 84 <= first_p <= 88:
+        base_pitch = 84
+    elif 72 <= first_p <= 76:
+        base_pitch = 72
+    elif 60 <= first_p <= 64:
+        base_pitch = 60
 
     for n in notes:
         # Determine current lane (0-4)
@@ -55,7 +59,8 @@ def reduce_to_hard(expert_notes: list, min_gap_ms: int = 120, *, rng: random.Ran
     min_gap_ms: Minimum time (ms) between notes.
     """
     base = _map_to_target(expert_notes, "Hard", rng)
-    if not base: return []
+    if not base:
+        return []
 
     filtered = []
     last_start = -1.0
@@ -104,7 +109,8 @@ def reduce_to_medium(hard_notes: list, min_gap_ms: int = 220, *, rng: random.Ran
     - Enforces density drop from Hard.
     """
     base = _map_to_target(hard_notes, "Medium", rng)
-    if not base: return []
+    if not base:
+        return []
 
     filtered = []
     last_start = -1.0
@@ -206,7 +212,8 @@ def reduce_to_easy(medium_notes: list, min_gap_ms: int = 450, *, rng: random.Ran
     - Compresses 4 lanes to 3.
     """
     base = _map_to_target(medium_notes, "Easy", rng)
-    if not base: return []
+    if not base:
+        return []
 
     filtered = []
     last_start = -1.0

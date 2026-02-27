@@ -108,12 +108,15 @@ class DensityGraphWidget(QWidget):
 
         # Determine Scaling
         max_t = self._density[-1]['t']
-        if max_t <= 0: max_t = 1.0
+        if max_t <= 0:
+            max_t = 1.0
 
         max_nps = 0.0
         for d in self._density:
-            if d['nps'] > max_nps: max_nps = d['nps']
-        if max_nps < 5.0: max_nps = 5.0 # Minimum ceiling for visualization
+            if d['nps'] > max_nps:
+                max_nps = d['nps']
+        if max_nps < 5.0:
+            max_nps = 5.0  # Minimum ceiling for visualization
 
         # Margins
         margin_b = 20
@@ -162,7 +165,8 @@ class DensityGraphWidget(QWidget):
 
         for i, s in enumerate(self._sections):
             t = s.get('start', 0.0)
-            if t > max_t: continue
+            if t > max_t:
+                continue
 
             x = (t / max_t) * w
             painter.drawLine(int(x), 0, int(x), h)

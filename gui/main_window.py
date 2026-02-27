@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 from PySide6.QtCore import QProcess, QSettings, Qt, QTimer, QUrl
@@ -9,7 +8,6 @@ from PySide6.QtGui import QDragEnterEvent, QDropEvent, QPixmap, QDesktopServices
 from PySide6.QtWidgets import (QApplication, QMainWindow, QMessageBox, QFileDialog,
                                QListWidgetItem, QWidget, QHBoxLayout, QLabel, QToolButton, QStyle)
 
-from charter.config import REPO_URL
 from gui.utils import RunConfig
 from gui.theme import ThemeManager
 from gui.widgets import LogWindow
@@ -24,7 +22,7 @@ from gui.ui_layout import UiBuilder
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle(f"CloneHero 1-Click Charter")
+        self.setWindowTitle("CloneHero 1-Click Charter")
         self.setAcceptDrops(True)
         self.settings = QSettings("Zullo", "1ClickCharter")
 
@@ -376,7 +374,7 @@ class MainWindow(QMainWindow):
             try:
                 (out_song / "album.png").write_bytes(self.cover_path.read_bytes())
                 self.log_window.append_text("Cover copied.")
-            except:
+            except Exception:
                 pass
 
         self.status_label.setText("Validating...")

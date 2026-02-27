@@ -35,7 +35,7 @@ def _save_cache(cache_path: Path, data: dict[str, Any]) -> None:
     try:
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         cache_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    except OSError as e:
+    except OSError:
         user_fallback = Path.home() / ".1clickcharter_cache"
         user_fallback.parent.mkdir(parents=True, exist_ok=True)
         user_fallback.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")

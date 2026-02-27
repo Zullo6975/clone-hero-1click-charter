@@ -15,9 +15,6 @@ from PySide6.QtWidgets import (QAbstractItemView, QDialog, QDialogButtonBox,
 # Try to import mutagen for metadata reading
 try:
     import mutagen
-    from mutagen.easyid3 import EasyID3
-    from mutagen.flac import FLAC
-    from mutagen.oggvorbis import OggVorbis
     HAS_MUTAGEN = True
 except ImportError:
     HAS_MUTAGEN = False
@@ -98,10 +95,14 @@ class BatchEntryDialog(QDialog):
                 path = item["path"]
                 data = item
                 # Ensure defaults if keys missing
-                if "title" not in data: data["title"] = path.stem
-                if "artist" not in data: data["artist"] = "Unknown Artist"
-                if "genre" not in data: data["genre"] = "Rock"
-                if "charter" not in data: data["charter"] = "Zullo7569"
+                if "title" not in data:
+                    data["title"] = path.stem
+                if "artist" not in data:
+                    data["artist"] = "Unknown Artist"
+                if "genre" not in data:
+                    data["genre"] = "Rock"
+                if "charter" not in data:
+                    data["charter"] = "Zullo7569"
 
             # 2. Filename (Visual only)
             item_fn = QTableWidgetItem(path.name)
@@ -122,16 +123,19 @@ class BatchEntryDialog(QDialog):
             for c, val in enumerate(cols, 1):
                 self.table.setItem(r, c, QTableWidgetItem(str(val)))
 
-        if self.table.columnWidth(0) > 250: self.table.setColumnWidth(0, 250)
+        if self.table.columnWidth(0) > 250:
+            self.table.setColumnWidth(0, 250)
 
     def _read_metadata(self, path: Path) -> dict:
         """Best-effort metadata reader using Mutagen if available."""
-        if not HAS_MUTAGEN: return {}
+        if not HAS_MUTAGEN:
+            return {}
 
         data = {}
         try:
             f = mutagen.File(str(path))
-            if not f: return {}
+            if not f:
+                return {}
 
             def get_tag(keys):
                 for k in keys:
@@ -204,7 +208,8 @@ class SectionReviewDialog(QDialog):
         diffs = ["Expert", "Hard", "Medium", "Easy"]
 
         for diff in diffs:
-            if diff not in self.density_map: continue
+            if diff not in self.density_map:
+                continue
             data = self.density_map[diff]
             graph = DensityGraphWidget(data, sections)
             self.graph_tabs.addTab(graph, diff)

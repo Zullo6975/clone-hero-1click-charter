@@ -315,14 +315,16 @@ class SettingsWidget(QGroupBox):
     def _wire_sync(self, spin_ms: SafeSpinBox, spin_nps: SafeDoubleSpinBox):
         # Prevent feedback loops by blocking signals during programmatic updates
         def on_ms_change(val):
-            if val <= 0: return
+            if val <= 0:
+                return
             new_nps = 1000.0 / val
             spin_nps.blockSignals(True)
             spin_nps.setValue(new_nps)
             spin_nps.blockSignals(False)
 
         def on_nps_change(val):
-            if val <= 0: return
+            if val <= 0:
+                return
             new_ms = int(1000.0 / val)
             spin_ms.blockSignals(True)
             spin_ms.setValue(new_ms)
@@ -407,7 +409,8 @@ class SettingsWidget(QGroupBox):
 
     def apply_preset(self, name: str):
         preset = self.all_presets.get(name)
-        if not preset: return
+        if not preset:
+            return
 
         self.max_nps_spin.setValue(float(preset["max_nps"]))
         self.min_gap_spin.setValue(int(preset["min_gap_ms"]))
@@ -440,12 +443,14 @@ class SettingsWidget(QGroupBox):
 
             # Select the new item using findData because the Text is different
             idx = self.preset_combo.findData(name)
-            if idx >= 0: self.preset_combo.setCurrentIndex(idx)
+            if idx >= 0:
+                self.preset_combo.setCurrentIndex(idx)
 
     def on_delete_preset(self):
         idx = self.preset_combo.currentIndex()
         key = self.preset_combo.itemData(idx)
-        if not key or key in DEFAULT_PRESETS: return
+        if not key or key in DEFAULT_PRESETS:
+            return
 
         ret = QMessageBox.question(self, "Delete Preset", f"Delete '{key}'?")
         if ret == QMessageBox.Yes:

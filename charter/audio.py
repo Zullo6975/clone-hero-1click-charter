@@ -7,7 +7,7 @@ import sys
 import librosa  # type: ignore
 import numpy as np  # type: ignore
 
-from gui.utils import repo_root, is_frozen
+from gui.utils import is_frozen
 
 
 def get_bin_path(tool_name: str) -> str:
