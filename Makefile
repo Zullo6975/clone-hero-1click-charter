@@ -43,7 +43,9 @@ SEED           ?= 42
 # 3. ENVIRONMENT & DEPENDENCIES
 # -----------------------------------------------------------------------------
 venv:
+ifeq ($(wildcard $(VENV)/$(VENV_DIR)/$(PYTHON_EXE)),)
 	$(PY) -m venv $(VENV)
+endif
 
 # ADDED: setup-ffmpeg call
 deps: venv
