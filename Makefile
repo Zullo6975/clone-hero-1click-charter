@@ -91,13 +91,19 @@ icons:
 	@echo "Generating icons..."
 	$(PYTHON) $(SCRIPTS_DIR)/make_icons.py
 
+ifeq ($(OS),Windows_NT)
+    ICON_FILE := $(ASSETS_DIR)/icons/AppIcon.ico
+else
+    ICON_FILE := $(ASSETS_DIR)/icons/AppIcon.icns
+endif
+
 package: install icons
 	@echo "Packaging $(APP_NAME)..."
 	@$(PYTHON) -c "import shutil; shutil.rmtree('dist', ignore_errors=True); shutil.rmtree('build', ignore_errors=True)"
 	$(VENV_BIN)/pyinstaller --noconfirm --clean \
 		--name "$(APP_NAME)" \
 		--windowed \
-		--icon "$(ASSETS_DIR)/icons/AppIcon.icns" \
+		--icon "$(ICON_FILE)" \
 		--add-data "$(ASSETS_DIR)$(SEP)$(ASSETS_DIR)" \
 		--add-binary "$(BIN_DIR)/ffmpeg$(if $(filter Windows_NT,$(OS)),.exe,)$(SEP)." \
 		--add-binary "$(BIN_DIR)/ffprobe$(if $(filter Windows_NT,$(OS)),.exe,)$(SEP)." \

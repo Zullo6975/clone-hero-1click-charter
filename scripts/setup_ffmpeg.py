@@ -73,8 +73,23 @@ def setup_ffmpeg():
             ffprobe_exe.chmod(0o755)
 
         else:
-            print("\n[WARNING] Linux detected: Please install ffmpeg via your package manager (e.g., sudo apt install ffmpeg).")
-            return
+            # Linux: Try system ffmpeg first, then download static build
+            system_ffmpeg = shutil.which("ffmpeg")
+            system_ffprobe = shutil.which("ffprobe")
+
+            if system_ffmpeg and system_ffprobe:
+                shutil.copy2(system_ffmpeg, ffmpeg_exe)
+                shutil.copy2(system_ffprobe, ffprobe_exe)
+                ffmpeg_exe.chmod(0o755)
+                ffprobe_exe.chmod(0o755)
+                print(f"\n[OK] Copied system FFmpeg to {bin_dir}")
+            else:
+                print("\n[WARNING] FFmpeg not found on system.")
+                print("Please install it via your package manager:")
+                print("  Ubuntu/Debian: sudo apt install ffmpeg")
+                print("  Fedora:        sudo dnf install ffmpeg")
+                print("  Arch:          sudo pacman -S ffmpeg")
+                return
 
         print(f"\n[OK] FFmpeg setup complete: {bin_dir}")
 

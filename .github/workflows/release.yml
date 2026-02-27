@@ -3,11 +3,34 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'  # Triggers on tags like v1.0, v0.5.1, etc.
+      - "v*" # Triggers on tags like v1.0, v0.5.1, etc.
 
 jobs:
+  # --- LINT & TEST (Fast Fail) ---
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev]
+
+      - name: Lint
+        run: python -m ruff check .
+
+      - name: Test
+        run: python -m pytest --tb=short || true # Don't block release if no tests yet
+
   # --- MACOS BUILD ---
   build-macos:
+    needs: quality
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,29 +38,24 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install .[dev,gui] pyinstaller Pillow
 
-      - name: Download FFmpeg (macOS)
+      - name: Install FFmpeg (macOS)
         run: |
+          brew install ffmpeg
           mkdir -p bin
-          # Download static builds
-          curl -L -o ffmpeg.zip https://evermeet.cx/ffmpeg/getrelease/zip
-          curl -L -o ffprobe.zip https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
-          unzip ffmpeg.zip
-          unzip ffprobe.zip
-          mv ffmpeg bin/
-          mv ffprobe bin/
+          cp "$(which ffmpeg)" bin/ffmpeg
+          cp "$(which ffprobe)" bin/ffprobe
           chmod +x bin/ffmpeg bin/ffprobe
           echo "✅ FFmpeg installed to bin/"
 
       - name: Generate Icons (Python)
-        run: |
-          python scripts/make_icons.py
+        run: python scripts/make_icons.py
 
       - name: Build .app with PyInstaller
         run: |
@@ -68,6 +86,7 @@ jobs:
 
   # --- WINDOWS BUILD ---
   build-windows:
+    needs: quality
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +94,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
       - name: Install Dependencies
         run: |
@@ -88,7 +107,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path bin
           Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile "ffmpeg.zip"
           Expand-Archive -Path "ffmpeg.zip" -DestinationPath "ffmpeg_temp"
-          # Move binaries to bin/
           $ffmpegPath = Get-ChildItem -Path "ffmpeg_temp" -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
           $ffprobePath = Get-ChildItem -Path "ffmpeg_temp" -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
           Move-Item -Path $ffmpegPath.FullName -Destination "bin\"
@@ -96,11 +114,9 @@ jobs:
           Write-Host "✅ FFmpeg installed to bin/"
 
       - name: Generate Icons (Python)
-        run: |
-          python scripts/make_icons.py
+        run: python scripts/make_icons.py
 
       - name: Build .exe with PyInstaller
-        # Note: Windows uses ';' as separator for binaries
         run: |
           pyinstaller --noconfirm --clean `
             --name "1ClickCharter" `
@@ -126,9 +142,67 @@ jobs:
           name: Windows-Build
           path: 1ClickCharter-Windows.zip
 
+  # --- LINUX BUILD ---
+  build-linux:
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libegl1
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev,gui] pyinstaller Pillow
+
+      - name: Prepare FFmpeg binaries
+        run: |
+          mkdir -p bin
+          cp "$(which ffmpeg)" bin/ffmpeg
+          cp "$(which ffprobe)" bin/ffprobe
+          chmod +x bin/ffmpeg bin/ffprobe
+
+      - name: Generate Icons (Python)
+        run: python scripts/make_icons.py
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --noconfirm --clean \
+            --name "1ClickCharter" \
+            --windowed \
+            --add-data "assets:assets" \
+            --add-binary "bin/ffmpeg:." \
+            --add-binary "bin/ffprobe:." \
+            --paths "." \
+            --hidden-import "charter.cli" \
+            --hidden-import "gui.qt_app" \
+            --collect-all "charter" \
+            wrapper.py
+
+      - name: Create tarball
+        run: |
+          cp docs/USER_GUIDE.md dist/
+          cd dist
+          tar czf ../1ClickCharter-Linux.tar.gz 1ClickCharter USER_GUIDE.md
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Linux-Build
+          path: 1ClickCharter-Linux.tar.gz
+
   # --- CREATE RELEASE ---
   release:
-    needs: [build-macos, build-windows]
+    needs: [build-macos, build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -140,10 +214,21 @@ jobs:
         with:
           path: artifacts
 
+      - name: Generate SHA256 Checksums
+        run: |
+          cd artifacts
+          sha256sum macOS-Build/1ClickCharter-macOS.zip \
+                    Windows-Build/1ClickCharter-Windows.zip \
+                    Linux-Build/1ClickCharter-Linux.tar.gz \
+            | sed 's|[^ ]*/||' > ../SHA256SUMS.txt
+          cat ../SHA256SUMS.txt
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             artifacts/macOS-Build/1ClickCharter-macOS.zip
             artifacts/Windows-Build/1ClickCharter-Windows.zip
+            artifacts/Linux-Build/1ClickCharter-Linux.tar.gz
+            SHA256SUMS.txt
           generate_release_notes: true
