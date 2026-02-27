@@ -8,9 +8,7 @@ from typing import Any
 import pretty_midi
 import mido
 
-
-# Clone Hero lead guitar track name we generate
-TRACK_NAME = "PART GUITAR"
+from charter.config import TRACK_NAME
 
 # Our lane pitches (G,R,Y,B,O) — used only for lane counting
 PITCH_TO_LANE = {

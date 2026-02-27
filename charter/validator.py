@@ -8,8 +8,7 @@ from typing import Iterable, List, Tuple
 import pretty_midi
 import mido
 
-# ---- Your chart conventions ----
-TRACK_NAME = "PART GUITAR"
+from charter.config import TRACK_NAME, SP_PITCH
 
 # Define ranges for all difficulties
 ALL_DIFFS = {
@@ -23,7 +22,7 @@ ALL_DIFFS = {
 LANE_PITCHES = set(ALL_DIFFS["Expert"])
 ORANGE_PITCH = 100
 DEFAULT_MIN_NOTE_START = 0.5
-DEFAULT_SP_PITCH = 116
+DEFAULT_SP_PITCH = SP_PITCH
 
 
 @dataclass

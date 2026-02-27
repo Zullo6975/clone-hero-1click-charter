@@ -481,13 +481,16 @@ class MainWindow(QMainWindow):
             self.status_label.setText(f"Queue: Loaded {self.audio_path.name}")
         else:
             self.audio_path = None
-            self.audio_label.setText("Drag Audio Files Here")
-            self.audio_label.setStyleSheet(
-                "font-style: italic; color: palette(disabled-text);")
+            self._reset_audio_label()
             self.status_label.setText("Audio cleared")
             self._update_state()
             self.audio_label.adjustSize()
             QTimer.singleShot(10, self.snap_to_content)
+
+    def _reset_audio_label(self):
+        self.audio_label.setText("Drag Audio Files Here")
+        self.audio_label.setStyleSheet(
+            "font-style: italic; color: palette(disabled-text);")
 
     def _clear_song_info(self):
         self.meta_panel.clear_fields()
@@ -678,9 +681,7 @@ class MainWindow(QMainWindow):
             if not self.song_queue:
                 self._clear_song_info()
                 self.audio_path = None
-                self.audio_label.setText("Drag Audio Files Here")
-                self.audio_label.setStyleSheet(
-                    "font-style: italic; color: palette(disabled-text);")
+                self._reset_audio_label()
 
             # Show Summary Dialog INSTEAD of standard popup
             BatchResultDialog(self.batch_results, self).exec()
@@ -699,9 +700,7 @@ class MainWindow(QMainWindow):
         else:
             self._clear_song_info()
             self.audio_path = None
-            self.audio_label.setText("Drag Audio Files Here")
-            self.audio_label.setStyleSheet(
-                "font-style: italic; color: palette(disabled-text);")
+            self._reset_audio_label()
 
         if warnings:
             msg += "\n\nWarnings/Errors:\n" + \

@@ -134,7 +134,8 @@ def generate_expert_notes(times: list[float], pitches: list[float], beat_times: 
 
     measure_notes = {}
     pattern_memory = {}
-    if len(beat_times) > 4:
+    has_rhythm = len(beat_times) > 4
+    if has_rhythm:
         for i, t in enumerate(times):
             m_idx, m_offset = _quantize_to_measure(t, beat_times)
             measure_notes.setdefault(m_idx, []).append((m_offset, i))
@@ -152,7 +153,7 @@ def generate_expert_notes(times: list[float], pitches: list[float], beat_times: 
         is_chord = False
         found_memory = False
 
-        if len(beat_times) > 4:
+        if has_rhythm:
             m_idx, m_offset = _quantize_to_measure(t, beat_times)
             sig = ""
             if m_idx in measure_notes:
@@ -175,7 +176,7 @@ def generate_expert_notes(times: list[float], pitches: list[float], beat_times: 
             if rng.random() < cfg.chord_prob:
                 is_chord = True
 
-            if len(beat_times) > 4:
+            if has_rhythm:
                 m_idx, m_offset = _quantize_to_measure(t, beat_times)
                 if m_idx in measure_notes:
                     offsets = sorted([x[0] for x in measure_notes[m_idx]])
