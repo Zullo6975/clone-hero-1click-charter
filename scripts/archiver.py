@@ -3,17 +3,16 @@ import re
 from pathlib import Path
 
 def get_current_version(root_path: Path) -> str:
-    """Reads the version string from pyproject.toml."""
-    toml_path = root_path / "pyproject.toml"
-    if not toml_path.exists():
-        raise FileNotFoundError("pyproject.toml not found!")
+    """Reads the version string from charter/__init__.py (single source of truth)."""
+    init_path = root_path / "charter" / "__init__.py"
+    if not init_path.exists():
+        raise FileNotFoundError("charter/__init__.py not found!")
 
-    content = toml_path.read_text(encoding="utf-8")
-    # robust regex to find version = "X.Y.Z"
-    match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
+    content = init_path.read_text(encoding="utf-8")
+    match = re.search(r'__version__\s*=\s*"([^"]+)"', content)
     if match:
         return match.group(1)
-    raise ValueError("Could not find version string in pyproject.toml")
+    raise ValueError("Could not find __version__ in charter/__init__.py")
 
 def archive_current_version():
     # If this script is in /scripts/, parent[1] is still the repo root.

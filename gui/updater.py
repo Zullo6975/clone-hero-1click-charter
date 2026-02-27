@@ -4,8 +4,7 @@ import requests
 from packaging import version
 from PySide6.QtCore import QObject, QThread, Signal
 
-# Current App Version
-CURRENT_VERSION = "2.1.4"
+from charter import __version__
 
 class UpdateChecker(QObject):
     update_available = Signal(str, str) # version_tag, url
@@ -22,7 +21,7 @@ class UpdateChecker(QObject):
                 # Remove 'v' prefix if present for comparison
                 clean_tag = tag.lstrip("v")
 
-                if version.parse(clean_tag) > version.parse(CURRENT_VERSION):
+                if version.parse(clean_tag) > version.parse(__version__):
                     self.update_available.emit(tag, html_url)
         except Exception:
             pass # Fail silently if no internet
