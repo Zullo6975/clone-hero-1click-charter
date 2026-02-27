@@ -357,12 +357,13 @@ def write_real_notes_mid(
     medium_notes = []
     easy_notes = []
     if expert_notes:
+        reduction_rng = random.Random(cfg.seed + 1)
         hard_notes = reduce_to_hard(
-            expert_notes, min_gap_ms=cfg.hard_min_gap_ms)
+            expert_notes, min_gap_ms=cfg.hard_min_gap_ms, rng=reduction_rng)
         medium_notes = reduce_to_medium(
-            hard_notes, min_gap_ms=cfg.medium_min_gap_ms)
+            hard_notes, min_gap_ms=cfg.medium_min_gap_ms, rng=reduction_rng)
         easy_notes = reduce_to_easy(
-            medium_notes, min_gap_ms=cfg.easy_min_gap_ms)
+            medium_notes, min_gap_ms=cfg.easy_min_gap_ms, rng=reduction_rng)
 
     # 3. Sections
     final_sections = []

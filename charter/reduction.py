@@ -12,7 +12,7 @@ LANE_Y = 2
 LANE_B = 3
 LANE_O = 4
 
-def _map_to_target(notes: list, target_diff: str) -> list:
+def _map_to_target(notes: list, target_diff: str, rng: random.Random) -> list:
     new_notes = []
     # Target map: e.g. Medium {0:72, 1:73, 2:74, 3:75, 4:76}
     target_map = DIFFICULTY_PITCHES[target_diff]
@@ -39,7 +39,7 @@ def _map_to_target(notes: list, target_diff: str) -> list:
         # Randomly shift highest lane down sometimes to reduce density of "hard" notes
         if target_diff in ["Medium", "Easy"] and lane == max_lane:
             # 40% chance to shift Blue->Yellow (Med) or Yellow->Red (Easy)
-            if random.random() < 0.40:
+            if rng.random() < 0.40:
                 lane -= 1
 
         if lane in target_map:
@@ -49,12 +49,12 @@ def _map_to_target(notes: list, target_diff: str) -> list:
 
     return new_notes
 
-def reduce_to_hard(expert_notes: list, min_gap_ms: int = 120) -> list:
+def reduce_to_hard(expert_notes: list, min_gap_ms: int = 120, *, rng: random.Random) -> list:
     """
     Expert -> Hard
     min_gap_ms: Minimum time (ms) between notes.
     """
-    base = _map_to_target(expert_notes, "Hard")
+    base = _map_to_target(expert_notes, "Hard", rng)
     if not base: return []
 
     filtered = []
@@ -96,14 +96,14 @@ def reduce_to_hard(expert_notes: list, min_gap_ms: int = 120) -> list:
 
     return final_notes
 
-def reduce_to_medium(hard_notes: list, min_gap_ms: int = 220) -> list:
+def reduce_to_medium(hard_notes: list, min_gap_ms: int = 220, *, rng: random.Random) -> list:
     """
     Hard -> Medium
     - Allow Chords (Max 2, Throttled).
     - Limits Orange notes to MAX 5.
     - Enforces density drop from Hard.
     """
-    base = _map_to_target(hard_notes, "Medium")
+    base = _map_to_target(hard_notes, "Medium", rng)
     if not base: return []
 
     filtered = []
@@ -189,23 +189,23 @@ def reduce_to_medium(hard_notes: list, min_gap_ms: int = 220) -> list:
 
     # Keep 5 random ones, scatter the rest to ANY lower lane
     if len(orange_indices) > 5:
-        to_keep = set(random.sample(orange_indices, 5))
+        to_keep = set(rng.sample(orange_indices, 5))
         for i in orange_indices:
             if i not in to_keep:
                 # Scatter logic: Shift Orange to 1 (Red), 2 (Yellow), or 3 (Blue)
                 # Weighted slightly towards Blue to keep intensity
-                new_lane = random.choices([0, 1, 2, 3], weights=[0.2, 0.3, 0.4, 0.1], k=1)[0]
+                new_lane = rng.choices([0, 1, 2, 3], weights=[0.2, 0.3, 0.4, 0.1], k=1)[0]
                 filtered[i].pitch = base_pitch + new_lane
 
     return filtered
 
-def reduce_to_easy(medium_notes: list, min_gap_ms: int = 450) -> list:
+def reduce_to_easy(medium_notes: list, min_gap_ms: int = 450, *, rng: random.Random) -> list:
     """
     Medium -> Easy
     - Allow Chords (Max 2, Adjacent Only, Throttled).
     - Compresses 4 lanes to 3.
     """
-    base = _map_to_target(medium_notes, "Easy")
+    base = _map_to_target(medium_notes, "Easy", rng)
     if not base: return []
 
     filtered = []
