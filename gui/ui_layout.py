@@ -29,11 +29,9 @@ class UiBuilder:
         # Splitter Body
         window.splitter = QSplitter(Qt.Horizontal)
         window.splitter.setHandleWidth(1)
-        # Visual line for the splitter handle
-        # Light gray #d0d0d0, no margins
         window.splitter.setStyleSheet("""
             QSplitter::handle {
-                background-color: #d0d0d0;
+                background-color: palette(mid);
                 margin: 0px;
             }
         """)
@@ -108,7 +106,7 @@ class UiBuilder:
         # 2. Separator Line (Direct child of root layout, no margins = touches edges)
         line = QFrame()
         line.setFixedHeight(1)
-        line.setStyleSheet("background-color: #d0d0d0; border: none;")
+        line.setStyleSheet("background-color: palette(mid); border: none;")
         layout.addWidget(line)
 
     def _build_sidebar_content(self, window, layout):
@@ -118,7 +116,7 @@ class UiBuilder:
         v.setSpacing(10) # Tighter inside the box
         window.audio_label = QLabel("Drag Audio Files Here")
         window.audio_label.setAlignment(Qt.AlignCenter)
-        window.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+        window.audio_label.setStyleSheet("font-style: italic; color: palette(disabled-text);")
 
         window.btn_add_audio = QPushButton("Add Songs...")
         window.btn_add_audio.setIcon(window.style().standardIcon(QStyle.SP_DirOpenIcon))
@@ -164,7 +162,7 @@ class UiBuilder:
         window.cover_preview = QLabel("Drag Art Here")
         window.cover_preview.setAlignment(Qt.AlignCenter)
         window.cover_preview.setFixedSize(250, 250)
-        window.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic; font-size: 11pt;")
+        window.cover_preview.setStyleSheet("border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic;")
 
         window.btn_pick_cover = QPushButton("Image...")
         window.btn_clear_cover = QToolButton()
@@ -183,7 +181,7 @@ class UiBuilder:
     def _build_footer(self, window):
         # UPDATED: Footer Separator Horiz (Top border on status bar)
         # Since root layout has 0 margins, this touches left/right edges.
-        window.statusBar().setStyleSheet("QStatusBar { border-top: 1px solid #d0d0d0; background: palette(window); }")
+        window.statusBar().setStyleSheet("QStatusBar { border-top: 1px solid palette(mid); background: palette(window); }")
 
         # Reset margins on the status bar itself to ensure no extra padding prevents touching
         window.statusBar().setContentsMargins(0, 0, 0, 0)
@@ -206,14 +204,14 @@ class UiBuilder:
             f.setFixedWidth(1)
             f.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
             # UPDATED: Light gray, no margins
-            f.setStyleSheet("background-color: #d0d0d0; border: none; margin: 0px;")
+            f.setStyleSheet("background-color: palette(mid); border: none; margin: 0px;")
             return f
 
         # --- LEFT CONTROLS ---
         lay.addWidget(vline())
 
         window.chk_dark = QCheckBox("Dark Mode")
-        window.chk_dark.setStyleSheet("font-size: 11pt;")
+        window.chk_dark.setStyleSheet("")
         window.chk_dark.setChecked(window.dark_mode)
         lay.addWidget(window.chk_dark)
 
@@ -249,7 +247,7 @@ class UiBuilder:
         s_lay.setContentsMargins(20, 0, 0, 0)
 
         window.status_label = QLabel("Ready")
-        window.status_label.setStyleSheet("font-weight: bold; font-size: 11pt;")
+        window.status_label.setStyleSheet("font-weight: bold;")
 
         window.progress_bar = QProgressBar()
         window.progress_bar.setRange(0, 0)

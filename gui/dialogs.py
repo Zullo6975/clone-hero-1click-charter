@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from charter.config import REPO_URL, SUPPORT_EMAIL, VENMO_URL
-from gui.utils import get_font
+from gui.utils import get_base_font_size, get_font
 from gui.widgets import DensityGraphWidget, SafeTabWidget
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QBrush, QColor, QDesktopServices, Qt
@@ -37,7 +37,7 @@ class BatchEntryDialog(QDialog):
         layout = QVBoxLayout(self)
 
         lbl = QLabel("Verify Metadata for Batch Processing")
-        lbl.setStyleSheet("font-size: 12pt; font-weight: bold;")
+        lbl.setStyleSheet(f"font-size: {get_base_font_size() + 2}pt; font-weight: bold;")
         layout.addWidget(lbl)
 
         sub = QLabel("Edit these fields now to ensure your charts are named correctly. Tab to move quickly.")
@@ -287,12 +287,12 @@ class SupportDialog(QDialog):
 
         lbl = QLabel("Having trouble with a chart? Found a bug?")
         lbl.setWordWrap(True)
-        lbl.setStyleSheet("font-size: 12pt; font-weight: bold;")
+        lbl.setStyleSheet(f"font-size: {get_base_font_size() + 2}pt; font-weight: bold;")
         lbl.setAlignment(Qt.AlignCenter)
 
         sub = QLabel("We're happy to help. Please check the docs or send us a message.")
         sub.setWordWrap(True)
-        sub.setStyleSheet("color: palette(disabled-text); font-size: 11pt;")
+        sub.setStyleSheet("color: palette(disabled-text);")
         sub.setAlignment(Qt.AlignCenter)
 
         btn_layout = QVBoxLayout()
@@ -330,7 +330,7 @@ class SupportDialog(QDialog):
         lay.setContentsMargins(20, 30, 20, 20)
 
         lbl = QLabel("Enjoying 1-Click Charter?")
-        lbl.setStyleSheet("font-size: 12pt; font-weight: bold;")
+        lbl.setStyleSheet(f"font-size: {get_base_font_size() + 2}pt; font-weight: bold;")
         lbl.setAlignment(Qt.AlignCenter)
 
         txt = QLabel(
@@ -339,7 +339,7 @@ class SupportDialog(QDialog):
         )
         txt.setWordWrap(True)
         txt.setAlignment(Qt.AlignCenter)
-        txt.setStyleSheet("line-height: 1.4; font-size: 11pt;")
+        txt.setStyleSheet("line-height: 1.4;")
 
         btn_venmo = QPushButton("💙 Tip with Venmo")
         btn_venmo.setCursor(Qt.PointingHandCursor)
@@ -352,7 +352,6 @@ class SupportDialog(QDialog):
                 background-color: #008CFF;
                 color: white;
                 font-weight: bold;
-                font-size: 11pt;
                 border-radius: 6px;
             }
             QPushButton:hover {
@@ -388,9 +387,9 @@ class BatchResultDialog(QDialog):
 
         lbl = QLabel(f"Processed {total} songs: {success} Succeeded, {failed} Failed.")
         if failed > 0:
-            lbl.setStyleSheet("font-size: 12pt; font-weight: bold; color: #ff5555;")
+            lbl.setStyleSheet(f"font-size: {get_base_font_size() + 2}pt; font-weight: bold; color: #ff5555;")
         else:
-            lbl.setStyleSheet("font-size: 12pt; font-weight: bold; color: #4caf50;")
+            lbl.setStyleSheet(f"font-size: {get_base_font_size() + 2}pt; font-weight: bold; color: #4caf50;")
         layout.addWidget(lbl)
 
         # Table
@@ -420,7 +419,7 @@ class BatchResultDialog(QDialog):
                 item_status.setForeground(QBrush(QColor("#4caf50"))) # Green
             else:
                 item_status.setForeground(QBrush(QColor("#f44336"))) # Red
-                item_status.setFont(get_font(weight="bold"))
+                item_status.setFont(get_font(bold=True))
 
             self.table.setItem(r, 1, item_status)
 

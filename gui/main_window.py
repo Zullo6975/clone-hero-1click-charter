@@ -468,7 +468,7 @@ class MainWindow(QMainWindow):
         self.audio_path = path
         self.audio_label.setText(path.name)
         self.audio_label.setStyleSheet(
-            "color: palette(text); font-weight: bold; font-size: 11pt;")
+            "color: palette(text); font-weight: bold;")
         if not self._title_user_edited and not self.meta_panel.title_edit.text().strip():
             self.meta_panel.title_edit.setText(path.stem)
         self._update_state()
@@ -483,7 +483,7 @@ class MainWindow(QMainWindow):
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
             self.audio_label.setStyleSheet(
-                "font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+                "font-style: italic; color: palette(disabled-text);")
             self.status_label.setText("Audio cleared")
             self._update_state()
             self.audio_label.adjustSize()
@@ -567,7 +567,7 @@ class MainWindow(QMainWindow):
         self.cover_preview.setPixmap(QPixmap())
         self.cover_preview.setText("Drag Art Here")
         self.cover_preview.setStyleSheet(
-            "font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+            "border: 2px dashed palette(mid); border-radius: 6px; color: palette(disabled-text); font-style: italic;")
 
     def pick_output_dir(self):
         p = QFileDialog.getExistingDirectory(self, "Output Folder")
@@ -582,8 +582,7 @@ class MainWindow(QMainWindow):
             self._open(self.last_out_song)
 
     def _open(self, p: Path):
-        QProcess.startDetached(
-            "open" if sys.platform == "darwin" else "explorer" if sys.platform == "win32" else "xdg-open", [str(p)])
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
 
     def on_dark_toggle(self, checked):
         ThemeManager.apply_style(QApplication.instance(), checked)
@@ -591,7 +590,14 @@ class MainWindow(QMainWindow):
     def snap_to_content(self):
         if self.centralWidget():
             self.centralWidget().layout().activate()
-        self.resize(1100, 850)  # Taller default
+        screen = self.screen()
+        if screen:
+            avail = screen.availableGeometry()
+            w = min(1100, int(avail.width() * 0.85))
+            h = min(850, int(avail.height() * 0.85))
+        else:
+            w, h = 1100, 850
+        self.resize(w, h)
 
     def dragEnterEvent(self, e: QDragEnterEvent):
         if e.mimeData().hasUrls():
@@ -674,7 +680,7 @@ class MainWindow(QMainWindow):
                 self.audio_path = None
                 self.audio_label.setText("Drag Audio Files Here")
                 self.audio_label.setStyleSheet(
-                    "font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+                    "font-style: italic; color: palette(disabled-text);")
 
             # Show Summary Dialog INSTEAD of standard popup
             BatchResultDialog(self.batch_results, self).exec()
@@ -695,7 +701,7 @@ class MainWindow(QMainWindow):
             self.audio_path = None
             self.audio_label.setText("Drag Audio Files Here")
             self.audio_label.setStyleSheet(
-                "font-style: italic; color: palette(disabled-text); font-size: 11pt;")
+                "font-style: italic; color: palette(disabled-text);")
 
         if warnings:
             msg += "\n\nWarnings/Errors:\n" + \

@@ -2,6 +2,7 @@ from __future__ import annotations
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QFont, QPalette, QColor
 from PySide6.QtCore import Qt
+from gui.utils import get_base_font_size
 
 class ThemeManager:
     @staticmethod
@@ -9,7 +10,7 @@ class ThemeManager:
         app.setStyle("Fusion")
 
         font = QFont()
-        font.setPointSize(11)
+        font.setPointSize(get_base_font_size())
         app.setFont(font)
         palette = QPalette()
 
@@ -71,6 +72,9 @@ class ThemeManager:
 
         app.setPalette(palette)
 
+        base_pt = get_base_font_size()
+        grp_pt = base_pt - 1  # GroupBox titles slightly smaller
+
         # Stylesheet overrides
         app.setStyleSheet(f"""
             QWidget {{
@@ -84,7 +88,7 @@ class ThemeManager:
                 margin-top: 1.2em; /* Reduced top margin */
                 padding: 12px;     /* Reduced internal padding (was 15) */
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: {grp_pt}pt;
                 background-color: transparent;
             }}
             QGroupBox::title {{
@@ -101,7 +105,7 @@ class ThemeManager:
                 border: 1px solid palette(mid);
                 background-color: palette(base);
                 color: palette(text);
-                font-size: 11pt;
+                font-size: {base_pt}pt;
                 selection-background-color: palette(highlight);
             }}
             QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{
@@ -116,7 +120,7 @@ class ThemeManager:
                 border: 1px solid palette(mid);
                 background-color: palette(button);
                 color: palette(text);
-                font-size: 11pt;
+                font-size: {base_pt}pt;
                 font-weight: 500;
             }}
             QPushButton:hover {{

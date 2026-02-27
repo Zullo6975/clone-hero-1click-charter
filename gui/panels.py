@@ -54,7 +54,7 @@ class MetadataWidget(QGroupBox):
         row_clear = QHBoxLayout()
         row_clear.addStretch()
         lbl_cf = QLabel("Clear Fields ")
-        lbl_cf.setStyleSheet("font-size: 11pt;")
+        lbl_cf.setStyleSheet("")
         row_clear.addWidget(lbl_cf)
         row_clear.addWidget(self.btn_clear)
         layout.addRow("", row_clear)
@@ -77,7 +77,7 @@ class SettingsWidget(QGroupBox):
         main_layout = QVBoxLayout(self)
 
         self.chk_adv = QCheckBox("Show Tuning Controls")
-        self.chk_adv.setStyleSheet("font-weight: bold; margin-bottom: 6px; font-size: 11pt;")
+        self.chk_adv.setStyleSheet("font-weight: bold; margin-bottom: 6px;")
         self.chk_adv.setCursor(Qt.PointingHandCursor)
         self.chk_adv.toggled.connect(self.toggle_advanced)
         main_layout.addWidget(self.chk_adv)
@@ -94,7 +94,7 @@ class SettingsWidget(QGroupBox):
         preset_layout.setContentsMargins(0, 0, 0, 0)
 
         lbl_preset = QLabel("Expert Style:")
-        lbl_preset.setStyleSheet("font-size: 11pt;")
+        lbl_preset.setStyleSheet("")
         lbl_preset.setMinimumWidth(100)
         lbl_preset.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
@@ -123,19 +123,19 @@ class SettingsWidget(QGroupBox):
         content_layout.addWidget(preset_row)
 
         self.preset_hint = QLabel("Select baseline intensity.")
-        self.preset_hint.setStyleSheet("color: palette(disabled-text); font-size: 11pt; margin-left: 110px;")
+        self.preset_hint.setStyleSheet("color: palette(disabled-text); margin-left: 110px;")
         content_layout.addWidget(self.preset_hint)
 
         row_opts = QHBoxLayout()
         row_opts.setContentsMargins(110, 0, 0, 0)
 
         self.chk_review = QCheckBox("Review Sections")
-        self.chk_review.setStyleSheet("font-size: 11pt;")
+        self.chk_review.setStyleSheet("")
         self.chk_review.setToolTip("Show a list of detected sections to rename/edit before creating the chart.")
         self.chk_review.setCursor(Qt.PointingHandCursor)
 
         self.chk_export_chart = QCheckBox("Export .chart") # <--- New Checkbox
-        self.chk_export_chart.setStyleSheet("font-size: 11pt;")
+        self.chk_export_chart.setStyleSheet("")
         self.chk_export_chart.setToolTip("Generate a text-based .chart file for editing in Moonscraper.")
         self.chk_export_chart.setCursor(Qt.PointingHandCursor)
 
@@ -170,9 +170,9 @@ class SettingsWidget(QGroupBox):
 
         self.mode_group = QButtonGroup(self)
         self.mode_real = QRadioButton("Real (Audio Analysis)")
-        self.mode_real.setStyleSheet("font-size: 11pt;")
+        self.mode_real.setStyleSheet("")
         self.mode_dummy = QRadioButton("Dummy (Metronome)")
-        self.mode_dummy.setStyleSheet("font-size: 11pt;")
+        self.mode_dummy.setStyleSheet("")
         self.mode_real.setChecked(True)
         self.mode_group.addButton(self.mode_real)
         self.mode_group.addButton(self.mode_dummy)
@@ -248,7 +248,7 @@ class SettingsWidget(QGroupBox):
         lbl_info = QLabel("Lower difficulties are created by filtering the Expert chart. "
                           "Edit the 'Gap' (ms) or the 'Target NPS' to adjust difficulty.")
         lbl_info.setWordWrap(True)
-        lbl_info.setStyleSheet("color: palette(disabled-text); font-style: italic; margin-bottom: 10px; font-size: 11pt;")
+        lbl_info.setStyleSheet("color: palette(disabled-text); font-style: italic; margin-bottom: 10px;")
         layout.addWidget(lbl_info)
 
         form = QFormLayout()
