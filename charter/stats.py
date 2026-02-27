@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from bisect import bisect_left, bisect_right
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
@@ -245,9 +246,11 @@ def compute_chart_stats(
         if b <= a:
             continue
 
-        # notes in this bucket by start time
-        bucket_notes = [n for n in notes if a <= float(n.start) < b]
-        bucket_starts = [float(n.start) for n in bucket_notes]
+        # notes in this bucket by start time (bisect for O(log n))
+        lo = bisect_left(starts, a)
+        hi = bisect_left(starts, b)
+        bucket_notes = notes[lo:hi]
+        bucket_starts = starts[lo:hi]
         bucket_chords = _group_chords(bucket_notes)
         bucket_chord_count = sum(1 for g in bucket_chords if len(g) >= 2)
         bucket_sustains = sum(

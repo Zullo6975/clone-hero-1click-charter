@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pathlib import Path
 from dataclasses import asdict
+import bisect
 import random
 import json
 import math
@@ -77,8 +78,9 @@ def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
     t = 0.0
     times_sorted = sorted(times)
     while t <= duration:
-        count = sum(1 for x in times_sorted if t <= x < t + window)
-        points.append({"t": round(t, 2), "nps": count})
+        lo = bisect.bisect_left(times_sorted, t)
+        hi = bisect.bisect_left(times_sorted, t + window)
+        points.append({"t": round(t, 2), "nps": hi - lo})
         t += step
     return points
 
