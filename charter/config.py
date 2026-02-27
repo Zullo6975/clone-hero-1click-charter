@@ -42,11 +42,6 @@ class ChartConfig:
     easy_min_gap_ms: int = 450
 
     # --- Gameplay Customization ---
-    # CLEANUP: Locked these values to "Always On / High Quality"
-    allow_orange: bool = True       # Always allow 5th lane logic to run
-    rhythmic_glue: bool = True      # Always enforce patterns
-    grid_snap: str = "1/16"         # Always use high-res grid
-
     chord_prob: float = 0.22
     sustain_len: float = 0.4
     movement_bias: float = 0.6

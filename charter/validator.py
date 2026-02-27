@@ -246,9 +246,6 @@ def validate_song_dir(song_dir: Path, *, sp_pitch: int, min_note_start: float = 
         warnings.append(
             f"No Star Power notes found (expected SP pitch={sp_pitch}).")
 
-    if orange_notes > 0:
-        pass  # Warning removed, seeing orange notes is now expected/good!
-
     sections, track_loc = _parse_sections(notes_mid, pm)
     if not sections:
         warnings.append("No section markers found.")
@@ -360,7 +357,7 @@ def validate_chart_file(song_dir: Path, summary_only: bool = False):
         # FIXED: Replaced checkmark with [OK]
         print("\n[OK] Chart passed basic health check.")
 
-    if summary_only or True:
+    if summary_only:
         summarize(song_dir, sp_pitch=DEFAULT_SP_PITCH)
 
 

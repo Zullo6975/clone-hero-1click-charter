@@ -447,8 +447,6 @@ class MainWindow(QMainWindow):
             min_gap_ms=sp.min_gap_spin.value(),
             seed=sp.seed_spin.value(),
 
-            allow_orange=True, rhythmic_glue=True, grid_snap="1/16",
-
             chord_prob=sp.chord_slider.value()/100.0,
             sustain_len=sp.sustain_slider.value()/100.0,
             sustain_threshold=sp.sustain_gap_spin.value(),

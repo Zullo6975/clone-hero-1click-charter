@@ -92,10 +92,6 @@ class RunConfig:
     max_nps: float
     min_gap_ms: int
     seed: int
-    # CLEANUP: These are now hardcoded in the build logic
-    allow_orange: bool
-    rhythmic_glue: bool
-    grid_snap: str
 
     chord_prob: float
     sustain_len: float

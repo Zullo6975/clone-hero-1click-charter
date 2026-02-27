@@ -88,9 +88,7 @@ def _compute_rolling_density(times: list[float], duration: float) -> list[dict]:
 
 
 def _assign_lane(prev_lane: int, curr_pitch: float | None, prev_pitch: float | None, rng: random.Random, cfg: ChartConfig) -> int:
-    options = [0, 1, 2, 3]
-    if cfg.allow_orange:
-        options.append(4)
+    options = [0, 1, 2, 3, 4]
 
     weights = []
     for lane in options:
@@ -136,7 +134,7 @@ def generate_expert_notes(times: list[float], pitches: list[float], beat_times: 
 
     measure_notes = {}
     pattern_memory = {}
-    if cfg.rhythmic_glue and len(beat_times) > 4:
+    if len(beat_times) > 4:
         for i, t in enumerate(times):
             m_idx, m_offset = _quantize_to_measure(t, beat_times)
             measure_notes.setdefault(m_idx, []).append((m_offset, i))
@@ -154,7 +152,7 @@ def generate_expert_notes(times: list[float], pitches: list[float], beat_times: 
         is_chord = False
         found_memory = False
 
-        if cfg.rhythmic_glue and len(beat_times) > 4:
+        if len(beat_times) > 4:
             m_idx, m_offset = _quantize_to_measure(t, beat_times)
             sig = ""
             if m_idx in measure_notes:
@@ -177,7 +175,7 @@ def generate_expert_notes(times: list[float], pitches: list[float], beat_times: 
             if rng.random() < cfg.chord_prob:
                 is_chord = True
 
-            if cfg.rhythmic_glue and len(beat_times) > 4:
+            if len(beat_times) > 4:
                 m_idx, m_offset = _quantize_to_measure(t, beat_times)
                 if m_idx in measure_notes:
                     offsets = sorted([x[0] for x in measure_notes[m_idx]])
@@ -197,8 +195,6 @@ def generate_expert_notes(times: list[float], pitches: list[float], beat_times: 
         lanes = [lane]
         if is_chord:
             opts = [l for l in [lane-1, lane+1] if 0 <= l <= 4]
-            if not cfg.allow_orange:
-                opts = [l for l in opts if l != 4]
             if opts:
                 l2 = rng.choice(opts)
                 lanes.append(l2)
@@ -319,7 +315,7 @@ def write_real_notes_mid(
     # Grid Snap
     if len(beat_times) > 1:
         grid = []
-        divs = {"1/4": 1, "1/8": 2, "1/16": 4}.get(cfg.grid_snap, 2)
+        divs = 4  # 1/16 grid
         for i in range(len(beat_times)-1):
             s, e = beat_times[i], beat_times[i+1]
             span = e - s

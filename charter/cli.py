@@ -39,19 +39,16 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--min-gap-ms", type=int, default=140)
     p.add_argument("--seed", type=int, default=42)
 
-    # New Knobs
-    p.add_argument("--no-orange", action="store_true")
+    # Note Knobs
     p.add_argument("--chord-prob", type=float, default=0.12)
     p.add_argument("--sustain-len", type=float, default=0.5)
     p.add_argument("--movement-bias", type=float, default=0.5)
-    p.add_argument("--grid-snap", default="1/8")
 
     # Sustain Tuning (v1.1.2)
     p.add_argument("--sustain-threshold", type=float, default=0.8)
     p.add_argument("--sustain-buffer", type=float, default=0.25)
 
     # Rhythm (v1.2)
-    p.add_argument("--no-rhythmic-glue", action="store_true")
     p.add_argument("--no-stats", action="store_true")
 
     # Manual Overrides (v1.2)
@@ -107,14 +104,11 @@ def main():
         max_nps=args.max_nps,
         min_gap_ms=args.min_gap_ms,
         seed=args.seed,
-        allow_orange=not args.no_orange,
         chord_prob=args.chord_prob,
         sustain_len=args.sustain_len,
         movement_bias=args.movement_bias,
-        grid_snap=args.grid_snap,
         sustain_threshold=args.sustain_threshold,
         sustain_buffer=args.sustain_buffer,
-        rhythmic_glue=not args.no_rhythmic_glue,
         hard_min_gap_ms=args.hard_gap_ms,
         medium_min_gap_ms=args.med_gap_ms,
         easy_min_gap_ms=args.easy_gap_ms,
